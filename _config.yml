@@ -1,0 +1,26 @@
+title: Dragan Djuric
+subtitle: Programming, Machine Learning, Data Analysis, Bayesian
+author: Dragan Djuric
+simple_search: http://google.com/search
+description: Dragan Djuric and his writings
+name: tufte
+markdown: kramdown
+markdown_ext: "markdown,mkdown,mkdn,mkd,md"
+permalink: /articles/:short_year/:title
+timezone: Europe/Belgrade
+excerpt_separator: <!--more-->  # you can specify your own separator, of course.
+exclude: ['Gemfile', 'Gemfile.lock', 'Rakefile', 'UploadToGithub.Rakefile', 'README.md']
+post:
+  template: _post.txt
+  extension: md
+page:
+  template: _page.txt
+  extension: md
+editor: emacsclient
+git:
+  branch: master
+transfer:
+  command: rsync
+  settings: -av
+  source: _site/
+  destination: ~/Git/blueberry.github.com/
