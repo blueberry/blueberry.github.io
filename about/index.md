@@ -9,7 +9,7 @@ When I'm not running, working out, dancing, reading, and pleasantly wasting time
 
 I live in [Belgrade](https://en.wikipedia.org/wiki/Belgrade), [Serbia](https://en.wikipedia.org/wiki/Serbia); if you are curious, it's in the southern part of Europe, just across the Adriatic Sea from Italy, to the North-West.
 
-{% fullwidth "https://upload.wikimedia.org/wikipedia/commons/thumb/d/db/The_confluence_of_the_Sava_into_the_Danube_at_Belgrade.jpg/1280px-The_confluence_of_the_Sava_into_the_Danube_at_Belgrade.jpg" "Belgrade's main rivers, Danube and Sava" %}
+![Belgrade's main rivers, Danube and Sava](https://upload.wikimedia.org/wikipedia/commons/thumb/d/db/The_confluence_of_the_Sava_into_the_Danube_at_Belgrade.jpg/1280px-The_confluence_of_the_Sava_into_the_Danube_at_Belgrade.jpg)
 
 I started using [Clojure](http://clojure.org/) as my main programming language in 2009 (wow, that was long ago!), and I also managed to sneak it into the curriculum in 2010 (don't ask me how I managed to do that), so I also teach it at the university. One thing lead to another, and soon enough, I started using [Emacs](http://batsov.com/prelude/) as my primary development environment. I am also interested in machine learning, and, since I'm often hard-headed, that means the probabilistic, Bayesian kind of machine learning, data analysis, and related fields.
 
