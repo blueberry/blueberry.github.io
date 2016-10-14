@@ -1,14 +1,14 @@
-_site
+
 .sass-cache
 .DS\_Store
 config.codekit
 .bundle
 .DS_Store
 .rvmrc
-_site
+
 bin
 source/tmp/*
-_site/*
+
 .sass-cache/*
 *.sassc
 *\#*
