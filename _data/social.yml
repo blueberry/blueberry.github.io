@@ -2,5 +2,5 @@
   icon: icon-twitter
 - link: //github.com/blueberry
   icon: icon-github
-- link: /feed
+- link: /feed.xml
   icon: icon-feed
