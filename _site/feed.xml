@@ -3,10 +3,10 @@
   <channel>
     <title>Dragan Djuric</title>
     <description>Dragan Djuric and his writings</description>
-    <link>/</link>
-    <atom:link href="/feed.xml" rel="self" type="application/rss+xml"/>
-    <pubDate>Fri, 14 Oct 2016 12:46:50 +0200</pubDate>
-    <lastBuildDate>Fri, 14 Oct 2016 12:46:50 +0200</lastBuildDate>
+    <link>http://localhost:4000/</link>
+    <atom:link href="http://localhost:4000/feed.xml" rel="self" type="application/rss+xml"/>
+    <pubDate>Fri, 14 Oct 2016 12:50:40 +0200</pubDate>
+    <lastBuildDate>Fri, 14 Oct 2016 12:50:40 +0200</lastBuildDate>
     <generator>Jekyll v3.3.0</generator>
     
       <item>
@@ -58,8 +58,8 @@ aatastaaasrtar
 &lt;/div&gt;
 </description>
         <pubDate>Thu, 13 Oct 2016 00:00:00 +0200</pubDate>
-        <link>/articles/16/2016-10-13-proba3</link>
-        <guid isPermaLink="true">/articles/16/2016-10-13-proba3</guid>
+        <link>http://localhost:4000/articles/16/2016-10-13-proba3</link>
+        <guid isPermaLink="true">http://localhost:4000/articles/16/2016-10-13-proba3</guid>
         
         <category>dummy-tags-should-be-replaced</category>
         
