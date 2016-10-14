@@ -18,7 +18,7 @@ This blog is a place where I'll write about my journey of trying (and eventually
 1. By sharing here some thoughts about the things I'm experimenting with, learning, or working on, and *inspiring you* to join in.
 2. By creating open source Clojure libraries that can *help you apply what i "preach"*; you can find those at [Uncomplicate Clojure Project](http://uncomplicate.org). Make sure you check it out, it already provides excellent, working, state-of-the-art performance!
 
-** My profiles
+## My profiles
 
 - [Google Scholar](https://scholar.google.com/citations?user=bDd0r1gAAAAJ)
 - [Good Old AI](http://goodoldai.org/dragan_djuric)
