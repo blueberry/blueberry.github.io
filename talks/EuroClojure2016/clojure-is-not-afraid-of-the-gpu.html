@@ -1,0 +1,1827 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Clojure is not afraid of the GPU</title>
+<meta name="author" content="(Dragan Djuric)"/>
+<style type="text/css">
+.underline { text-decoration: underline; }
+</style>
+<link rel="stylesheet" href="http://cdn.jsdelivr.net/reveal.js/3.0.0/css/reveal.css"/>
+
+<link rel="stylesheet" href="http://cdn.jsdelivr.net/reveal.js/3.0.0/css/theme/beige.css" id="theme"/>
+
+<link rel="stylesheet" href="noborder.css"/>
+
+<!-- If the query includes 'print-pdf', include the PDF print sheet -->
+<script>
+    if( window.location.search.match( /print-pdf/gi ) ) {
+        var link = document.createElement( 'link' );
+        link.rel = 'stylesheet';
+        link.type = 'text/css';
+        link.href = 'http://cdn.jsdelivr.net/reveal.js/3.0.0/css/print/pdf.css';
+        document.getElementsByTagName( 'head' )[0].appendChild( link );
+    }
+</script>
+<script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+<section id="sec-title-slide"><h2>Clojure is not afraid of the GPU</h2><h3>Dragan Djuric</h3><strong><a href="mailto:dragandj@gmail.com">dragandj@gmail.com</a></strong>
+</section>
+
+<section>
+<section id="slide-orgheadline2">
+<h2 id="orgheadline2">Dragan Djuric</h2>
+<ul>
+<li>new! blog <a href="http://dragan.rocks">http://dragan.rocks</a></li>
+<li>pronounce as you please :)</li>
+<li>Professor of Software Engineering</li>
+<li>University of Belgrade</li>
+<li>Clojure as a primary language since <b>2009</b></li>
+<li>Teach Clojure since 2010</li>
+<li>dragandj@gmail.com</li>
+<li>github: blueberry / uncomplicate</li>
+<li><a href="http://uncomplicate.org">http://uncomplicate.org</a></li>
+
+</ul>
+
+
+<aside class="notes">
+<p>
+My name is Dragan Djuric, I am a professor of software engineering at
+the University of Belgrade, and, surprisingly, I enjoy doing actual programming :)
+I've been using Clojure as my primary programming language since 2009,
+and I managed to sneak it in the curriculum in 2010.
+You can find me on github, and I have just started writing a blog!
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgheadline1">
+<h3 id="orgheadline1">My Hammock</h3>
+
+<div class="figure">
+<p><img src="gaston1.jpg" alt="gaston1.jpg" />
+</p>
+</div>
+
+<aside class="notes">
+<p>
+I saw that Rich Hickey has his hammock,
+and I liked that idea, so I also have a hammock. Maybe that's not overly productive,
+but when I need my hammock time, and there is a tree missing,
+I don't just throw my hands up in the air!
+</p>
+
+</aside>
+
+</section>
+</section>
+<section>
+<section id="slide-orgheadline8">
+<h2 id="orgheadline8">Four Horsemen of the Apocalypse</h2>
+<ul>
+<li>lisp</li>
+<li>Emacs</li>
+<li>native libraries</li>
+<li>Graphical Processing Units</li>
+
+</ul>
+
+<aside class="notes">
+<p>
+Now, in Stephen Kings' guide to beyond Java, I guess the main villains would have been those four.
+Remember those times when you heard about those crazy lispers and their "lisp"?
+It felt so alien! But, now, those weird parentheses are the most natural thing ever!
+When I first saw Emacs, it certainly looked weird: ugly, barren, does not have any bells and whistles&#x2026;
+&#x2026;not out of the box! Once I'd "get it" - every IDE looks ridiculous.
+Today, <b>I hope to convince you</b> that native libraries and GPUs are conquerable, too!
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgheadline3">
+<h3 id="orgheadline3">Clojure is great!</h3>
+<ul>
+<li>Dynamic <b>and</b> fast</li>
+<li>First-class functions</li>
+<li>Great abstractions and data structures</li>
+<li>Many useful libraries</li>
+<li>Even more experimental libraries</li>
+<li>Access to Java and the JVM</li>
+<li>Hey, the community is amazing!</li>
+
+</ul>
+
+<aside class="notes">
+<p>
+Clojure is great! I'm sure no one here needs to be reminded of that.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgheadline4">
+<h3 id="orgheadline4">Good at number crunching?</h3>
+<ul>
+<li>Good? maybe.</li>
+<li>Great? NO!</li>
+<li>JVM - no access to hardware-specific optimizations</li>
+
+<li>We can make it great!</li>
+
+</ul>
+
+<aside class="notes">
+<p>
+But, is it good at number crunching?
+It is certainly not bad, but compared to what's available elsewhere, it is not great either.
+One of my goals is to make Clojure great for implementing numerical-heavy algorithms.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgheadline5">
+<h3 id="orgheadline5">CPU is not so great either!</h3>
+<ul>
+<li>R, Python? Even worse than Java.</li>
+<li>C? complicated, verbose platform-specific optimizations.</li>
+<li>CPU? too beefed-up. Burns as the Sun!</li>
+
+</ul>
+
+<aside class="notes">
+<p>
+What about other managed platforms? Those are even worse than JVM when it comes
+to number crunching. It is true that they have rich libraries that fall back
+to native code, but&#x2026; when you need to write some of that native code&#x2026; brrrr!
+And CPU itself is not so great either! CPUs have rich instruction sets, but
+that requires lots of transistors that devours energy.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgheadline6">
+<h3 id="orgheadline6">GPU has a lot to offer &#x2026;at a price</h3>
+<ul>
+<li>many dumb computing units</li>
+<li>but, power-efficient for number crunching</li>
+<li>hardware support for massive parallelism</li>
+<li>faster and cheaper each year</li>
+<li><b>notoriously difficult to program</b></li>
+
+</ul>
+
+<aside class="notes">
+<p>
+&#x2026;which brings us to GPUs. GPUs contain very simple computing units, but it is
+possible to pack many of those on one chip!
+The features that are provided are exactly the numerical operations and parallelization
+support that we need! They are more powerful and cheaper each year.
+It's a shame that the programming platforms are from the stone age!
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgheadline7">
+<h3 id="orgheadline7">Uncomplicate</h3>
+<dl>
+<dt><font color = "DeepPink">Fluokitten</font></dt><dd>monadic and other fluorescent fuzzy little things</dd>
+<dt><font color = "green">ClojureCL</font></dt><dd>take control of the GPU, CPU, and accelerators from Clojure</dd>
+<dt><font color = "indigo">Neanderthal</font></dt><dd>vectors and matrices, but optimized for CPU and GPU</dd>
+<dt><font color = "OrangeRed">Bayadera</font></dt><dd>high performance Bayesian statistics and data analysis on the GPU</dd>
+
+</dl>
+
+<aside class="notes">
+<p>
+Uncomplicate is a family of open-source Clojure libraries for scientific and high-performance computing.
+My main goal was to create a state-of-the art Bayesian machine learning infrastructure. For that to fly,
+I also had to provide lower-level libraries, since what was available at the time on JVM, was lot worse
+than the best tools available elsewhere.
+ClojureCL is a Clojure library for taking <b>full</b> control of the GPU with minimal overhead.
+Neanderthal leverages battle-tested native linear algebra libraries for the CPU and latest GPU libraries
+to provide the full-speed matrix support tailored to Clojure with almost no overhead.
+Bayadera goes beyond that - a library for Bayesian statistics on the GPU that is much faster than
+the fastest available mainstream offerings!
+I hope this can become an infrastructure that can help in making Clojure
+the fastest and most pleasant environment for programming machine learning solutions!
+ <b>With your help!</b>
+</p>
+
+</aside>
+
+</section>
+</section>
+<section>
+<section id="slide-orgheadline16">
+<h2 id="orgheadline16">Hello world: dot product</h2>
+<div>
+\begin{gather*}
+\vec{x} = [x_1, x_2,\ldots, x_n]\\
+\vec{y} = [y_1, y_2,\ldots, y_n]\\
+\vec{x} \cdot \vec{y} = \sum_{i=1}^n x_i y_i
+\end{gather*}
+
+</div>
+
+
+<div class="figure">
+<p><object type="image/svg+xml" data="dot.svg" >
+Sorry, your browser does not support SVG.</object>
+</p>
+</div>
+
+<ul>
+<li>\(O(n)\): linear, one loop</li>
+<li>\(2n\) FLOPS, \(2n\) reads</li>
+
+</ul>
+
+<aside class="notes">
+<p>
+Let's dive straight into the code. Dot product is one of the simplest vectorized operations.
+To make it less abstract, let's say \(\vec{x}\) is a vector of quantities of various products sold
+and \(\vec{y}\) a vector of prices per unit. Dot product computes the total amount in
+dollars that we earned.
+</p>
+
+<p>
+The diagram shows that corresponding elements are multiplied and the results
+summed up to give the final result.
+</p>
+
+<p>
+It is rather simple and scales linearly, needing 2n floating point operations, and 2n reads. Easy stuff&#x2026;
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgheadline9">
+<h3 id="orgheadline9">Idiomatic Clojure</h3>
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><span style="color: #6c71c4;">(</span><span style="color: #6c71c4; font-weight: bold;">let</span> <span style="color: #268bd2;">[</span>dot-product <span style="color: #2aa198;">(</span><span style="color: #6c71c4; font-weight: bold;">fn</span> <span style="color: #859900;">[</span>xs ys<span style="color: #859900;">]</span>
+                    <span style="color: #859900;">(</span>reduce + <span style="color: #b58900;">(</span>map * xs ys<span style="color: #b58900;">)</span><span style="color: #859900;">)</span><span style="color: #2aa198;">)</span>
+
+      x-vec <span style="color: #2aa198;">(</span>vec <span style="color: #859900;">(</span>range 100000<span style="color: #859900;">)</span><span style="color: #2aa198;">)</span>
+      y-vec <span style="color: #2aa198;">(</span>vec <span style="color: #859900;">(</span>range 100000<span style="color: #859900;">)</span><span style="color: #2aa198;">)</span><span style="color: #268bd2;">]</span>
+
+  <span style="color: #268bd2;">(</span>dot-product x-vec y-vec<span style="color: #268bd2;">)</span><span style="color: #6c71c4;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+333328333350000
+</pre>
+
+<p class="fragment (appear)">
+Execution time: 14 ms
+</p>
+
+<aside class="notes">
+<p>
+&#x2026;It's in fact so easy, that it's a one-liner in Clojure.
+Map over xs and ys with multiplication and reduce the result using addition.
+</p>
+
+<p>
+How fast is it?
+</p>
+
+<p>
+&#x2026;
+</p>
+
+<p>
+14 ms for 100,000 elements. Looks pretty fast to me!
+If we are using such function as a small part of a huge algorithm, though,
+this execution time can be a problem!
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgheadline10">
+<h3 id="orgheadline10">loop/recur</h3>
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><span style="color: #6c71c4;">(</span><span style="color: #6c71c4; font-weight: bold;">let</span> <span style="color: #268bd2;">[</span>dot-product <span style="color: #2aa198;">(</span><span style="color: #6c71c4; font-weight: bold;">fn</span> <span style="color: #859900;">[</span>xs ys<span style="color: #859900;">]</span>
+                    <span style="color: #859900;">(</span><span style="color: #6c71c4; font-weight: bold;">loop</span> <span style="color: #b58900;">[</span>res 0.0
+                           x <span style="color: #cb4b16;">(</span>first xs<span style="color: #cb4b16;">)</span> xs <span style="color: #cb4b16;">(</span>next xs<span style="color: #cb4b16;">)</span>
+                           y <span style="color: #cb4b16;">(</span>first ys<span style="color: #cb4b16;">)</span> ys <span style="color: #cb4b16;">(</span>next ys<span style="color: #cb4b16;">)</span><span style="color: #b58900;">]</span>
+                      <span style="color: #b58900;">(</span><span style="color: #6c71c4; font-weight: bold;">if</span> <span style="color: #cb4b16;">(</span><span style="color: #6c71c4; font-weight: bold;">and</span> x y<span style="color: #cb4b16;">)</span>
+                        <span style="color: #cb4b16;">(</span><span style="color: #6c71c4; font-weight: bold;">recur</span>  <span style="color: #dc322f;">(</span>+ res <span style="color: #839496;">(</span>* <span style="color: #586e75;">(</span>double x<span style="color: #586e75;">)</span> <span style="color: #586e75;">(</span>double y<span style="color: #586e75;">)</span><span style="color: #839496;">)</span><span style="color: #dc322f;">)</span>
+                                <span style="color: #dc322f;">(</span>first xs<span style="color: #dc322f;">)</span> <span style="color: #dc322f;">(</span>next xs<span style="color: #dc322f;">)</span>
+                                <span style="color: #dc322f;">(</span>first ys<span style="color: #dc322f;">)</span> <span style="color: #dc322f;">(</span>next ys<span style="color: #dc322f;">)</span><span style="color: #cb4b16;">)</span>
+                        res<span style="color: #b58900;">)</span><span style="color: #859900;">)</span><span style="color: #2aa198;">)</span>
+
+      x <span style="color: #2aa198;">(</span>vec <span style="color: #859900;">(</span>range 100000<span style="color: #859900;">)</span><span style="color: #2aa198;">)</span>
+      y <span style="color: #2aa198;">(</span>vec <span style="color: #859900;">(</span>range 100000<span style="color: #859900;">)</span><span style="color: #2aa198;">)</span><span style="color: #268bd2;">]</span>
+
+  <span style="color: #268bd2;">(</span>dot-product x y<span style="color: #268bd2;">)</span><span style="color: #6c71c4;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+3.3332833335E14
+</pre>
+
+<p class="fragment (appear)">
+Execution time: 2 ms
+</p>
+
+<aside class="notes">
+<p>
+Naturally, we seek for a faster, if a bit uglier, solution.
+</p>
+
+<p>
+Can direct recursion help?
+</p>
+
+<p>
+&#x2026;
+</p>
+
+<p>
+Yes, but not that much. Not even an order of magnitude.
+Which is fine, but often not enough.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgheadline11">
+<h3 id="orgheadline11">Intermezzo: <font color = "DeepPink">Fluokitten</font></h3>
+<ul>
+<li>"Monadic" functions in Clojure</li>
+<li>preserve the type of arguments</li>
+<li><code>fold</code> (a more versatile reduction)</li>
+<li><code>fmap</code></li>
+<li><code>foldmap</code>: map/reduce</li>
+<li>&#x2026;and much more&#x2026;</li>
+
+</ul>
+
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><span style="color: #6c71c4;">(</span>use '<span style="color: #b58900; font-weight: bold;">uncomplicate.fluokitten.core</span><span style="color: #6c71c4;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><span style="color: #6c71c4;">(</span><span style="color: #6c71c4; font-weight: bold;">let</span> <span style="color: #268bd2;">[</span>x-vec <span style="color: #2aa198;">(</span>vec <span style="color: #859900;">(</span>range 100000<span style="color: #859900;">)</span><span style="color: #2aa198;">)</span>
+      y-vec <span style="color: #2aa198;">(</span>vec <span style="color: #859900;">(</span>range 100000<span style="color: #859900;">)</span><span style="color: #2aa198;">)</span><span style="color: #268bd2;">]</span>
+
+  <span style="color: #268bd2;">(</span>foldmap + 0.0 * x-vec y-vec<span style="color: #268bd2;">)</span><span style="color: #6c71c4;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+3.3332833335E14
+</pre>
+
+<p class="fragment (appear)">
+Execution time: 4 ms (2.5 ms with primitive fn)
+</p>
+
+<aside class="notes">
+<p>
+As a side note, fluokitten's functions can give us best of both worlds in such cases:
+</p>
+<ul>
+<li>top speed available for the data structure at hand</li>
+<li>at high-level of abstraction</li>
+<li>and compact code</li>
+
+</ul>
+
+</aside>
+
+</section>
+<section id="slide-orgheadline12">
+<h3 id="orgheadline12">Primitive Java arrays</h3>
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><span style="color: #6c71c4;">(</span><span style="color: #6c71c4; font-weight: bold;">let</span> <span style="color: #268bd2;">[</span>dot-product <span style="color: #2aa198;">(</span><span style="color: #6c71c4; font-weight: bold;">fn</span> ^double <span style="color: #859900;">[</span>^doubles xs ^doubles ys<span style="color: #859900;">]</span>
+                      <span style="color: #859900;">(</span><span style="color: #6c71c4; font-weight: bold;">let</span> <span style="color: #b58900;">[</span>n <span style="color: #cb4b16;">(</span>alength xs<span style="color: #cb4b16;">)</span><span style="color: #b58900;">]</span>
+                        <span style="color: #b58900;">(</span><span style="color: #6c71c4; font-weight: bold;">loop</span> <span style="color: #cb4b16;">[</span>i 0 res 0.0<span style="color: #cb4b16;">]</span>
+                          <span style="color: #cb4b16;">(</span><span style="color: #6c71c4; font-weight: bold;">if</span> <span style="color: #dc322f;">(</span>&lt; i n<span style="color: #dc322f;">)</span>
+                            <span style="color: #dc322f;">(</span><span style="color: #6c71c4; font-weight: bold;">recur</span> <span style="color: #839496;">(</span>inc i<span style="color: #839496;">)</span> <span style="color: #839496;">(</span>+ res <span style="color: #586e75;">(</span>* <span style="color: #6c71c4;">(</span>aget xs i<span style="color: #6c71c4;">)</span>
+                                                     <span style="color: #6c71c4;">(</span>aget ys i<span style="color: #6c71c4;">)</span><span style="color: #586e75;">)</span><span style="color: #839496;">)</span><span style="color: #dc322f;">)</span>
+                            res<span style="color: #cb4b16;">)</span><span style="color: #b58900;">)</span><span style="color: #859900;">)</span><span style="color: #2aa198;">)</span>
+
+        x-arr <span style="color: #2aa198;">(</span>double-array <span style="color: #859900;">(</span>range 100000<span style="color: #859900;">)</span><span style="color: #2aa198;">)</span>
+        y-arr <span style="color: #2aa198;">(</span>double-array <span style="color: #859900;">(</span>range 100000<span style="color: #859900;">)</span><span style="color: #2aa198;">)</span><span style="color: #268bd2;">]</span>
+
+  <span style="color: #268bd2;">(</span>dot-product x-arr y-arr<span style="color: #268bd2;">)</span><span style="color: #6c71c4;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+3.3332833335E14
+</pre>
+
+<p class="fragment (appear)">
+Execution time: 76 &mu;s
+</p>
+
+<aside class="notes">
+<p>
+When it comes to numerical algorithms, and we have lots of computations,
+and we need speed, it always pays off to turn to primitives.
+In vanilla Clojure, that means Java arrays.
+</p>
+
+<p>
+&#x2026;
+</p>
+
+<ul>
+<li>We sped our code by 30 times!</li>
+<li>Paying the price with uglier low-level code and mutability</li>
+
+</ul>
+
+</aside>
+
+</section>
+<section id="slide-orgheadline13">
+<h3 id="orgheadline13"><font color = "indigo">Neanderthal</font>: using optimized library</h3>
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><span style="color: #6c71c4;">(</span>use '<span style="color: #268bd2;">(</span><span style="color: #b58900; font-weight: bold;">uncomplicate.neanderthal</span> core native<span style="color: #268bd2;">)</span><span style="color: #6c71c4;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><span style="color: #6c71c4;">(</span><span style="color: #6c71c4; font-weight: bold;">let</span> <span style="color: #268bd2;">[</span>x <span style="color: #2aa198;">(</span>dv <span style="color: #859900;">(</span>range 100000<span style="color: #859900;">)</span><span style="color: #2aa198;">)</span>
+      y <span style="color: #2aa198;">(</span>copy x<span style="color: #2aa198;">)</span><span style="color: #268bd2;">]</span>
+
+  <span style="color: #268bd2;">(</span>dot x y<span style="color: #268bd2;">)</span><span style="color: #6c71c4;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+3.3332833335E14
+</pre>
+
+<ul>
+<li class="fragment appear">Execution time (single thread!): 32 &mu;s</li>
+<li class="fragment appear">what a disappointment :(</li>
+<li class="fragment appear">patience, please&#x2026;</li>
+
+</ul>
+
+<aside class="notes">
+<p>
+What can we expect from an optimized matrix library - Neanderthal?
+</p>
+
+<p>
+&#x2026;
+</p>
+
+<ul>
+<li>faster even than primitive Java arrays</li>
+<li>while providing elegant API</li>
+
+</ul>
+
+<p>
+&#x2026;
+</p>
+
+<p>
+But, only a couple of times faster than Java arrays? Isn't that pathetic? Who would bother?
+</p>
+
+<p>
+Be patient&#x2026;
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgheadline14">
+<h3 id="orgheadline14"><font color = "indigo">Neanderthal</font>: a taste of GPU</h3>
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><span style="color: #6c71c4;">(</span>use '<span style="color: #b58900; font-weight: bold;">uncomplicate.clojurecl.core</span><span style="color: #6c71c4;">)</span>
+<span style="color: #6c71c4;">(</span>use '<span style="color: #b58900; font-weight: bold;">uncomplicate.neanderthal.opencl</span><span style="color: #6c71c4;">)</span>
+<span style="color: #6c71c4;">(</span>use '<span style="color: #b58900; font-weight: bold;">uncomplicate.commons.core</span><span style="color: #6c71c4;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><span style="color: #6c71c4;">(</span>with-default
+  <span style="color: #268bd2;">(</span>with-default-engine
+    <span style="color: #2aa198;">(</span>with-release <span style="color: #859900;">[</span>gpu-x <span style="color: #b58900;">(</span>clv <span style="color: #cb4b16;">(</span>range 100000<span style="color: #cb4b16;">)</span><span style="color: #b58900;">)</span>
+                   gpu-y <span style="color: #b58900;">(</span>copy gpu-x<span style="color: #b58900;">)</span><span style="color: #859900;">]</span>
+
+      <span style="color: #859900;">(</span>dot gpu-x gpu-y<span style="color: #859900;">)</span><span style="color: #2aa198;">)</span><span style="color: #268bd2;">)</span><span style="color: #6c71c4;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+3.33328318201856E14
+</pre>
+
+<ul>
+<li class="fragment appear">Execution time: <font color = "red">327</font> &mu;s</li>
+<li class="fragment appear">Something is surely not right here!</li>
+
+</ul>
+
+<aside class="notes">
+<p>
+Let's try Neanderthal's support for GPUs. I've heard Google and Facebook get
+insane speed using those. Neanderthal's API supports pluggable engines,
+and the GPU engine has already been provided.
+The API stays the same, while we use ClojureCL to set up our hardware.
+</p>
+
+<p>
+&#x2026;
+</p>
+
+<p>
+This is not a bad result, I mean, it's still faster than Clojure loops, but this
+is 4 times slower than Java arrays, and&#x2026; exactly 10 times slower than Neanderthal's
+CPU engine!
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgheadline15">
+<h3 id="orgheadline15">Sending a fleet to catch a few shrimps</h3>
+<ul>
+<li>parallelization suitability
+<ul>
+<li><i>map</i> :)</li>
+<li><i>reduce</i> :(</li>
+
+</ul></li>
+<li>fixed GPU calling costs (dozen(s) &mu;s)</li>
+<li>programming complexity!</li>
+
+</ul>
+
+<aside class="notes">
+<p>
+Remember the movie Forrest Gump? When you use the huge boat to catch a few shrimps,
+it does not pay off. If you want to do shrimping for a living, you better catch
+millions. And, if you only need a handful, just go to the fish market
+</p>
+
+<p>
+Mainly, you need to be sure of two things:
+</p>
+<ol>
+<li>your algorithm is suitable for GPUs. Luckily, there is lots of similarities to functional programming. Algorithms that need to map over elements are typically</li>
+
+</ol>
+<p>
+embarrassingly parallel, while reducing requires much more effort.
+</p>
+<ol>
+<li>You have to have lots and lots of data.</li>
+
+</ol>
+
+<p>
+Parallel programming is not trivial!
+</p>
+
+</aside>
+
+</section>
+</section>
+<section>
+<section id="slide-orgheadline23">
+<h2 id="orgheadline23">Hello (a slightly larger) world</h2>
+<div>
+\begin{gather*}
+C_{m\times n} = A_{m\times r}\, B_{r\times n}\\
+c_{ij} = \sum_{k=1}^r a_{ik} b_{kj}\,.\\
+c_{ij} = \vec{a_i}\cdot \vec{b_j}\,!
+\end{gather*}
+
+</div>
+
+<ul>
+<li>\(O(mnr)\) (qubic, triple nested loop)</li>
+<li>\(2mnr\) FLOPS, complex read/write patterns</li>
+
+</ul>
+
+<aside class="notes">
+<p>
+A typical example of a computationally expensive algorithm is matirix multiplication.
+If we have two matrices, \(A\) and \(B\), with dimensions m x r and r x n,
+and multiply them, we get matrix \(C\), where each element is a dot product of
+the respective row of \(A\) and column of \(B\).
+</p>
+
+<p>
+The complexity is qubic, and it requires complex memory reads/writes, which
+causes this straightforward algorithm to be a challenge to implement.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgheadline17">
+<h3 id="orgheadline17">Idiomatic(?) Clojure</h3>
+<p>
+Adapted from <a href="https://rosettacode.org/wiki/Matrix_multiplication#Clojure">Rosetta Code</a> (realize seqs with  <code>doall</code>).
+</p>
+
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><span style="color: #6c71c4;">(</span><span style="color: #6c71c4; font-weight: bold;">let</span> <span style="color: #268bd2;">[</span>transpose <span style="color: #2aa198;">(</span><span style="color: #6c71c4; font-weight: bold;">fn</span> <span style="color: #859900;">[</span>s<span style="color: #859900;">]</span>
+                  <span style="color: #859900;">(</span><span style="color: #6c71c4; font-weight: bold;">doall</span> <span style="color: #b58900;">(</span>apply map vector s<span style="color: #b58900;">)</span><span style="color: #859900;">)</span><span style="color: #2aa198;">)</span>
+      nested-for <span style="color: #2aa198;">(</span><span style="color: #6c71c4; font-weight: bold;">fn</span> <span style="color: #859900;">[</span>f x y<span style="color: #859900;">]</span>
+                   <span style="color: #859900;">(</span><span style="color: #6c71c4; font-weight: bold;">doall</span> <span style="color: #b58900;">(</span>map <span style="color: #cb4b16;">(</span><span style="color: #6c71c4; font-weight: bold;">fn</span> <span style="color: #dc322f;">[</span>a<span style="color: #dc322f;">]</span>
+                                 <span style="color: #dc322f;">(</span><span style="color: #6c71c4; font-weight: bold;">doall</span> <span style="color: #839496;">(</span>map <span style="color: #586e75;">(</span><span style="color: #6c71c4; font-weight: bold;">fn</span> <span style="color: #6c71c4;">[</span>b<span style="color: #6c71c4;">]</span>
+                                               <span style="color: #6c71c4;">(</span>f a b<span style="color: #6c71c4;">)</span><span style="color: #586e75;">)</span>
+                                             y<span style="color: #839496;">)</span><span style="color: #dc322f;">)</span><span style="color: #cb4b16;">)</span>
+                               x<span style="color: #b58900;">)</span><span style="color: #859900;">)</span><span style="color: #2aa198;">)</span>
+      matrix-mult <span style="color: #2aa198;">(</span><span style="color: #6c71c4; font-weight: bold;">fn</span> <span style="color: #859900;">[</span>a b<span style="color: #859900;">]</span>
+                    <span style="color: #859900;">(</span>nested-for <span style="color: #b58900;">(</span><span style="color: #6c71c4; font-weight: bold;">fn</span> <span style="color: #cb4b16;">[</span>x y<span style="color: #cb4b16;">]</span> <span style="color: #cb4b16;">(</span>reduce + <span style="color: #dc322f;">(</span>map * x y<span style="color: #dc322f;">)</span><span style="color: #cb4b16;">)</span><span style="color: #b58900;">)</span>
+                                a
+                                <span style="color: #b58900;">(</span>transpose b<span style="color: #b58900;">)</span><span style="color: #859900;">)</span><span style="color: #2aa198;">)</span>
+
+      ma-vec <span style="color: #2aa198;">(</span>vec <span style="color: #859900;">(</span>take 64 <span style="color: #b58900;">(</span>cycle <span style="color: #cb4b16;">[</span><span style="color: #dc322f;">(</span>take 64 <span style="color: #839496;">(</span>cycle <span style="color: #586e75;">[</span>1 2 3 4<span style="color: #586e75;">]</span><span style="color: #839496;">)</span><span style="color: #dc322f;">)</span><span style="color: #cb4b16;">]</span><span style="color: #b58900;">)</span><span style="color: #859900;">)</span><span style="color: #2aa198;">)</span>
+      mb-vec <span style="color: #2aa198;">(</span>vec <span style="color: #859900;">(</span>take 64 <span style="color: #b58900;">(</span>cycle <span style="color: #cb4b16;">[</span><span style="color: #dc322f;">(</span>take 64 <span style="color: #839496;">(</span>cycle <span style="color: #586e75;">[</span>4 3 2 1<span style="color: #586e75;">]</span><span style="color: #839496;">)</span><span style="color: #dc322f;">)</span><span style="color: #cb4b16;">]</span><span style="color: #b58900;">)</span><span style="color: #859900;">)</span><span style="color: #2aa198;">)</span><span style="color: #268bd2;">]</span>
+
+  <span style="color: #268bd2;">(</span>matrix-mult ma-vec mb-vec<span style="color: #268bd2;">)</span><span style="color: #6c71c4;">)</span>
+</pre>
+</div>
+
+<p class="fragment (appear)">
+Execution time (a small matrix!): 40 ms
+</p>
+
+<aside class="notes">
+<p>
+The Clojure implementation seems straightforward (if not overly pretty).
+</p>
+
+<p>
+&#x2026;
+</p>
+
+<p>
+The running time is OK for stand-alone computations of small matrices,
+but as a part of larger algorithm, it is disastrous.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgheadline18">
+<h3 id="orgheadline18">Neanderthal to the rescue</h3>
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><span style="color: #6c71c4;">(</span><span style="color: #6c71c4; font-weight: bold;">let</span> <span style="color: #268bd2;">[</span>a <span style="color: #2aa198;">(</span>sge 64 64 <span style="color: #859900;">(</span>take <span style="color: #b58900;">(</span>* 64 64<span style="color: #b58900;">)</span> <span style="color: #b58900;">(</span>cycle <span style="color: #cb4b16;">[</span>1 2 3<span style="color: #cb4b16;">]</span><span style="color: #b58900;">)</span><span style="color: #859900;">)</span><span style="color: #2aa198;">)</span>
+      b <span style="color: #2aa198;">(</span>copy a<span style="color: #2aa198;">)</span><span style="color: #268bd2;">]</span>
+
+  <span style="color: #268bd2;">(</span>mm a b<span style="color: #268bd2;">)</span><span style="color: #6c71c4;">)</span>
+</pre>
+</div>
+
+<aside class="notes">
+<p>
+I'll skip trying to do this with primitive arrays, because it would only give
+us decent speedup if all the data fits into the cache. For anything larger,
+the memory access pattern would lead to the processor idling while data is
+constantly being pulled from the (slow) memory.
+</p>
+
+<p>
+Many number crunching algorithms can be expressed through standard LINALG operations,
+and we should use that whenever we can.
+</p>
+
+<p>
+It is much cleaner&#x2026;
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgheadline19">
+<h3 id="orgheadline19">Quick comparison</h3>
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">\(n\times{}n\)</th>
+<th scope="col" class="org-left">Neanderthal</th>
+<th scope="col" class="org-left">Optimized Java</th>
+<th scope="col" class="org-right">\(\times\)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left">2 \(\times\) 2</td>
+<td class="org-left">118 ns</td>
+<td class="org-left">57 ns</td>
+<td class="org-right">0.49</td>
+</tr>
+
+<tr>
+<td class="org-left">4 \(\times\) 4</td>
+<td class="org-left">143 ns</td>
+<td class="org-left">132 ns</td>
+<td class="org-right">0.93</td>
+</tr>
+
+<tr>
+<td class="org-left">16 \(\times\) 16</td>
+<td class="org-left">1.1 &mu;s</td>
+<td class="org-left">3.8 &mu;s</td>
+<td class="org-right">3.44</td>
+</tr>
+
+<tr>
+<td class="org-left">64 \(\times\) 64</td>
+<td class="org-left">47 &mu;s</td>
+<td class="org-left">211 &mu;s</td>
+<td class="org-right">4.46</td>
+</tr>
+
+<tr>
+<td class="org-left">128 \(\times\) 128</td>
+<td class="org-left">191 &mu;s</td>
+<td class="org-left">1.6 ms</td>
+<td class="org-right">8.14</td>
+</tr>
+
+<tr>
+<td class="org-left">256 \(\times\) 256</td>
+<td class="org-left">639 &mu;s</td>
+<td class="org-left">12 ms</td>
+<td class="org-right">18.85</td>
+</tr>
+
+<tr>
+<td class="org-left">1024 \(\times\) 1024</td>
+<td class="org-left">38 ms</td>
+<td class="org-left">751 ms</td>
+<td class="org-right">19.77</td>
+</tr>
+
+<tr>
+<td class="org-left">2048 \(\times\) 2048</td>
+<td class="org-left">288 ms</td>
+<td class="org-left">6 sec</td>
+<td class="org-right">20.91</td>
+</tr>
+
+<tr>
+<td class="org-left">8192 \(\times\) 8192</td>
+<td class="org-left">18 sec</td>
+<td class="org-left">6 min</td>
+<td class="org-right">20.62</td>
+</tr>
+</tbody>
+</table>
+
+<aside class="notes">
+<p>
+&#x2026;and faster! This is only an example of one operation, mm. However, this operation
+can indicate the overall performance of a library. Here, Neanderthal is
+compared to a well optimized Java matrix library.
+</p>
+
+<p>
+Note that in the \(64\times{}64\) case it is 1000 \(\times\) faster than naive Clojure.
+</p>
+
+<p>
+Note that Neanderthal is much faster than optimized Java not only with
+large matrices, but even with rather small ones, despite the FFI overhead!
+</p>
+
+<p>
+So, the folk wisdom that calling the native code pays off only
+for huge amount of data is a myth - if done rigth!
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgheadline20">
+<h3 id="orgheadline20">Huge matrices</h3>
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><span style="color: #6c71c4;">(</span>with-default
+  <span style="color: #268bd2;">(</span>with-default-engine
+    <span style="color: #2aa198;">(</span>with-release <span style="color: #859900;">[</span>cpu-a <span style="color: #b58900;">(</span>sge 8192 8192 <span style="color: #cb4b16;">(</span>take <span style="color: #dc322f;">(</span>* 64 64<span style="color: #dc322f;">)</span> <span style="color: #dc322f;">(</span>cycle <span style="color: #839496;">[</span>1 2 3<span style="color: #839496;">]</span><span style="color: #dc322f;">)</span><span style="color: #cb4b16;">)</span><span style="color: #b58900;">)</span>
+                   cpu-b <span style="color: #b58900;">(</span>copy cpu-a<span style="color: #b58900;">)</span>
+                   cpu-c <span style="color: #b58900;">(</span>zero cpu-a<span style="color: #b58900;">)</span>
+                   gpu-a <span style="color: #b58900;">(</span>transfer! cpu-a <span style="color: #cb4b16;">(</span>clge 8192 8192<span style="color: #cb4b16;">)</span><span style="color: #b58900;">)</span>
+                   gpu-b <span style="color: #b58900;">(</span>transfer! cpu-b <span style="color: #cb4b16;">(</span>clge 8192 8192<span style="color: #cb4b16;">)</span><span style="color: #b58900;">)</span>
+                   gpu-c <span style="color: #b58900;">(</span>zero gpu-a<span style="color: #b58900;">)</span><span style="color: #859900;">]</span>
+
+      <span style="color: #93a1a1;">;;</span><span style="color: #839496; font-style: italic;">(mm! cpu-a cpu-b cpu-c) ;;18 seconds!</span>
+      <span style="color: #859900;">(</span>mm! gpu-a gpu-b gpu-c<span style="color: #859900;">)</span>
+      <span style="color: #93a1a1;">;;</span><span style="color: #839496; font-style: italic;">GPU calls are asynchronous, measure with finish!</span>
+      #_<span style="color: #859900; font-style: italic;">(</span><span style="color: #839496; font-style: italic;">finish!</span><span style="color: #859900; font-style: italic;">)</span> <span style="color: #2aa198;">)</span><span style="color: #268bd2;">)</span>
+</pre>
+</div>
+
+<p class="fragment (appear)">
+Execution time (8192&times; 8192):
+</p>
+<ul>
+<li class="fragment appear">Neanderthal CPU (i7-4790k): 17885 ms</li>
+<li class="fragment appear">Neanderthal GPU (AMD Radeon R9 290X): <font color = "red">293</font> ms
+<ul>
+<li>60&times; faster than native CPU</li>
+<li><font color = "red">1200</font>&times; faster than optimized Java</li>
+<li>vs "idiomatic" Clojure?<font color = "red">&#x2026;many orders of magnitude</font></li>
+
+</ul></li>
+
+</ul>
+
+<aside class="notes">
+<p>
+Finally, let's see GPU in real action.
+</p>
+
+<p>
+&#x2026;
+</p>
+
+<p>
+CPU needs 18 seconds to multiply these large matrices..
+</p>
+
+<p>
+&#x2026;
+</p>
+
+<p>
+GPU does it in less than 300 &mu;s!
+</p>
+
+<p>
+&#x2026;
+</p>
+
+<p>
+That's 60 times faster!
+And when we compare with the optimized Java library, it's 1200 times faster!
+Versus handcrafted Clojure code? Who knows. It takes too long, I didin't have days
+to wait for it to finish!
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgheadline21">
+<h3 id="orgheadline21">&#x2026; and much more reusable stuff</h3>
+<ul>
+<li>subvectors</li>
+<li>submatrices</li>
+<li>columns/rows of (sub)matrices</li>
+<li>subvectors of columns/rows of (sub)matrices</li>
+<li>strides</li>
+<li>edge cases</li>
+<li>don't forget memory size!</li>
+<li>&#x2026;</li>
+
+</ul>
+
+<aside class="notes">
+<p>
+Neanderthal does not give you only LINALG operations. It comes with many convenient
+data management operations. It supports many edge cases. What if you need to take
+a submatrix out of a matrix, and then take a few columns, and multiply a submatrix
+of another matrix by those? A few lines with Neanderthal. Without it? Good luck :)
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgheadline22">
+<h3 id="orgheadline22">So What?</h3>
+<ul>
+<li>Is that it? A bunch of math-y operations?</li>
+<li>Do I need those?
+<ul>
+<li>often you do, even if you do not see it at first :)</li>
+<li>get standard operations for free</li>
+
+</ul></li>
+<li>But I <b>also</b> need to implement unique algorithm X&#x2026;
+<ul>
+<li><b>THAT</b> is the point of all this!</li>
+<li>ClojureCL to the rescue</li>
+
+</ul></li>
+
+</ul>
+
+<aside class="notes">
+<p>
+Now, is that all? Is everything you need just to use LINALG operations and your programs
+would magically fly? Of course not! The point is that you get these standard operations for free,
+BUT that is not enough. We all have use cases that are unique, and
+that leads us to the meat of this talk - how can you write <b>your own non-standard</b>
+algorithms?
+</p>
+
+</aside>
+
+</section>
+</section>
+<section>
+<section id="slide-orgheadline29">
+<h2 id="orgheadline29">Hello Raw GPU</h2>
+
+<div class="figure">
+<p><img src="opencl-in-action-book.jpg" alt="opencl-in-action-book.jpg" />
+</p>
+</div>
+
+<p>
+Regular Hello World ~ 170 lines of code!
+</p>
+
+<aside class="notes">
+<p>
+OpenCL is a standard that enables unified programming of GPUs, accelerators, and CPUs.
+It is supported on AMD, Intel, and Nvidia GPUS, Intel and AMD CPUs, and various devices.
+</p>
+
+<p>
+The problem: it uses the C language, and, while it is not as bad as various compiler-dependent
+optimizations, the code that manages the execution is very verbose,
+and the tools are a disaster. Nvidia's proprietary CUDA is not much better in
+that regard - Clojure is certainly more pleasant.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgheadline24">
+<h3 id="orgheadline24"><font color = "green">ClojureCL</font> to the rescue</h3>
+<ul>
+<li>OpenCL &amp; ClojureCL</li>
+<li>main concepts
+<ul>
+<li>platforms, devices, contexts, queues, programs</li>
+<li><b>kernels</b></li>
+<li>buffers</li>
+<li>memory: global, local, and private</li>
+
+</ul></li>
+<li><b>enqueuing</b> kernels
+<ul>
+<li>parallel mapping - easy!</li>
+<li>(parallel) reduction - (not so) hard!</li>
+
+</ul></li>
+<li><b>Learning</b>: examples from the book - in Clojure!</li>
+<li>example: dot product in ClojureCL</li>
+
+</ul>
+
+<aside class="notes">
+<p>
+ClojureCL is a library that enables you to take <b>all</b> advantages
+of OpenCL, while ameliorating most of its sticky points. You write your kernels,
+little optimized chunks of your algorithm, in a <b>simple</b> subset of C99, and everything
+else is done in Clojure.
+</p>
+
+<p>
+Things such as platforms, devices, contexts, asynchronous execution queues,
+programs, memory management, buffers - you control all those in Clojure.
+</p>
+
+<p>
+ClojureCL even comes with a toolbox that help with one of major pain points
+ in writing efficient massively parallel code; reduction kernels.
+</p>
+
+<p>
+I know all these concepts seem overwhelming; that's why in all Uncomplicate
+projects I include Clojure code that follows a major book for <b>learning</b> what is at hand!
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgheadline25">
+<h3 id="orgheadline25">Mapping: a kernel for \(x_i y_i\)</h3>
+<div class="org-src-container">
+
+<pre  class="src src-c">__kernel <span style="color: #b58900; font-weight: bold;">void</span> <span style="color: #268bd2;">multiply</span> (__global <span style="color: #b58900; font-weight: bold;">float</span>* <span style="color: #dc322f;">acc</span>,
+                        __global <span style="color: #b58900; font-weight: bold;">float</span>* <span style="color: #dc322f;">x</span>,
+                        __global <span style="color: #b58900; font-weight: bold;">float</span>* <span style="color: #dc322f;">y</span>) {
+
+    <span style="color: #b58900; font-weight: bold;">uint</span> <span style="color: #dc322f;">id</span> = get_global_id(0);
+    acc[id] = x[id] * y[id];
+}
+</pre>
+</div>
+
+<aside class="notes">
+<p>
+Finally! Some real GPU code. Ladies and gentlemen, this is a kernel. See?
+Nothing to be afraid of. In this particular case, it is analogous to a Clojure
+function that is going to be mapped over.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgheadline26">
+<h3 id="orgheadline26">Fire it off - this is the whole program!</h3>
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><span style="color: #6c71c4;">(</span>with-release <span style="color: #268bd2;">[</span>dev <span style="color: #2aa198;">(</span>first <span style="color: #859900;">(</span>sort-by-cl-version <span style="color: #b58900;">(</span>devices <span style="color: #cb4b16;">(</span>first <span style="color: #dc322f;">(</span>platforms<span style="color: #dc322f;">)</span><span style="color: #cb4b16;">)</span><span style="color: #b58900;">)</span><span style="color: #859900;">)</span><span style="color: #2aa198;">)</span>
+               ctx <span style="color: #2aa198;">(</span>context <span style="color: #859900;">[</span>dev<span style="color: #859900;">]</span><span style="color: #2aa198;">)</span>
+               cqueue <span style="color: #2aa198;">(</span>command-queue ctx dev<span style="color: #2aa198;">)</span><span style="color: #268bd2;">]</span>
+  <span style="color: #268bd2;">(</span><span style="color: #6c71c4; font-weight: bold;">let</span> <span style="color: #2aa198;">[</span>cnt 5 size <span style="color: #859900;">(</span>* 4 cnt<span style="color: #859900;">)</span> work-sizes <span style="color: #859900;">(</span>work-size <span style="color: #b58900;">[</span>cnt<span style="color: #b58900;">]</span><span style="color: #859900;">)</span>
+        result <span style="color: #859900;">(</span>float-array cnt<span style="color: #859900;">)</span>
+        program-source <span style="color: #859900;">(</span>slurp <span style="color: #b58900;">(</span><span style="color: #b58900; font-weight: bold;">clojure.java.io</span><span style="color: #586e75; background-color: #fdf6e3;">/</span>file <span style="color: #859900;">"multiply.cl"</span><span style="color: #b58900;">)</span><span style="color: #859900;">)</span><span style="color: #2aa198;">]</span>
+    <span style="color: #2aa198;">(</span>with-release <span style="color: #859900;">[</span>cl-x <span style="color: #b58900;">(</span>cl-buffer ctx size <span style="color: #cb4b16;">:read-only</span><span style="color: #b58900;">)</span>
+                   cl-y <span style="color: #b58900;">(</span>cl-buffer ctx size <span style="color: #cb4b16;">:read-only</span><span style="color: #b58900;">)</span>
+                   cl-acc <span style="color: #b58900;">(</span>cl-buffer ctx size <span style="color: #cb4b16;">:read-write</span><span style="color: #b58900;">)</span>
+                   prog <span style="color: #b58900;">(</span>build-program!
+                         <span style="color: #cb4b16;">(</span>program-with-source ctx <span style="color: #dc322f;">[</span>program-source<span style="color: #dc322f;">]</span><span style="color: #cb4b16;">)</span><span style="color: #b58900;">)</span>
+                   multiply-kernel <span style="color: #b58900;">(</span>kernel prog <span style="color: #859900;">"multiply"</span><span style="color: #b58900;">)</span><span style="color: #859900;">]</span>
+
+      <span style="color: #859900;">(</span>enq-write! cqueue cl-x <span style="color: #b58900;">(</span>float-array <span style="color: #cb4b16;">[</span>1 2 3 4 5<span style="color: #cb4b16;">]</span><span style="color: #b58900;">)</span><span style="color: #859900;">)</span>
+      <span style="color: #859900;">(</span>enq-write! cqueue cl-y <span style="color: #b58900;">(</span>float-array <span style="color: #cb4b16;">[</span>0.5 1.5 2.5 3.5 4.5<span style="color: #cb4b16;">]</span><span style="color: #b58900;">)</span><span style="color: #859900;">)</span>
+      <span style="color: #859900;">(</span>set-args! multiply-kernel cl-acc cl-x cl-y<span style="color: #859900;">)</span>
+      <span style="color: #859900;">(</span>enq-nd! cqueue multiply-kernel work-sizes<span style="color: #859900;">)</span>
+      <span style="color: #859900;">(</span>enq-read! cqueue cl-acc result<span style="color: #859900;">)</span>
+      <span style="color: #859900;">(</span>seq result<span style="color: #859900;">)</span><span style="color: #2aa198;">)</span><span style="color: #268bd2;">)</span><span style="color: #6c71c4;">)</span>
+</pre>
+</div>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+</colgroup>
+<tbody>
+<tr>
+<td class="org-right">0.5</td>
+<td class="org-right">3.0</td>
+<td class="org-right">7.5</td>
+<td class="org-right">14.0</td>
+<td class="org-right">22.5</td>
+</tr>
+</tbody>
+</table>
+
+<aside class="notes">
+<p>
+We "just" need to set everything up and fire it off. In plain OpenCL, this would require
+hundreds of lines of code. In Clojure, it is not as simple as I wish it were,
+but it is not hard either, <b>considering that in this example we are not using any
+help from Neanderthal</b>, and do everything at the lowest possible level.
+<b>This is the whole program that generates slies</b>.
+</p>
+
+<p>
+Here is what we do:
+</p>
+<ul>
+<li>set up the platform (my GPU card), create context, the command queue;</li>
+<li>load and compile! the kernel code;</li>
+<li>set up the memory</li>
+<li>transfer the data from Clojure to the GPU;</li>
+<li>set up the arguments;</li>
+<li>enqueue the computations;</li>
+<li>read the result.</li>
+
+</ul>
+
+</aside>
+
+</section>
+<section id="slide-orgheadline27">
+<h3 id="orgheadline27">Reducing: a kernel for \(\sum_{i=1}^n\)</h3>
+<div class="org-src-container">
+
+<pre  class="src src-c">__kernel <span style="color: #b58900; font-weight: bold;">void</span> <span style="color: #268bd2;">sum_reduction</span> (__global <span style="color: #b58900; font-weight: bold;">float</span>* <span style="color: #dc322f;">acc</span>) {
+    <span style="color: #6c71c4; font-weight: bold;">const</span> <span style="color: #b58900; font-weight: bold;">float</span> <span style="color: #dc322f;">sum</span> = work_group_reduction_sum(acc[get_global_id(0)]);
+    <span style="color: #6c71c4; font-weight: bold;">if</span> (get_local_id(0) == 0) {
+        acc[get_group_id(0)] = sum;
+    }
+}
+
+__kernel <span style="color: #b58900; font-weight: bold;">void</span> <span style="color: #268bd2;">multiply_reduce</span> (__global <span style="color: #b58900; font-weight: bold;">float</span>* <span style="color: #dc322f;">acc</span>,
+                               __global <span style="color: #b58900; font-weight: bold;">float</span>* <span style="color: #dc322f;">x</span>,
+                               __global <span style="color: #b58900; font-weight: bold;">float</span>* <span style="color: #dc322f;">y</span>) {
+
+    <span style="color: #b58900; font-weight: bold;">uint</span> <span style="color: #dc322f;">id</span> = get_global_id(0);
+    <span style="color: #b58900; font-weight: bold;">float</span> <span style="color: #dc322f;">sum</span> = work_group_reduction_sum(x[id] * y[id]);
+    <span style="color: #6c71c4; font-weight: bold;">if</span> (get_local_id(0) == 0) {
+        acc[get_group_id(0)] = sum;
+    }
+}
+</pre>
+</div>
+
+<aside class="notes">
+<p>
+Recall that to implement the dot product, we first map-multiply pairs, but then have
+to reduce them. Massively parallel reduction is hard, because you need to somehow synchronize
+the work of thousands of work items to get the single result, <b>and do it efficiently</b>.
+</p>
+
+<p>
+With some help from ClojureCL we do it in a couple of phases:
+</p>
+<ol>
+<li>re-engineer the multiplication kernel to do the partial reduction of the workgroup that's already loaded in memory</li>
+<li>write additional reduction kernel that loads sub-sums into local memory and sums them up.</li>
+
+</ol>
+
+</aside>
+
+</section>
+<section id="slide-orgheadline28">
+<h3 id="orgheadline28">Enqueuing reduction</h3>
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><span style="color: #6c71c4;">(</span>use '<span style="color: #b58900; font-weight: bold;">uncomplicate.clojurecl.toolbox</span><span style="color: #6c71c4;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><span style="color: #6c71c4;">(</span>with-default
+  <span style="color: #268bd2;">(</span><span style="color: #6c71c4; font-weight: bold;">let</span> <span style="color: #2aa198;">[</span>cnt 5 size <span style="color: #859900;">(</span>* 4 cnt<span style="color: #859900;">)</span> work-sizes <span style="color: #859900;">(</span>work-size <span style="color: #b58900;">[</span>cnt<span style="color: #b58900;">]</span><span style="color: #859900;">)</span>
+        program-sources <span style="color: #859900;">[</span><span style="color: #b58900;">(</span>slurp <span style="color: #cb4b16;">(</span><span style="color: #b58900; font-weight: bold;">clojure.java.io</span><span style="color: #586e75; background-color: #fdf6e3;">/</span>resource
+                                 <span style="color: #859900;">"uncomplicate/clojurecl/kernels/reduction.cl"</span><span style="color: #cb4b16;">)</span><span style="color: #b58900;">)</span>
+                         <span style="color: #b58900;">(</span>slurp <span style="color: #cb4b16;">(</span><span style="color: #b58900; font-weight: bold;">clojure.java.io</span><span style="color: #586e75; background-color: #fdf6e3;">/</span>file <span style="color: #859900;">"dot_reduce.cl"</span><span style="color: #cb4b16;">)</span><span style="color: #b58900;">)</span><span style="color: #859900;">]</span><span style="color: #2aa198;">]</span>
+    <span style="color: #2aa198;">(</span>with-release <span style="color: #859900;">[</span>cl-x <span style="color: #b58900;">(</span>cl-buffer <span style="color: #dc322f;">*context*</span> size <span style="color: #cb4b16;">:read-only</span><span style="color: #b58900;">)</span>
+                   cl-y <span style="color: #b58900;">(</span>cl-buffer <span style="color: #dc322f;">*context*</span> size <span style="color: #cb4b16;">:read-only</span><span style="color: #b58900;">)</span>
+                   cl-acc <span style="color: #b58900;">(</span>cl-buffer <span style="color: #dc322f;">*context*</span> size <span style="color: #cb4b16;">:read-write</span><span style="color: #b58900;">)</span>
+                   prog <span style="color: #b58900;">(</span>build-program!
+                         <span style="color: #cb4b16;">(</span>program-with-source <span style="color: #dc322f;">*context*</span> program-sources<span style="color: #cb4b16;">)</span>
+                         <span style="color: #859900;">"-cl-std=CL2.0 -DREAL=float -DACCUMULATOR=float"</span> <span style="color: #cb4b16;">nil</span><span style="color: #b58900;">)</span>
+                   multiply-kernel <span style="color: #b58900;">(</span>kernel prog <span style="color: #859900;">"multiply_reduce"</span><span style="color: #b58900;">)</span>
+                   sum-reduction-kernel <span style="color: #b58900;">(</span>kernel prog <span style="color: #859900;">"sum_reduction"</span><span style="color: #b58900;">)</span><span style="color: #859900;">]</span>
+
+      <span style="color: #859900;">(</span>enq-write! <span style="color: #dc322f;">*command-queue*</span> cl-x <span style="color: #b58900;">(</span>float-array <span style="color: #cb4b16;">[</span>1 2 3 4 5<span style="color: #cb4b16;">]</span><span style="color: #b58900;">)</span><span style="color: #859900;">)</span>
+      <span style="color: #859900;">(</span>enq-write! <span style="color: #dc322f;">*command-queue*</span> cl-y <span style="color: #b58900;">(</span>float-array <span style="color: #cb4b16;">[</span>0.5 1.5 2.5 3.5 4.5<span style="color: #cb4b16;">]</span><span style="color: #b58900;">)</span><span style="color: #859900;">)</span>
+      <span style="color: #859900;">(</span>set-args! multiply-kernel cl-acc cl-x cl-y<span style="color: #859900;">)</span>
+      <span style="color: #859900;">(</span>set-args! sum-reduction-kernel cl-acc<span style="color: #859900;">)</span>
+      <span style="color: #859900;">(</span>enq-reduce <span style="color: #dc322f;">*command-queue*</span> multiply-kernel sum-reduction-kernel cnt 256<span style="color: #859900;">)</span>
+      <span style="color: #859900;">(</span>enq-read-float <span style="color: #dc322f;">*command-queue*</span> cl-acc<span style="color: #859900;">)</span><span style="color: #2aa198;">)</span><span style="color: #268bd2;">)</span><span style="color: #6c71c4;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+47.5
+</pre>
+
+<aside class="notes">
+<p>
+Now, calling those reduction kernels recursively might be challenging. Luckilly, ClojureCL can
+do this for us! - we need to make only minor changes to the Clojure code that controls
+the whole process and the result is here!
+</p>
+
+</aside>
+
+</section>
+</section>
+<section>
+<section id="slide-orgheadline42">
+<h2 id="orgheadline42"><font color = "orangered">Bayadera</font></h2>
+<ul>
+<li>a Clojure library
+<ul>
+<li>highly opinionated - Bayesian</li>
+<li>probabilistic</li>
+<li>need to NOT be super slow - thus <b>GPU</b></li>
+<li>actually is the fastest I have seen</li>
+
+</ul></li>
+<li>use cases:
+<ul>
+<li>Bayesian data analysis (more stats-oriented)</li>
+<li>a foundation for machine learning algorithms</li>
+<li>lots of statistical number crunching</li>
+<li>risk assessment, decision analysis, etc.</li>
+
+</ul></li>
+
+</ul>
+
+<aside class="notes">
+<p>
+I achieved great speedups using this approach with Bayadera.
+</p>
+
+<p>
+Bayadera is a highly opinionated Bayesian probabilistic Clojure library, that is
+much faster than the state-of-the-art established environments.
+</p>
+
+<p>
+I built it primarily for doing Bayesian data analysis, but plan to
+build on it to do machine learning.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgheadline30">
+<h3 id="orgheadline30">The Goal</h3>
+<ul>
+<li><b>programmers are the first-class citizens</b></li>
+<li>NOT a "me too, just in clojure"</li>
+<li><b>different</b> and better (for what I want to do)</li>
+
+</ul>
+
+<aside class="notes">
+<p>
+I do not have time to talk more about Bayadera, and I hope I will at some
+future conference, but these are its main goals:
+</p>
+
+<p>
+Programmers should feel at home and be able to do both the usual scientific
+stuff, but also to build robust software running on servers!
+</p>
+
+<p>
+It does NOT to try to catch up to what R and Python (and Julia) already do.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgheadline31">
+<h3 id="orgheadline31">Bayes rule</h3>
+<p>
+Going backwards, from results to possible causes!
+</p>
+
+<div>
+\begin{equation*}
+\Pr(H|D) = \frac{\Pr(D|H)\times \Pr(H)}{\Pr(D)}
+\end{equation*}
+
+</div>
+
+<p>
+&#x2026;
+</p>
+
+<div>
+\begin{equation*}
+posterior = \frac{likelihood\times prior}{evidence}
+\end{equation*}
+
+</div>
+
+<p>
+Looks simple and easy!
+</p>
+
+<aside class="notes">
+<p>
+What it means to be Bayesian? It means that you treat everything probabilistically.
+In data analysis, Bayes' rule leads us to reason about things that we cannot observe,
+by measuring the things that we can and updating the knowledge that we previously had.
+</p>
+
+<p>
+It may look and sound like Greek to you, but once you wrap your head around that,
+it looks ridiculously simple and easy!
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgheadline32">
+<h3 id="orgheadline32">HARD to compute</h3>
+<p>
+Usually:
+</p>
+
+<div>
+\begin{equation*}
+\Pr(\vec{h}|\vec{d}) = \frac{\prod_i f(\vec{d_i},\vec{h})\times g(\vec{h})}{\idotsint \prod_i f(\vec{d_i},\vec{h})\,d \vec{h}}
+\end{equation*}
+
+</div>
+
+<p>
+computationally:
+</p>
+
+<div>
+\begin{equation*}
+answer = \frac{hard\times acceptable}{impossible}
+\end{equation*}
+
+</div>
+
+<aside class="notes">
+<p>
+The main problem that held Bayesian methods dormant for 200 years,
+until a decade or two ago was that it is ridiculouslyhard to compute in the general case!
+</p>
+
+<p>
+Usually, we do not have a nice unimodal one-dimensional problems that nicely fit into
+analytical formulas and lead to simple results.
+We have to explore this multi-dimensional continuous space numerically.
+</p>
+
+<p>
+So, to get the answer, we have to multiply something that is hard to compute with
+something that is acceptably simpler, do this many (millions, billions) of times, and
+divide by something that is practically impossible to compute by brute force.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgheadline33">
+<h3 id="orgheadline33">Markov Chain Monte Carlo (MCMC)</h3>
+<ul>
+<li>a family of simulation algorithms</li>
+<li>draws samples from <b>unknown</b> probability distributions</li>
+<li>(enough) samples approximate the distribution</li>
+
+</ul>
+
+<div>
+\begin{equation*}
+\Pr(\vec{h}|\vec{d}) \propto \exp \left(\sum_i \log f(\vec{d_i},\vec{h}) + \log g(\vec{h})\right)
+\end{equation*}
+
+</div>
+
+<p>
+computationally:
+</p>
+
+<div>
+\begin{equation*}
+answer \propto zillions \times (hard\times acceptable)
+\end{equation*}
+
+</div>
+
+<aside class="notes">
+<p>
+Long story short, MCMC can simulate and draw samples from an unknown distribution.
+With enough samples, we can approximate that distribution -
+the impossible-to-compute posterior that we were looking for!
+</p>
+
+<p>
+By using the MCMC algorithm, we are left with "just"
+computing zillions of "only" hard to compute things.
+</p>
+
+<p>
+That's why CPU-based Bayesian is notoriously slow. Luckily,
+GPU can help us in bringing that time to acceptable levels.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgheadline34">
+<h3 id="orgheadline34">Log likelihood</h3>
+<div class="org-src-container">
+
+<pre  class="src src-c"><span style="color: #b58900; font-weight: bold;">REAL</span> <span style="color: #268bd2;">rlr_loglik</span>(<span style="color: #b58900; font-weight: bold;">__constant</span> <span style="color: #6c71c4; font-weight: bold;">const</span> <span style="color: #dc322f;">REAL</span>* params, <span style="color: #b58900; font-weight: bold;">REAL</span>* <span style="color: #dc322f;">x</span>) {
+    <span style="color: #6c71c4; font-weight: bold;">const</span> <span style="color: #b58900; font-weight: bold;">REAL</span> <span style="color: #dc322f;">nu</span> = x[0];
+    <span style="color: #6c71c4; font-weight: bold;">const</span> <span style="color: #b58900; font-weight: bold;">REAL</span> <span style="color: #dc322f;">b0</span> = x[1];
+    <span style="color: #6c71c4; font-weight: bold;">const</span> <span style="color: #b58900; font-weight: bold;">REAL</span> <span style="color: #dc322f;">b1</span> = x[2];
+    <span style="color: #6c71c4; font-weight: bold;">const</span> <span style="color: #b58900; font-weight: bold;">REAL</span> <span style="color: #dc322f;">sigma</span> = x[3];
+    <span style="color: #6c71c4; font-weight: bold;">const</span> <span style="color: #b58900; font-weight: bold;">uint</span> <span style="color: #dc322f;">n</span> = (<span style="color: #b58900; font-weight: bold;">uint</span>)params[0];
+    <span style="color: #6c71c4; font-weight: bold;">const</span> <span style="color: #b58900; font-weight: bold;">bool</span> <span style="color: #dc322f;">valid</span> = (0.0f &lt; nu) &amp;&amp; (0.0f &lt; sigma);
+    <span style="color: #6c71c4; font-weight: bold;">if</span> (valid) {
+        <span style="color: #6c71c4; font-weight: bold;">const</span> <span style="color: #b58900; font-weight: bold;">REAL</span> <span style="color: #dc322f;">scale</span> = t_log_scale(nu, sigma);
+        <span style="color: #b58900; font-weight: bold;">REAL</span> <span style="color: #dc322f;">res</span> = 0.0;
+        <span style="color: #6c71c4; font-weight: bold;">for</span> (<span style="color: #b58900; font-weight: bold;">uint</span> <span style="color: #dc322f;">i</span> = 0; i &lt; n; i = i+2) {
+            res += t_log_unscaled(nu, b0 + b1 * params[i+1],
+                                  sigma, params[i+2])
+                + scale;
+        }
+        <span style="color: #6c71c4; font-weight: bold;">return</span> res;
+    }
+    <span style="color: #6c71c4; font-weight: bold;">return</span> NAN;
+}
+</pre>
+</div>
+
+<aside class="notes">
+<p>
+I do not expect from you to follow this code, but I am showing it as an example
+of the code the user typically writes.
+</p>
+
+<p>
+This is actually the most complex part - write the multidimensional likelihood
+function for the data combining statistical functions that Bayadera provides.
+</p>
+
+</aside>
+</section>
+<section id="slide-orgheadline35">
+<h3 id="orgheadline35">Log prior</h3>
+<div class="org-src-container">
+
+<pre  class="src src-c"><span style="color: #b58900; font-weight: bold;">REAL</span> <span style="color: #268bd2;">rlr_mcmc_logpdf</span>(<span style="color: #b58900; font-weight: bold;">__constant</span> <span style="color: #6c71c4; font-weight: bold;">const</span> <span style="color: #dc322f;">REAL</span>* params, <span style="color: #b58900; font-weight: bold;">REAL</span>* <span style="color: #dc322f;">x</span>) {
+    <span style="color: #6c71c4; font-weight: bold;">const</span> <span style="color: #b58900; font-weight: bold;">bool</span> <span style="color: #dc322f;">valid</span> = (1.0f &lt; x[0]);
+    <span style="color: #6c71c4; font-weight: bold;">if</span> (valid) {
+        <span style="color: #6c71c4; font-weight: bold;">return</span> exponential_log_unscaled(params[0], x[0] - 1)
+            + gaussian_log_unscaled(params[1], params[2], x[1])
+            + gaussian_log_unscaled(params[3], params[4], x[2])
+            + uniform_log(params[5], params[6], x[3]);
+    }
+    <span style="color: #6c71c4; font-weight: bold;">return</span> NAN;
+
+}
+</pre>
+</div>
+
+<aside class="notes">
+<p>
+Then, write a prior distribution function.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgheadline36">
+<h3 id="orgheadline36">Calling it from Clojure</h3>
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><span style="color: #6c71c4;">(</span><span style="color: #6c71c4; font-weight: bold;">def</span> <span style="color: #dc322f;">rlr-prior</span>
+  <span style="color: #268bd2;">(</span>cl-distribution-model
+   <span style="color: #2aa198;">[</span><span style="color: #859900;">(</span><span style="color: #cb4b16;">:gaussian</span> source-library<span style="color: #859900;">)</span> <span style="color: #859900;">(</span><span style="color: #cb4b16;">:uniform</span> source-library<span style="color: #859900;">)</span>
+    <span style="color: #859900;">(</span><span style="color: #cb4b16;">:exponential</span> source-library<span style="color: #859900;">)</span> <span style="color: #859900;">(</span><span style="color: #cb4b16;">:t</span> source-library<span style="color: #859900;">)</span>
+    <span style="color: #859900;">(</span>slurp <span style="color: #b58900;">(</span><span style="color: #b58900; font-weight: bold;">io</span><span style="color: #586e75; background-color: #fdf6e3;">/</span>resource <span style="color: #859900;">"uncomplicate/bayadera/examples/dbda/ch17/robust-linear-</span><span style="color: #d33682; background-color: #eee8d5;">regression.h"</span><span style="color: #b58900; background-color: #eee8d5;">)</span><span style="color: #859900; background-color: #eee8d5;">)</span><span style="color: #2aa198; background-color: #eee8d5;">]</span>
+   <span style="color: #cb4b16;">:name</span> <span style="color: #859900;">"rlr"</span> <span style="color: #cb4b16;">:mcmc-logpdf</span> <span style="color: #859900;">"rlr_mcmc_logpdf"</span> <span style="color: #cb4b16;">:params-size</span> 7 <span style="color: #cb4b16;">:dimension</span> 4<span style="color: #268bd2;">)</span><span style="color: #6c71c4;">)</span>
+
+<span style="color: #6c71c4;">(</span><span style="color: #6c71c4; font-weight: bold;">defn</span> <span style="color: #268bd2;">rlr-likelihood</span> <span style="color: #268bd2;">[</span>n<span style="color: #268bd2;">]</span>
+  <span style="color: #268bd2;">(</span>cl-likelihood-model <span style="color: #2aa198;">(</span>slurp <span style="color: #859900;">(</span><span style="color: #b58900; font-weight: bold;">io</span><span style="color: #586e75; background-color: #fdf6e3;">/</span>resource <span style="color: #859900;">"uncomplicate/bayadera/examples/dbda/</span><span style="color: #d33682; background-color: #eee8d5;">ch17/robust-linear-regression.h"</span><span style="color: #859900; background-color: #eee8d5;">)</span><span style="color: #2aa198; background-color: #eee8d5;">)</span>
+                       <span style="color: #cb4b16;">:name</span> <span style="color: #859900;">"rlr"</span> <span style="color: #cb4b16;">:params-size</span> n<span style="color: #268bd2;">)</span><span style="color: #6c71c4;">)</span>
+
+<span style="color: #6c71c4;">(</span><span style="color: #6c71c4; font-weight: bold;">defn</span> <span style="color: #268bd2;">analysis</span> <span style="color: #268bd2;">[]</span>
+  <span style="color: #268bd2;">(</span>with-default-bayadera
+    <span style="color: #2aa198;">(</span>with-release
+      <span style="color: #859900;">[</span>prior <span style="color: #b58900;">(</span>distribution rlr-prior<span style="color: #b58900;">)</span>
+       prior-dist <span style="color: #b58900;">(</span>prior <span style="color: #cb4b16;">(</span>sv 10 -100 100 5 10 0.001 1000<span style="color: #cb4b16;">)</span><span style="color: #b58900;">)</span>
+       post <span style="color: #b58900;">(</span>posterior <span style="color: #859900;">"rlr_300"</span>
+                       <span style="color: #cb4b16;">(</span>rlr-likelihood <span style="color: #dc322f;">(</span>dim params-300<span style="color: #dc322f;">)</span><span style="color: #cb4b16;">)</span>
+                       prior-dist<span style="color: #b58900;">)</span>
+       post-dist <span style="color: #b58900;">(</span>post-300 params-300<span style="color: #b58900;">)</span>
+       post-sampler <span style="color: #b58900;">(</span>sampler post-300-dist
+                             <span style="color: #cb4b16;">{</span><span style="color: #cb4b16;">:limits</span> <span style="color: #dc322f;">(</span>sge 2 4 <span style="color: #839496;">[</span>1 10 -400 100 0 20 0.01 100<span style="color: #839496;">]</span><span style="color: #dc322f;">)</span><span style="color: #cb4b16;">}</span><span style="color: #b58900;">)</span><span style="color: #859900;">]</span>
+
+      <span style="color: #859900;">(</span>mix! post-sampler <span style="color: #b58900;">{</span><span style="color: #cb4b16;">:step</span> 384<span style="color: #b58900;">}</span><span style="color: #859900;">)</span>
+      <span style="color: #859900;">(</span>histogram! post-sampler 1000<span style="color: #859900;">)</span><span style="color: #2aa198;">)</span><span style="color: #268bd2;">)</span><span style="color: #6c71c4;">)</span>
+</pre>
+</div>
+
+<aside class="notes">
+<p>
+Set it up in Clojure, load the data, and run the computation.
+</p>
+
+<p>
+Please note that this is not a hello-world-ish example, but an example of
+a real code for robust linear regression.
+</p>
+
+<p>
+In Bayadera's code repository, you can find many examples from
+the most popular Bayesian textbook in this area: Learning Bayesian Data Analysis.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgheadline37">
+<h3 id="orgheadline37">How fast is it?</h3>
+<p>
+<b>MCMC is sequential by nature - it is very difficult to transfer to GPU</b>
+</p>
+
+<ul>
+<li>Bayadera
+<ul>
+<li>61,208,576 samples in 267 ms.</li>
+<li>4.36 ns per sample
+<ul>
+<li>each computing statistical function 306 times.</li>
+
+</ul></li>
+<li>very precise histogram</li>
+
+</ul></li>
+<li>JAGS/Stan (state-of-the-art bayesian C++ tools)
+<ul>
+<li>20,000 samples in 180/485 seconds</li>
+<li>9 ms per sample</li>
+<li>rough histogram</li>
+
+</ul></li>
+
+<li><font color = "red">2,000,000 &times;</font> faster per sample</li>
+<li>more precise results, <font color = "red">1000 &times;</font> faster</li>
+
+</ul>
+
+<aside class="notes">
+<p>
+What I really wanted to show you is this: Bayadera runs circles around the best
+state of the art Bayesian environments!
+</p>
+
+<p>
+For this particular analysis, Bayadera took 60 M samples during the
+exploration of that complex multi-dimensional space in just 267 ms, which is 4 ns per sample!
+</p>
+
+<p>
+JAGS and Stan, two best popular R/Python tools implemented in C++ spent 180/485 seconds
+to get 20K samples.
+</p>
+
+<p>
+This is 2 million times less per sample. However, it is not fair to compare those
+directly, since Stan tries to spend more time on getting supposedly better convergence.
+</p>
+
+<p>
+But, when we compare the <b>whole analysis</b>, we can see that Bayadera was roughly
+1000 times faster, and yet produced a better result with much more precise histograms
+(not shown here)!
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgheadline38">
+<h3 id="orgheadline38">Clojure (only \(likelihood \times prior\))</h3>
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><span style="color: #6c71c4;">(</span><span style="color: #6c71c4; font-weight: bold;">defn</span> <span style="color: #268bd2;">log-likelihood</span> <span style="color: #268bd2;">[</span>params x<span style="color: #268bd2;">]</span>
+  <span style="color: #268bd2;">(</span><span style="color: #6c71c4; font-weight: bold;">let</span> <span style="color: #2aa198;">[</span>nu <span style="color: #859900;">(</span>entry x 0<span style="color: #859900;">)</span> b0 <span style="color: #859900;">(</span>entry x 1<span style="color: #859900;">)</span> b1 <span style="color: #859900;">(</span>entry x 2<span style="color: #859900;">)</span> sigma <span style="color: #859900;">(</span>entry x 3<span style="color: #859900;">)</span> n <span style="color: #859900;">(</span>dim pa<span style="color: #d33682; background-color: #eee8d5;">rams</span><span style="color: #859900; background-color: #eee8d5;">)</span><span style="color: #2aa198; background-color: #eee8d5;">]</span>
+    <span style="color: #2aa198;">(</span><span style="color: #6c71c4; font-weight: bold;">if</span> <span style="color: #859900;">(</span><span style="color: #6c71c4; font-weight: bold;">and</span> <span style="color: #b58900;">(</span>&lt; 0.0 nu<span style="color: #b58900;">)</span> <span style="color: #b58900;">(</span>&lt; 0.0 sigma<span style="color: #b58900;">)</span><span style="color: #859900;">)</span>
+      <span style="color: #859900;">(</span><span style="color: #6c71c4; font-weight: bold;">let</span> <span style="color: #b58900;">[</span>scale <span style="color: #cb4b16;">(</span>t-log-scale nu sigma<span style="color: #cb4b16;">)</span><span style="color: #b58900;">]</span>
+        <span style="color: #b58900;">(</span><span style="color: #6c71c4; font-weight: bold;">loop</span> <span style="color: #cb4b16;">[</span>i 0 res 0.0<span style="color: #cb4b16;">]</span>
+          <span style="color: #cb4b16;">(</span><span style="color: #6c71c4; font-weight: bold;">if</span> <span style="color: #dc322f;">(</span>&lt; i n<span style="color: #dc322f;">)</span>
+            <span style="color: #dc322f;">(</span><span style="color: #6c71c4; font-weight: bold;">recur</span> <span style="color: #839496;">(</span>+ i 2<span style="color: #839496;">)</span>
+                   <span style="color: #839496;">(</span>+ res scale <span style="color: #586e75;">(</span>t-log-unscaled nu <span style="color: #6c71c4;">(</span>+ b0 <span style="color: #268bd2;">(</span>* b1 <span style="color: #2aa198;">(</span>entry params i<span style="color: #2aa198;">)</span><span style="color: #268bd2;">)</span><span style="color: #6c71c4; background-color: #eee8d5;">)</span>
+                                                sigma <span style="color: #6c71c4;">(</span>entry params <span style="color: #268bd2;">(</span>inc i<span style="color: #268bd2;">)</span><span style="color: #6c71c4;">)</span><span style="color: #586e75;">)</span><span style="color: #839496;">)</span><span style="color: #dc322f;">)</span>
+            res<span style="color: #cb4b16;">)</span><span style="color: #b58900;">)</span><span style="color: #859900;">)</span>
+      <span style="color: #b58900; font-weight: bold;">Double</span><span style="color: #586e75; background-color: #fdf6e3;">/</span><span style="color: #b58900; font-weight: bold;">NaN</span><span style="color: #2aa198;">)</span><span style="color: #268bd2;">)</span><span style="color: #6c71c4;">)</span>
+
+<span style="color: #6c71c4;">(</span><span style="color: #6c71c4; font-weight: bold;">defn</span> <span style="color: #268bd2;">log-prior</span> <span style="color: #268bd2;">[</span>params x<span style="color: #268bd2;">]</span>
+  <span style="color: #268bd2;">(</span><span style="color: #6c71c4; font-weight: bold;">if</span> <span style="color: #2aa198;">(</span>&lt; 1.0 <span style="color: #859900;">(</span>entry x 0<span style="color: #859900;">)</span><span style="color: #2aa198;">)</span>
+    <span style="color: #2aa198;">(</span>+ <span style="color: #859900;">(</span>exponential-log-pdf <span style="color: #b58900;">(</span>entry params 0<span style="color: #b58900;">)</span> <span style="color: #b58900;">(</span>dec <span style="color: #cb4b16;">(</span>entry x 0<span style="color: #cb4b16;">)</span><span style="color: #b58900;">)</span><span style="color: #859900;">)</span>
+       <span style="color: #859900;">(</span>gaussian-log-pdf <span style="color: #b58900;">(</span>entry params 1<span style="color: #b58900;">)</span> <span style="color: #b58900;">(</span>entry params 2<span style="color: #b58900;">)</span> <span style="color: #b58900;">(</span>entry x 1<span style="color: #b58900;">)</span><span style="color: #859900;">)</span>
+       <span style="color: #859900;">(</span>gaussian-log-pdf <span style="color: #b58900;">(</span>entry params 3<span style="color: #b58900;">)</span> <span style="color: #b58900;">(</span>entry params 4<span style="color: #b58900;">)</span> <span style="color: #b58900;">(</span>entry x 2<span style="color: #b58900;">)</span><span style="color: #859900;">)</span>
+       <span style="color: #859900;">(</span>uniform-log-pdf <span style="color: #b58900;">(</span>entry params 5<span style="color: #b58900;">)</span> <span style="color: #b58900;">(</span>entry params 6<span style="color: #b58900;">)</span> <span style="color: #b58900;">(</span>entry x 3<span style="color: #b58900;">)</span><span style="color: #859900;">)</span><span style="color: #2aa198;">)</span>
+    <span style="color: #b58900; font-weight: bold;">Double</span><span style="color: #586e75; background-color: #fdf6e3;">/</span><span style="color: #b58900; font-weight: bold;">NaN</span><span style="color: #268bd2;">)</span><span style="color: #6c71c4;">)</span>
+
+<span style="color: #6c71c4;">(</span><span style="color: #6c71c4; font-weight: bold;">defn</span> <span style="color: #268bd2;">posterior-unscaled</span> <span style="color: #268bd2;">[</span>params x<span style="color: #268bd2;">]</span>
+  <span style="color: #268bd2;">(</span><span style="color: #6c71c4; font-weight: bold;">let</span> <span style="color: #2aa198;">[</span>n <span style="color: #859900;">(</span>entry params 0<span style="color: #859900;">)</span><span style="color: #2aa198;">]</span>
+    <span style="color: #2aa198;">(</span>+ <span style="color: #859900;">(</span>log-likelihood <span style="color: #b58900;">(</span>subvector params 1 n<span style="color: #b58900;">)</span> x<span style="color: #859900;">)</span>
+       <span style="color: #859900;">(</span>log-prior <span style="color: #b58900;">(</span>subvector params <span style="color: #cb4b16;">(</span>inc n<span style="color: #cb4b16;">)</span> <span style="color: #cb4b16;">(</span>- <span style="color: #dc322f;">(</span>dim params<span style="color: #dc322f;">)</span> n 1<span style="color: #cb4b16;">)</span><span style="color: #b58900;">)</span> x<span style="color: #859900;">)</span><span style="color: #2aa198;">)</span><span style="color: #268bd2;">)</span><span style="color: #6c71c4;">)</span>
+</pre>
+</div>
+
+<aside class="notes">
+<p>
+The question that is also interesting is: what if we implemented the
+algorithm in optimized Clojure without ClojureCL, Neanderthal and Bayadera?
+</p>
+
+<p>
+I did not have time to waste to implement the MCMC algorithm,
+but I just implement a simplified likelihood and prior part in Clojure.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgheadline39">
+<h3 id="orgheadline39">Unfair comparison - still much faster</h3>
+<p>
+Probability density function evaluation
+</p>
+
+<ul>
+<li>Bayadera
+<ul>
+<li>including read/write to memory</li>
+<li>100,000,000 in 260 ms</li>
+<li>2.6 <font color = "red">ns</font> per element</li>
+
+</ul></li>
+<li>Clojure
+<ul>
+<li>just naive reevaluation /w same arguments from cache</li>
+<li>100,000 in 430 ms</li>
+<li>4.3 <font color = "blue">&mu;s</font> per element</li>
+
+</ul></li>
+
+</ul>
+
+<p>
+<font color = "red">1650</font> &times; faster!
+</p>
+
+<aside class="notes">
+<p>
+Although the comparison is unfair to Bayadera, since it does the whole <b>complex</b>
+work, including billions of real memory reads/writes versus clojure code just dumbly
+re-computing the same data from the cache, Bayadera is still 1650 times faster!
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgheadline40">
+<h3 id="orgheadline40">Incanter?</h3>
+<p>
+Incanter:
+</p>
+<ul>
+<li>No bayesian functionality</li>
+<li>Deadly slow</li>
+<li>Trivial example: 100,000,000 samples from gaussian: 27 seconds</li>
+
+</ul>
+
+<p>
+Bayadera:
+</p>
+<ul>
+<li>4 ms</li>
+<li>7,000 faster</li>
+
+</ul>
+
+<aside class="notes">
+<p>
+What about Incanter? It does not support MCMC or Bayesian stuff, but let's
+compare something that it can do - taking samples from the straightforward
+Normal distribution.
+</p>
+
+<p>
+It took Incanter 27 seconds to take 100 M samples, while Bayadera took 4 ms.
+7000 times faster!
+</p>
+
+<p>
+What if you do not need that many? The thing is: <b>to do the Bayesian
+analysis you DO NEED THEM</b>. Even if Incanter had Bayesian functionality,
+it would run for a loooooong time.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgheadline41">
+<h3 id="orgheadline41">In real life</h3>
+<ul>
+<li>1 second vs a couple of hours</li>
+<li>1 minute vs several days!</li>
+<li>1 hour vs couple months/ a year</li>
+
+</ul>
+
+<aside class="notes">
+<p>
+Now, you might think - but who cares if something is 1000 times faster or slower?
+So what if it takes a couple of milliseconds instead of a few nanoseconds? Both are
+faster than the blink of an eye.
+</p>
+
+<p>
+Well, considering number of seconds in a day, hours in a month, etc&#x2026;
+This is a difference of having to wait 1 second instead of an hour,
+or 1 minute instead of a few days, or 1 hour instead of months or even a year!
+</p>
+
+</aside>
+
+</section>
+</section>
+<section>
+<section id="slide-orgheadline43">
+<h2 id="orgheadline43">Thank You</h2>
+<p>
+The presentation can be reached through my blog:
+</p>
+<ul>
+<li><a href="http://dragan.rocks">http://dragan.rocks</a></li>
+
+</ul>
+
+<p>
+Find more at:
+</p>
+<ul>
+<li><a href="http://clojurecl.uncomplicate.org">http://clojurecl.uncomplicate.org</a></li>
+<li><a href="http://neanderthal.uncomplicate.org">http://neanderthal.uncomplicate.org</a></li>
+<li><a href="http://bayadera.uncomplicate.org">http://bayadera.uncomplicate.org</a></li>
+<li><a href="http://fluokitten.uncomplicate.org">http://fluokitten.uncomplicate.org</a></li>
+
+</ul>
+</section>
+</section>
+</div>
+</div>
+<script src="http://cdn.jsdelivr.net/reveal.js/3.0.0/lib/js/head.min.js"></script>
+<script src="http://cdn.jsdelivr.net/reveal.js/3.0.0/js/reveal.js"></script>
+
+<script>
+// Full list of configuration options available here:
+// https://github.com/hakimel/reveal.js#configuration
+Reveal.initialize({
+
+controls: true,
+progress: true,
+history: false,
+center: true,
+slideNumber: 'c',
+rollingLinks: false,
+keyboard: true,
+overview: true,
+
+theme: Reveal.getQueryHash().theme, // available themes are in /css/theme
+transition: Reveal.getQueryHash().transition || 'default', // default/cube/page/concave/zoom/linear/fade/none
+transitionSpeed: 'default',
+multiplex: {
+    secret: '', // null if client
+    id: '', // id, obtained from socket.io server
+    url: '' // Location of socket.io server
+},
+
+// Optional libraries used to extend on reveal.js
+dependencies: [
+ { src: 'http://cdn.jsdelivr.net/reveal.js/3.0.0/lib/js/classList.js', condition: function() { return !document.body.classList; } },
+ { src: 'http://cdn.jsdelivr.net/reveal.js/3.0.0/plugin/markdown/marked.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
+ { src: 'http://cdn.jsdelivr.net/reveal.js/3.0.0/plugin/markdown/markdown.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
+ { src: 'http://cdn.jsdelivr.net/reveal.js/3.0.0/plugin/zoom-js/zoom.js', async: true, condition: function() { return !!document.body.classList; } },
+ { src: 'http://cdn.jsdelivr.net/reveal.js/3.0.0/plugin/notes/notes.js', async: true, condition: function() { return !!document.body.classList; } }]
+});
+</script>
+</body>
+</html>
