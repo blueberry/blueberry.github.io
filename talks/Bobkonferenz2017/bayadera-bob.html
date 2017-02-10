@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Bayadera: Bayes + Clojure + GPU</title>
+<meta name="author" content="(Dragan Djuric)"/>
+<style type="text/css">
+.underline { text-decoration: underline; }
+</style>
+<link rel="stylesheet" href="./reveal.js/css/reveal.css"/>
+
+<link rel="stylesheet" href="./reveal.js/css/theme/night.css" id="theme"/>
+
+<link rel="stylesheet" href="noborder.css"/>
+
+<!-- If the query includes 'print-pdf', include the PDF print sheet -->
+<script>
+    if( window.location.search.match( /print-pdf/gi ) ) {
+        var link = document.createElement( 'link' );
+        link.rel = 'stylesheet';
+        link.type = 'text/css';
+        link.href = './reveal.js/css/print/pdf.css';
+        document.getElementsByTagName( 'head' )[0].appendChild( link );
+    }
+</script>
+<script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+<section id="sec-title-slide"><h2>Bayadera: Bayes + Clojure + GPU</h2><h3>Dragan Djuric</h3><strong><a href="mailto:dragandj@gmail.com">dragandj@gmail.com</a></strong>
+</section>
+
+<section>
+<section id="slide-orgheadline1">
+<h2 id="orgheadline1">Dragan Djuric</h2>
+<ul>
+<li>blog <a href="http://dragan.rocks">http://dragan.rocks</a></li>
+<li>twitter <a href="https://twitter.com/draganrocks">@draganrocks</a></li>
+<li>Professor of Software Engineering</li>
+<li>University of Belgrade</li>
+<li>Clojure as a primary language since <b>2009</b></li>
+<li>Interested in Bayesian methods in ML.</li>
+<li>dragandj@gmail.com</li>
+<li>github: blueberry / uncomplicate</li>
+<li><a href="http://uncomplicate.org">http://uncomplicate.org</a></li>
+
+</ul>
+
+<aside class="notes">
+<p>
+My name is Dragan Djuric, I am a professor of software engineering at
+the University of Belgrade. I've been using Clojure as my primary programming language since 2009,
+and I teach it since 2010. I am interested in ML, especially the bayesian kind.
+You can find me on github, or read my blog at dragan.rocks.
+</p>
+
+</aside>
+
+</section>
+</section>
+<section>
+<section id="slide-orgheadline8">
+<h2 id="orgheadline8">A little background</h2>
+<ul>
+<li>Clojure</li>
+<li>GPU computing</li>
+<li>Bayesian Data Analysis</li>
+
+</ul>
+
+<aside class="notes">
+<p>
+There are 3 topics in this talk:
+</p>
+<ul>
+<li>Clojure</li>
+<li>GPU computing</li>
+<li>Bayesian Data Analysis</li>
+
+</ul>
+
+</aside>
+</section>
+<section id="slide-orgheadline2">
+<h3 id="orgheadline2">Clojure - a modern lisp</h3>
+<ul>
+<li>Dynamic <b>and</b> fast</li>
+<li>First-class functions</li>
+<li>Great abstractions and data structures</li>
+<li>Many useful libraries</li>
+<li>Even more experimental libraries</li>
+<li>Seamless access to Java and the JVM</li>
+<li>ClojureScript in browsers, node etc.</li>
+
+</ul>
+
+
+<aside class="notes">
+<p>
+Clojure is great! It's a modern, pragmatical lisp, that integrates well into today's most popular platforms.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgheadline3">
+<h3 id="orgheadline3">Are Java and Clojure good at number crunching?</h3>
+<ul>
+<li>Good? maybe.</li>
+<li>Great? NO!</li>
+<li>JVM - no access to hardware-specific optimizations</li>
+
+<li>We can make it great!</li>
+
+</ul>
+
+<aside class="notes">
+<p>
+But, is it good at number crunching?
+It is certainly not bad, but compared to what's available elsewhere, it is not great either.
+One of my goals is to make Clojure great for implementing numerical-heavy algorithms.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgheadline4">
+<h3 id="orgheadline4">CPU is not so great either!</h3>
+<ul>
+<li>R, Python? Even worse than Java.</li>
+<li>C? complicated, verbose platform-specific optimizations.</li>
+<li>CPU? too beefed-up. Burns as the Sun!</li>
+
+</ul>
+
+<aside class="notes">
+<p>
+What about other managed platforms? Those are even worse than JVM when it comes
+to number crunching. It is true that they have rich libraries that fall back
+to native code, but&#x2026; writing <b>custom</b> algorithms is very difficult&#x2026;
+And CPU itself is not so great either! CPUs have rich instruction sets, but
+that requires lots of transistors that devours energy.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgheadline5">
+<h3 id="orgheadline5">GPU has a lot to offer &#x2026;at a price</h3>
+<ul>
+<li>many dumb computing units</li>
+<li>but, power-efficient for number crunching</li>
+<li>hardware support for massive parallelism</li>
+<li>faster and cheaper each year</li>
+<li><b>notoriously difficult to program</b></li>
+
+</ul>
+
+<aside class="notes">
+<p>
+&#x2026;which brings us to GPUs. GPUs contain very simple computing units, but it is
+possible to pack many of those on one chip!
+The features that are provided are exactly the numerical operations and parallelization
+support that we need! They are more powerful and cheaper each year.
+It's a shame that the programming platforms are from the stone age!
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgheadline6">
+<h3 id="orgheadline6">Uncomplicate</h3>
+<dl>
+<dt><font color = "DeepPink">Fluokitten</font></dt><dd>fluorescent monadic fuzzy little things</dd>
+<dt><font color = "green">ClojureCL</font></dt><dd>take control of the GPU and CPU from Clojure</dd>
+<dt><font color = "indigo">Neanderthal</font></dt><dd>optimized vectors and matrices on CPU and GPU</dd>
+<dt><font color = "OrangeRed">Bayadera</font></dt><dd>high performance Bayesian statistics and data analysis on the GPU</dd>
+
+</dl>
+
+<aside class="notes">
+<p>
+Uncomplicate is a family of open-source Clojure libraries for scientific and high-performance computing.
+My main goal was to create a state-of-the art Bayesian machine learning infrastructure. For that to fly,
+I also had to provide lower-level libraries, since what was available at the time on JVM, was lot worse
+than the best tools available elsewhere.
+ClojureCL is a Clojure library for taking <b>full</b> control of the GPU with minimal overhead.
+Neanderthal leverages battle-tested native linear algebra libraries for the CPU and latest GPU libraries
+to provide the full-speed matrix support tailored to Clojure with almost no overhead.
+Bayadera goes beyond that - a library for Bayesian statistics on the GPU that is much faster than
+the fastest available mainstream offerings!
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgheadline7">
+<h3 id="orgheadline7">What does all this has to do with Bayes stuff?</h3>
+<ul>
+<li>BDA is conceptually simple</li>
+<li>Real models must be calculated numerically</li>
+<li>MCMC sampling and related methods</li>
+<li>In higher dimensions, requires huge samples</li>
+<li>Analyses typically runs in minutes, hours, weeks</li>
+
+</ul>
+<p>
+.
+</p>
+<ul>
+<li>Good: Clojure and GPU FTW</li>
+<li>Challenge: <b>MCMC is sequential</b></li>
+
+</ul>
+<aside class="notes">
+<p>
+Bayesian methods are conceptually simple and elegant (although not always easy to learn).
+The main challenge is that <b>real-world</b> models are not possible to solve analytically, and require
+<b>enormous</b> computational resources. Main numerical methods are variants of MCMC simulation, and analyses
+typically run in minutes, hours, days, weeks or even more.
+GPU are an obvious help, but with a caveat: <b>MCMC is inherently sequential</b> so it is difficult to parallelize.
+</p>
+
+</aside>
+</section>
+</section>
+<section>
+<section id="slide-orgheadline15">
+<h2 id="orgheadline15">A Bayesian Data Analysis Primer</h2>
+<p>
+How to know something we cannot observe?
+</p>
+
+<ul>
+<li>All credible hypotheses and prior distribution</li>
+<li>Measure something it influences (get data)</li>
+<li>And calculate "backwards", using Bayes' rule</li>
+
+</ul>
+<div>
+\begin{equation*}
+\Pr(H|D) = \frac{\Pr(D|H)\times \Pr(H)}{\Pr(D)}
+\end{equation*}
+
+</div>
+
+<ul>
+<li><b>No one true hypothesis</b> wins</li>
+<li>posterior probability <b>distribution</b></li>
+
+</ul>
+
+<aside class="notes">
+<p>
+When would be use BDA? Often we cannot measure a phenomenon directly. We can only measure something <b>else</b>,
+that we suspect is caused by the phenomenon. We pose some hypotheses about the relation. There is <b>rarely</b> one true
+hypotheses. More likely, they have more or less credibility. BDA helps us discover that probability by taking into
+account what we knew previously, what we predicted, and what we measured in the data.
+</p>
+
+</aside>
+</section>
+<section id="slide-orgheadline9">
+<h3 id="orgheadline9">Doing Bayesian Data Analysis</h3>
+<ul>
+<li>John Kruschke</li>
+<li>Excellent tutorial, even for beginners</li>
+<li>Real-world examples through the book!</li>
+
+</ul>
+
+
+<div class="figure">
+<p><img src="dbda-book.png" alt="dbda-book.png" height="30%," width="30%" />
+</p>
+</div>
+
+<aside class="notes">
+<p>
+This book is what I would recommend as the best learning resource. It is approachable by (strong) beginners,
+but the examples are still from the real world analysis.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgheadline10">
+<h3 id="orgheadline10">Hello World: Fair or Trick coin?</h3>
+<ul>
+<li>Coin bias, tendency to fall on head: &theta;</li>
+<li>We can <b>not</b> measure &theta; directly</li>
+<li>We can only know sample data (D)</li>
+<li>&theta; is general; &theta;<sub>1</sub>, &theta;<sub>2</sub>, &#x2026;, &theta;<sub>n</sub> are specific values</li>
+<li>D is general; 3 heads out of 10 specific</li>
+
+</ul>
+
+<p>
+By Bayes' rule:
+</p>
+
+<div>
+\begin{equation*}
+\Pr(\theta|D) = \frac{\Pr(D|\theta)\times \Pr(\theta)}{\Pr(D)}
+\end{equation*}
+
+</div>
+
+</section>
+<section id="slide-orgheadline11">
+<h3 id="orgheadline11">Analytical solution</h3>
+<p>
+Likelihood:
+</p>
+<p>
+Pr(z,N|&theta;) = &theta;<sup>z</sup> (1 - &theta;)<sup>N-z</sup>
+</p>
+
+<p>
+(conjugate) prior
+</p>
+<p>
+Pr(&theta;|a,b) = beta(&theta;|a,b) = &theta;<sup>(a-1)</sup>(1-&theta;)<sup>(b-1)</sup>/B(a,b)
+</p>
+
+<p>
+Posterior, conveniently:
+</p>
+<p>
+Pr(&theta;|z,N) = beta(&theta;|z+a, N - z + b)
+</p>
+
+</section>
+<section id="slide-orgheadline12">
+<h3 id="orgheadline12">Example from Kruschke's book</h3>
+
+<div class="figure">
+<p><img src="coin-analytical.png" alt="coin-analytical.png" height="50%," width="50%" />
+</p>
+</div>
+
+</section>
+<section id="slide-orgheadline13">
+<h3 id="orgheadline13">Easy computation</h3>
+<p>
+What is Pr(0.4&lt;&theta;&lt;0.6)?
+</p>
+
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><span style="color: #8b0000; background-color: #333333;">(</span><span style="color: #4c83ff; background-color: #333333; font-weight: bold;">let</span><span style="background-color: #333333;"> </span><span style="color: #006400; background-color: #333333;">[</span><span style="background-color: #333333;">a-prior 5
+      b-prior 5
+      z 1
+      </span><span style="color: #96CBFE; background-color: #333333;">N</span><span style="background-color: #333333;"> 10
+      a-post </span><span style="color: #ff1493; background-color: #333333;">(</span><span style="background-color: #333333;">+ a-prior z</span><span style="color: #ff1493; background-color: #333333;">)</span><span style="background-color: #333333;">
+      b-post </span><span style="color: #ff1493; background-color: #333333;">(</span><span style="background-color: #333333;">+ b-prior </span><span style="color: #ffff00; background-color: #333333;">(</span><span style="background-color: #333333;">- </span><span style="color: #96CBFE; background-color: #333333;">N</span><span style="background-color: #333333;"> z</span><span style="color: #ffff00; background-color: #333333;">)</span><span style="color: #ff1493; background-color: #333333;">)</span><span style="color: #006400; background-color: #333333;">]</span><span style="background-color: #333333;">
+
+</span><span style="color: #006400; background-color: #333333;">(</span><span style="background-color: #333333;">- </span><span style="color: #ff1493; background-color: #333333;">(</span><span style="background-color: #333333;">beta-cdf a-post b-post 0.6</span><span style="color: #ff1493; background-color: #333333;">)</span><span style="background-color: #333333;">
+   </span><span style="color: #ff1493; background-color: #333333;">(</span><span style="background-color: #333333;">beta-cdf a-post b-post 0.4</span><span style="color: #ff1493; background-color: #333333;">)</span><span style="color: #006400; background-color: #333333;">)</span><span style="color: #8b0000; background-color: #333333;">)</span><span style="background-color: #333333;">
+</span>
+</pre>
+</div>
+
+<pre class="example">
+0.15985465263144316
+</pre>
+
+</section>
+<section id="slide-orgheadline14">
+<h3 id="orgheadline14">Never happens in practice</h3>
+<ul>
+<li>Only the simplest models are "nice"</li>
+<li>The curse of dimensionality</li>
+<li>We have to use numerical methods (MCMC)</li>
+
+</ul>
+
+</section>
+</section>
+<section>
+<section id="slide-orgheadline19">
+<h2 id="orgheadline19"><font color = "orangered">Bayadera</font></h2>
+<ul>
+<li>a Clojure library
+<ul>
+<li>highly opinionated - Bayesian</li>
+<li>probabilistic</li>
+<li>need to NOT be super slow - thus <b>GPU</b></li>
+<li>actually is the fastest I have seen</li>
+
+</ul></li>
+<li>use cases:
+<ul>
+<li>Bayesian data analysis (more stats-oriented)</li>
+<li>a foundation for machine learning algorithms</li>
+<li>lots of statistical number crunching</li>
+<li>risk assessment, decision analysis, etc.</li>
+
+</ul></li>
+
+</ul>
+
+<aside class="notes">
+<p>
+
+</p>
+
+<p>
+Bayadera is a highly opinionated Bayesian probabilistic Clojure library, that is
+much faster than the state-of-the-art established environments.
+</p>
+
+<p>
+I built it primarily for doing Bayesian data analysis, but plan to
+build on it to do machine learning.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgheadline16">
+<h3 id="orgheadline16">Bayadera Goals</h3>
+<ul>
+<li><b>programmers are the first-class citizens</b></li>
+<li><b>not</b> a "me too, just in Clojure"</li>
+<li><b>different</b> and better (for what I want to do)</li>
+<li>for interactive <b>and server</b> use</li>
+
+</ul>
+
+<aside class="notes">
+<p>
+Bayadera aims to be a well-designed software product.
+</p>
+
+<p>
+Programmers should feel at home and be able to do both the usual scientific
+stuff, but also to build robust software running on servers!
+</p>
+
+<p>
+It does NOT to try to catch up to what R and Python (and Julia) already do.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgheadline17">
+<h3 id="orgheadline17">HARD to compute</h3>
+<p>
+Usually:
+</p>
+
+<div>
+\begin{equation*}
+\Pr(\vec{h}|\vec{d}) = \frac{\prod_i f(\vec{d_i},\vec{h})\times g(\vec{h})}{\idotsint \prod_i f(\vec{d_i},\vec{h})\,d \vec{h}}
+\end{equation*}
+
+</div>
+
+<p>
+computationally:
+</p>
+
+<div>
+\begin{equation*}
+answer = \frac{hard\times acceptable}{impossible}
+\end{equation*}
+
+</div>
+
+<aside class="notes">
+<p>
+The main problem that held Bayesian methods dormant for 200 years,
+until a decade or two ago was that it is ridiculouslyhard to compute in the general case!
+</p>
+
+<p>
+Usually, we do not have a nice unimodal one-dimensional problems that nicely fit into
+analytical formulas and lead to simple results.
+We have to explore this multi-dimensional continuous space numerically.
+</p>
+
+<p>
+So, to get the answer, we have to multiply something that is hard to compute with
+something that is acceptably simpler, do this many (millions, billions) of times, and
+divide by something that is practically impossible to compute by brute force.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgheadline18">
+<h3 id="orgheadline18">Markov Chain Monte Carlo (MCMC)</h3>
+<ul>
+<li>a family of simulation algorithms</li>
+<li>draws samples from <b>unknown</b> probability distributions</li>
+<li>(enough) samples approximate the distribution</li>
+
+</ul>
+
+<div>
+\begin{equation*}
+\Pr(\vec{h}|\vec{d}) \propto \exp \left(\sum_i \log f(\vec{d_i},\vec{h}) + \log g(\vec{h})\right)
+\end{equation*}
+
+</div>
+
+<p>
+computationally:
+</p>
+
+<div>
+\begin{equation*}
+answer \propto zillions \times (hard\times acceptable)
+\end{equation*}
+
+</div>
+
+<aside class="notes">
+<p>
+Long story short, MCMC can simulate and draw samples from an unknown distribution.
+With enough samples, we can approximate that distribution -
+the impossible-to-compute posterior that we were looking for!
+</p>
+
+<p>
+By using the MCMC algorithm, we are left with "just"
+computing zillions of "only" hard to compute things.
+</p>
+
+<p>
+That's why CPU-based Bayesian is notoriously slow. Luckily,
+GPU can help us in bringing that time to acceptable levels.
+</p>
+
+</aside>
+
+</section>
+</section>
+<section>
+<section id="slide-orgheadline22">
+<h2 id="orgheadline22">The coin example through simulation</h2>
+<ul>
+<li>MCMC not necessary in this case</li>
+<li>Good as a hello world example</li>
+<li>Comparison with analytical solution</li>
+
+</ul>
+
+</section>
+<section id="slide-orgheadline20">
+<h3 id="orgheadline20">Run the analysis on the GPU</h3>
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><span style="color: #8b0000; background-color: #333333;">(</span><span style="color: #4c83ff; background-color: #333333; font-weight: bold;">def</span><span style="background-color: #333333;"> </span><span style="color: #ff69b4; background-color: #333333;">result</span><span style="background-color: #333333;"> </span><span style="color: #006400; background-color: #333333;">(</span><span style="background-color: #333333;">atom
+</span><span style="color: #ff1493; background-color: #333333;">(</span><span style="background-color: #333333;">with-default-bayadera
+  </span><span style="color: #ffff00; background-color: #333333;">(</span><span style="color: #4c83ff; background-color: #333333; font-weight: bold;">let</span><span style="background-color: #333333;"> </span><span style="color: #00ff00; background-color: #333333;">[</span><span style="background-color: #333333;">a 5 b 5
+        z 1 </span><span style="color: #96CBFE; background-color: #333333;">N</span><span style="background-color: #333333;"> 10</span><span style="color: #00ff00; background-color: #333333;">]</span><span style="background-color: #333333;">
+    </span><span style="color: #00ff00; background-color: #333333;">(</span><span style="background-color: #333333;">with-release
+      </span><span style="color: #add8e6; background-color: #333333;">[</span><span style="background-color: #333333;">prior-dist </span><span style="color: #ffa500; background-color: #333333;">(</span><span style="background-color: #333333;">beta a b</span><span style="color: #ffa500; background-color: #333333;">)</span><span style="background-color: #333333;">
+       prior-sampler </span><span style="color: #ffa500; background-color: #333333;">(</span><span style="background-color: #333333;">sampler prior-dist</span><span style="color: #ffa500; background-color: #333333;">)</span><span style="background-color: #333333;">
+       prior-sample </span><span style="color: #ffa500; background-color: #333333;">(</span><span style="background-color: #333333;">dataset </span><span style="color: #6a5acd; background-color: #333333;">(</span><span style="background-color: #333333;">sample! prior-sampler</span><span style="color: #6a5acd; background-color: #333333;">)</span><span style="color: #ffa500; background-color: #333333;">)</span><span style="background-color: #333333;">
+       prior-pdf </span><span style="color: #ffa500; background-color: #333333;">(</span><span style="background-color: #333333;">pdf prior-dist prior-sample</span><span style="color: #ffa500; background-color: #333333;">)</span><span style="background-color: #333333;">
+       post </span><span style="color: #ffa500; background-color: #333333;">(</span><span style="background-color: #333333;">posterior </span><span style="color: #6a5acd; background-color: #333333;">(</span><span style="background-color: #333333;">posterior-model </span><span style="color: #d3d3d3; background-color: #333333;">(</span><span style="color: #96CBFE; background-color: #333333;">:binomial</span><span style="background-color: #333333;"> likelihoods</span><span style="color: #d3d3d3; background-color: #333333;">)</span><span style="background-color: #333333;">
+                                        </span><span style="color: #d3d3d3; background-color: #333333;">(</span><span style="color: #96CBFE; background-color: #333333;">:beta</span><span style="background-color: #333333;"> distributions</span><span style="color: #d3d3d3; background-color: #333333;">)</span><span style="color: #6a5acd; background-color: #333333;">)</span><span style="color: #ffa500; background-color: #333333;">)</span><span style="background-color: #333333;">
+       post-dist </span><span style="color: #ffa500; background-color: #333333;">(</span><span style="background-color: #333333;">post </span><span style="color: #6a5acd; background-color: #333333;">(</span><span style="background-color: #333333;">sv </span><span style="color: #d3d3d3; background-color: #333333;">(</span><span style="background-color: #333333;">op </span><span style="color: #8b0000; background-color: #333333;">(</span><span style="background-color: #333333;">binomial-lik-params </span><span style="color: #96CBFE; background-color: #333333;">N</span><span style="background-color: #333333;"> z</span><span style="color: #8b0000; background-color: #333333;">)</span><span style="background-color: #333333;"> </span><span style="color: #8b0000; background-color: #333333;">(</span><span style="background-color: #333333;">beta-params a b</span><span style="color: #8b0000; background-color: #333333;">)</span><span style="color: #d3d3d3; background-color: #333333;">)</span><span style="color: #6a5acd; background-color: #333333;">)</span><span style="color: #ffa500; background-color: #333333;">)</span><span style="background-color: #333333;">
+       post-sampler </span><span style="color: #ffa500; background-color: #333333;">(</span><span style="background-color: #333333;">time </span><span style="color: #6a5acd; background-color: #333333;">(</span><span style="color: #4c83ff; background-color: #333333; font-weight: bold;">doto</span><span style="background-color: #333333;"> </span><span style="color: #d3d3d3; background-color: #333333;">(</span><span style="background-color: #333333;">sampler post-dist</span><span style="color: #d3d3d3; background-color: #333333;">)</span><span style="background-color: #333333;"> </span><span style="color: #d3d3d3; background-color: #333333;">(</span><span style="background-color: #333333;">mix!</span><span style="color: #d3d3d3; background-color: #333333;">)</span><span style="color: #6a5acd; background-color: #333333;">)</span><span style="color: #ffa500; background-color: #333333;">)</span><span style="background-color: #333333;">
+       post-sample </span><span style="color: #ffa500; background-color: #333333;">(</span><span style="background-color: #333333;">dataset </span><span style="color: #6a5acd; background-color: #333333;">(</span><span style="background-color: #333333;">sample! post-sampler</span><span style="color: #6a5acd; background-color: #333333;">)</span><span style="color: #ffa500; background-color: #333333;">)</span><span style="background-color: #333333;">
+       post-pdf </span><span style="color: #ffa500; background-color: #333333;">(</span><span style="background-color: #333333;">scal! </span><span style="color: #6a5acd; background-color: #333333;">(</span><span style="background-color: #333333;">/ 1.0 </span><span style="color: #d3d3d3; background-color: #333333;">(</span><span style="background-color: #333333;">evidence post-dist prior-sample</span><span style="color: #d3d3d3; background-color: #333333;">)</span><span style="color: #6a5acd; background-color: #333333;">)</span><span style="background-color: #333333;">
+                       </span><span style="color: #6a5acd; background-color: #333333;">(</span><span style="background-color: #333333;">pdf post-dist post-sample</span><span style="color: #6a5acd; background-color: #333333;">)</span><span style="color: #ffa500; background-color: #333333;">)</span><span style="color: #add8e6; background-color: #333333;">]</span><span style="background-color: #333333;">
+
+      </span><span style="color: #add8e6; background-color: #333333;">{</span><span style="color: #96CBFE; background-color: #333333;">:prior</span><span style="background-color: #333333;"> </span><span style="color: #ffa500; background-color: #333333;">{</span><span style="color: #96CBFE; background-color: #333333;">:sample</span><span style="background-color: #333333;"> </span><span style="color: #6a5acd; background-color: #333333;">(</span><span style="background-color: #333333;">native </span><span style="color: #d3d3d3; background-color: #333333;">(</span><span style="background-color: #333333;">row </span><span style="color: #8b0000; background-color: #333333;">(</span><span style="color: #afd8af; background-color: #333333;">p</span><span style="color: #d3d3d3; background-color: #333333;">/</span><span style="background-color: #333333;">data prior-sample</span><span style="color: #8b0000; background-color: #333333;">)</span><span style="background-color: #333333;"> 0</span><span style="color: #d3d3d3; background-color: #333333;">)</span><span style="color: #6a5acd; background-color: #333333;">)</span><span style="background-color: #333333;">
+               </span><span style="color: #96CBFE; background-color: #333333;">:pdf</span><span style="background-color: #333333;"> </span><span style="color: #6a5acd; background-color: #333333;">(</span><span style="background-color: #333333;">native prior-pdf</span><span style="color: #6a5acd; background-color: #333333;">)</span><span style="color: #ffa500; background-color: #333333;">}</span><span style="background-color: #333333;">
+       </span><span style="color: #96CBFE; background-color: #333333;">:posterior</span><span style="background-color: #333333;"> </span><span style="color: #ffa500; background-color: #333333;">{</span><span style="color: #96CBFE; background-color: #333333;">:sample</span><span style="background-color: #333333;"> </span><span style="color: #6a5acd; background-color: #333333;">(</span><span style="background-color: #333333;">native </span><span style="color: #d3d3d3; background-color: #333333;">(</span><span style="background-color: #333333;">row </span><span style="color: #8b0000; background-color: #333333;">(</span><span style="color: #afd8af; background-color: #333333;">p</span><span style="color: #d3d3d3; background-color: #333333;">/</span><span style="background-color: #333333;">data post-sample</span><span style="color: #8b0000; background-color: #333333;">)</span><span style="background-color: #333333;"> 0</span><span style="color: #d3d3d3; background-color: #333333;">)</span><span style="color: #6a5acd; background-color: #333333;">)</span><span style="background-color: #333333;">
+                   </span><span style="color: #96CBFE; background-color: #333333;">:pdf</span><span style="background-color: #333333;"> </span><span style="color: #6a5acd; background-color: #333333;">(</span><span style="background-color: #333333;">native post-pdf</span><span style="color: #6a5acd; background-color: #333333;">)</span><span style="color: #ffa500; background-color: #333333;">}</span><span style="color: #add8e6; background-color: #333333;">}</span><span style="color: #00ff00; background-color: #333333;">)</span><span style="color: #ffff00; background-color: #333333;">)</span><span style="color: #ff1493; background-color: #333333;">)</span><span style="color: #006400; background-color: #333333;">)</span><span style="color: #8b0000; background-color: #333333;">)</span><span style="background-color: #333333;">
+</span>
+</pre>
+</div>
+
+</section>
+<section id="slide-orgheadline21">
+<h3 id="orgheadline21">Prior and posterior plots</h3>
+
+<div class="figure">
+<p><img src="coin.png" alt="coin.png" />
+</p>
+</div>
+
+</section>
+</section>
+<section>
+<section id="slide-orgheadline32">
+<h2 id="orgheadline32">Real-World: Robust Linear Regression</h2>
+
+<div class="figure">
+<p><img src="kruschke-hlr-data.png" alt="kruschke-hlr-data.png" height="50%," width="50%" />
+</p>
+</div>
+
+</section>
+<section id="slide-orgheadline23">
+<h3 id="orgheadline23">Hierarchical Model</h3>
+
+<div class="figure">
+<p><img src="kruschke-hlr-model.png" alt="kruschke-hlr-model.png" />
+</p>
+</div>
+
+</section>
+<section id="slide-orgheadline24">
+<h3 id="orgheadline24">Resulting Posterior</h3>
+
+<div class="figure">
+<p><img src="kruschke-hlr-posterior.png" alt="kruschke-hlr-posterior.png" />
+</p>
+</div>
+
+</section>
+<section id="slide-orgheadline25">
+<h3 id="orgheadline25">Read the data</h3>
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><span style="color: #8b0000; background-color: #333333;">(</span><span style="color: #4c83ff; background-color: #333333; font-weight: bold;">defn</span><span style="background-color: #333333;"> </span><span style="color: #ff1493; background-color: #333333;">read-data</span><span style="background-color: #333333;"> </span><span style="color: #006400; background-color: #333333;">[</span><span style="background-color: #333333;">in-file</span><span style="color: #006400; background-color: #333333;">]</span><span style="background-color: #333333;">
+  </span><span style="color: #006400; background-color: #333333;">(</span><span style="color: #4c83ff; background-color: #333333; font-weight: bold;">loop</span><span style="background-color: #333333;"> </span><span style="color: #ff1493; background-color: #333333;">[</span><span style="background-color: #333333;">c 0 data </span><span style="color: #ffff00; background-color: #333333;">(</span><span style="background-color: #333333;">drop 1 </span><span style="color: #00ff00; background-color: #333333;">(</span><span style="color: #afd8af; background-color: #333333;">csv</span><span style="color: #d3d3d3; background-color: #333333;">/</span><span style="background-color: #333333;">read-csv in-file</span><span style="color: #00ff00; background-color: #333333;">)</span><span style="color: #ffff00; background-color: #333333;">)</span><span style="background-color: #333333;"> hw </span><span style="color: #ffff00; background-color: #333333;">(</span><span style="background-color: #333333;">transient </span><span style="color: #00ff00; background-color: #333333;">[]</span><span style="color: #ffff00; background-color: #333333;">)</span><span style="color: #ff1493; background-color: #333333;">]</span><span style="background-color: #333333;">
+    </span><span style="color: #ff1493; background-color: #333333;">(</span><span style="color: #4c83ff; background-color: #333333; font-weight: bold;">if</span><span style="background-color: #333333;"> data
+      </span><span style="color: #ffff00; background-color: #333333;">(</span><span style="color: #4c83ff; background-color: #333333; font-weight: bold;">let</span><span style="background-color: #333333;"> </span><span style="color: #00ff00; background-color: #333333;">[</span><span style="color: #add8e6; background-color: #333333;">[</span><span style="background-color: #333333;">_ h w</span><span style="color: #add8e6; background-color: #333333;">]</span><span style="background-color: #333333;"> </span><span style="color: #add8e6; background-color: #333333;">(</span><span style="background-color: #333333;">first data</span><span style="color: #add8e6; background-color: #333333;">)</span><span style="color: #00ff00; background-color: #333333;">]</span><span style="background-color: #333333;">
+        </span><span style="color: #00ff00; background-color: #333333;">(</span><span style="color: #4c83ff; background-color: #333333; font-weight: bold;">recur</span><span style="background-color: #333333;"> </span><span style="color: #add8e6; background-color: #333333;">(</span><span style="background-color: #333333;">inc c</span><span style="color: #add8e6; background-color: #333333;">)</span><span style="background-color: #333333;"> </span><span style="color: #add8e6; background-color: #333333;">(</span><span style="background-color: #333333;">next data</span><span style="color: #add8e6; background-color: #333333;">)</span><span style="background-color: #333333;">
+               </span><span style="color: #add8e6; background-color: #333333;">(</span><span style="color: #4c83ff; background-color: #333333; font-weight: bold;">-&gt;</span><span style="background-color: #333333;"> hw </span><span style="color: #ffa500; background-color: #333333;">(</span><span style="background-color: #333333;">conj! </span><span style="color: #6a5acd; background-color: #333333;">(</span><span style="background-color: #333333;">double </span><span style="color: #d3d3d3; background-color: #333333;">(</span><span style="background-color: #333333;">read-string h</span><span style="color: #d3d3d3; background-color: #333333;">)</span><span style="color: #6a5acd; background-color: #333333;">)</span><span style="color: #ffa500; background-color: #333333;">)</span><span style="background-color: #333333;">
+                   </span><span style="color: #ffa500; background-color: #333333;">(</span><span style="background-color: #333333;">conj! </span><span style="color: #6a5acd; background-color: #333333;">(</span><span style="background-color: #333333;">double </span><span style="color: #d3d3d3; background-color: #333333;">(</span><span style="background-color: #333333;">read-string w</span><span style="color: #d3d3d3; background-color: #333333;">)</span><span style="color: #6a5acd; background-color: #333333;">)</span><span style="color: #ffa500; background-color: #333333;">)</span><span style="color: #add8e6; background-color: #333333;">)</span><span style="color: #00ff00; background-color: #333333;">)</span><span style="color: #ffff00; background-color: #333333;">)</span><span style="background-color: #333333;">
+      </span><span style="color: #ffff00; background-color: #333333;">(</span><span style="background-color: #333333;">op </span><span style="color: #00ff00; background-color: #333333;">[</span><span style="background-color: #333333;">c</span><span style="color: #00ff00; background-color: #333333;">]</span><span style="background-color: #333333;"> </span><span style="color: #00ff00; background-color: #333333;">(</span><span style="background-color: #333333;">persistent! hw</span><span style="color: #00ff00; background-color: #333333;">)</span><span style="color: #ffff00; background-color: #333333;">)</span><span style="color: #ff1493; background-color: #333333;">)</span><span style="color: #006400; background-color: #333333;">)</span><span style="color: #8b0000; background-color: #333333;">)</span><span style="background-color: #333333;">
+
+</span><span style="color: #8b0000; background-color: #333333;">(</span><span style="color: #4c83ff; background-color: #333333; font-weight: bold;">def</span><span style="background-color: #333333;"> </span><span style="color: #ff69b4; background-color: #333333;">params-300</span><span style="background-color: #333333;"> </span><span style="color: #006400; background-color: #333333;">(</span><span style="background-color: #333333;">sv </span><span style="color: #ff1493; background-color: #333333;">(</span><span style="background-color: #333333;">read-data </span><span style="color: #ffff00; background-color: #333333;">(</span><span style="background-color: #333333;">slurp </span><span style="color: #00ff00; background-color: #333333;">(</span><span style="color: #afd8af; background-color: #333333;">io</span><span style="color: #d3d3d3; background-color: #333333;">/</span><span style="background-color: #333333;">file </span><span style="color: #61CE3C; background-color: #333333;">"ht-wt-data-300.csv"</span><span style="color: #00ff00; background-color: #333333;">)</span><span style="color: #ffff00; background-color: #333333;">)</span><span style="color: #ff1493; background-color: #333333;">)</span><span style="color: #006400; background-color: #333333;">)</span><span style="color: #8b0000; background-color: #333333;">)</span><span style="background-color: #333333;">
+</span>
+</pre>
+</div>
+
+</section>
+<section id="slide-orgheadline26">
+<h3 id="orgheadline26">Create a custom model</h3>
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><span style="color: #8b0000; background-color: #333333;">(</span><span style="color: #4c83ff; background-color: #333333; font-weight: bold;">def</span><span style="background-color: #333333;"> </span><span style="color: #ff69b4; background-color: #333333;">rlr-source</span><span style="background-color: #333333;"> </span><span style="color: #006400; background-color: #333333;">(</span><span style="background-color: #333333;">slurp </span><span style="color: #ff1493; background-color: #333333;">(</span><span style="color: #afd8af; background-color: #333333;">io</span><span style="color: #d3d3d3; background-color: #333333;">/</span><span style="background-color: #333333;">file </span><span style="color: #61CE3C; background-color: #333333;">"robust-linear-regression.h"</span><span style="color: #ff1493; background-color: #333333;">)</span><span style="color: #006400; background-color: #333333;">)</span><span style="color: #8b0000; background-color: #333333;">)</span><span style="background-color: #333333;">
+
+</span><span style="color: #8b0000; background-color: #333333;">(</span><span style="color: #4c83ff; background-color: #333333; font-weight: bold;">def</span><span style="background-color: #333333;"> </span><span style="color: #ff69b4; background-color: #333333;">rlr-prior</span><span style="background-color: #333333;">
+  </span><span style="color: #006400; background-color: #333333;">(</span><span style="background-color: #333333;">cl-distribution-model </span><span style="color: #ff1493; background-color: #333333;">[</span><span style="color: #ffff00; background-color: #333333;">(</span><span style="color: #96CBFE; background-color: #333333;">:gaussian</span><span style="background-color: #333333;"> source-library</span><span style="color: #ffff00; background-color: #333333;">)</span><span style="background-color: #333333;">
+                          </span><span style="color: #ffff00; background-color: #333333;">(</span><span style="color: #96CBFE; background-color: #333333;">:uniform</span><span style="background-color: #333333;"> source-library</span><span style="color: #ffff00; background-color: #333333;">)</span><span style="background-color: #333333;">
+                          </span><span style="color: #ffff00; background-color: #333333;">(</span><span style="color: #96CBFE; background-color: #333333;">:exponential</span><span style="background-color: #333333;"> source-library</span><span style="color: #ffff00; background-color: #333333;">)</span><span style="background-color: #333333;">
+                          </span><span style="color: #ffff00; background-color: #333333;">(</span><span style="color: #96CBFE; background-color: #333333;">:t</span><span style="background-color: #333333;"> source-library</span><span style="color: #ffff00; background-color: #333333;">)</span><span style="background-color: #333333;">
+                          rlr-source</span><span style="color: #ff1493; background-color: #333333;">]</span><span style="background-color: #333333;">
+                         </span><span style="color: #96CBFE; background-color: #333333;">:name</span><span style="background-color: #333333;"> </span><span style="color: #61CE3C; background-color: #333333;">"rlr"</span><span style="background-color: #333333;"> </span><span style="color: #96CBFE; background-color: #333333;">:mcmc-logpdf</span><span style="background-color: #333333;"> </span><span style="color: #61CE3C; background-color: #333333;">"rlr_mcmc_logpdf"</span><span style="background-color: #333333;">
+                         </span><span style="color: #96CBFE; background-color: #333333;">:params-size</span><span style="background-color: #333333;"> 7 </span><span style="color: #96CBFE; background-color: #333333;">:dimension</span><span style="background-color: #333333;"> 4</span><span style="color: #006400; background-color: #333333;">)</span><span style="color: #8b0000; background-color: #333333;">)</span><span style="background-color: #333333;">
+
+</span><span style="color: #8b0000; background-color: #333333;">(</span><span style="color: #4c83ff; background-color: #333333; font-weight: bold;">defn</span><span style="background-color: #333333;"> </span><span style="color: #ff1493; background-color: #333333;">rlr-likelihood</span><span style="background-color: #333333;"> </span><span style="color: #006400; background-color: #333333;">[</span><span style="background-color: #333333;">n</span><span style="color: #006400; background-color: #333333;">]</span><span style="background-color: #333333;">
+  </span><span style="color: #006400; background-color: #333333;">(</span><span style="background-color: #333333;">cl-likelihood-model rlr-source </span><span style="color: #96CBFE; background-color: #333333;">:name</span><span style="background-color: #333333;"> </span><span style="color: #61CE3C; background-color: #333333;">"rlr"</span><span style="background-color: #333333;"> </span><span style="color: #96CBFE; background-color: #333333;">:params-size</span><span style="background-color: #333333;"> n</span><span style="color: #006400; background-color: #333333;">)</span><span style="color: #8b0000; background-color: #333333;">)</span><span style="background-color: #333333;">
+</span>
+</pre>
+</div>
+
+</section>
+<section id="slide-orgheadline27">
+<h3 id="orgheadline27">Model's likelihood function</h3>
+<div class="org-src-container">
+
+<pre  class="src src-c"><span style="color: #afd8af; background-color: #333333;">REAL</span><span style="background-color: #333333;"> </span><span style="color: #ff1493; background-color: #333333;">rlr_loglik</span><span style="background-color: #333333;">(</span><span style="color: #afd8af; background-color: #333333;">__constant</span><span style="background-color: #333333;"> </span><span style="color: #4c83ff; background-color: #333333; font-weight: bold;">const</span><span style="background-color: #333333;"> </span><span style="color: #ff69b4; background-color: #333333;">REAL</span><span style="background-color: #333333;">* params, </span><span style="color: #afd8af; background-color: #333333;">REAL</span><span style="background-color: #333333;">* </span><span style="color: #ff69b4; background-color: #333333;">x</span><span style="background-color: #333333;">) {
+    </span><span style="color: #4c83ff; background-color: #333333; font-weight: bold;">const</span><span style="background-color: #333333;"> </span><span style="color: #afd8af; background-color: #333333;">REAL</span><span style="background-color: #333333;"> </span><span style="color: #ff69b4; background-color: #333333;">nu</span><span style="background-color: #333333;"> = x[0];
+    </span><span style="color: #4c83ff; background-color: #333333; font-weight: bold;">const</span><span style="background-color: #333333;"> </span><span style="color: #afd8af; background-color: #333333;">REAL</span><span style="background-color: #333333;"> </span><span style="color: #ff69b4; background-color: #333333;">b0</span><span style="background-color: #333333;"> = x[1];
+    </span><span style="color: #4c83ff; background-color: #333333; font-weight: bold;">const</span><span style="background-color: #333333;"> </span><span style="color: #afd8af; background-color: #333333;">REAL</span><span style="background-color: #333333;"> </span><span style="color: #ff69b4; background-color: #333333;">b1</span><span style="background-color: #333333;"> = x[2];
+    </span><span style="color: #4c83ff; background-color: #333333; font-weight: bold;">const</span><span style="background-color: #333333;"> </span><span style="color: #afd8af; background-color: #333333;">REAL</span><span style="background-color: #333333;"> </span><span style="color: #ff69b4; background-color: #333333;">sigma</span><span style="background-color: #333333;"> = x[3];
+    </span><span style="color: #4c83ff; background-color: #333333; font-weight: bold;">const</span><span style="background-color: #333333;"> </span><span style="color: #afd8af; background-color: #333333;">uint</span><span style="background-color: #333333;"> </span><span style="color: #ff69b4; background-color: #333333;">n</span><span style="background-color: #333333;"> = (</span><span style="color: #afd8af; background-color: #333333;">uint</span><span style="background-color: #333333;">)params[0];
+    </span><span style="color: #4c83ff; background-color: #333333; font-weight: bold;">const</span><span style="background-color: #333333;"> </span><span style="color: #afd8af; background-color: #333333;">bool</span><span style="background-color: #333333;"> </span><span style="color: #ff69b4; background-color: #333333;">valid</span><span style="background-color: #333333;"> = (0.0f &lt; nu) &amp;&amp; (0.0f &lt; sigma);
+    </span><span style="color: #4c83ff; background-color: #333333; font-weight: bold;">if</span><span style="background-color: #333333;"> (valid) {
+        </span><span style="color: #4c83ff; background-color: #333333; font-weight: bold;">const</span><span style="background-color: #333333;"> </span><span style="color: #afd8af; background-color: #333333;">REAL</span><span style="background-color: #333333;"> </span><span style="color: #ff69b4; background-color: #333333;">scale</span><span style="background-color: #333333;"> = t_log_scale(nu, sigma);
+        </span><span style="color: #afd8af; background-color: #333333;">REAL</span><span style="background-color: #333333;"> </span><span style="color: #ff69b4; background-color: #333333;">res</span><span style="background-color: #333333;"> = 0.0;
+        </span><span style="color: #4c83ff; background-color: #333333; font-weight: bold;">for</span><span style="background-color: #333333;"> (</span><span style="color: #afd8af; background-color: #333333;">uint</span><span style="background-color: #333333;"> </span><span style="color: #ff69b4; background-color: #333333;">i</span><span style="background-color: #333333;"> = 0; i &lt; n; i = i+2) {
+            res += t_log_unscaled(nu,
+                                  b0 + b1 * params[i+1],
+                                  sigma, params[i+2])
+                + scale;
+        }
+        </span><span style="color: #4c83ff; background-color: #333333; font-weight: bold;">return</span><span style="background-color: #333333;"> res;
+    }
+    </span><span style="color: #4c83ff; background-color: #333333; font-weight: bold;">return</span><span style="background-color: #333333;"> NAN;
+}
+</span>
+</pre>
+</div>
+
+</section>
+<section id="slide-orgheadline28">
+<h3 id="orgheadline28">Model's prior function</h3>
+<div class="org-src-container">
+
+<pre  class="src src-c"><span style="color: #afd8af; background-color: #333333;">REAL</span><span style="background-color: #333333;"> </span><span style="color: #ff1493; background-color: #333333;">rlr_logpdf</span><span style="background-color: #333333;">(</span><span style="color: #afd8af; background-color: #333333;">__constant</span><span style="background-color: #333333;"> </span><span style="color: #4c83ff; background-color: #333333; font-weight: bold;">const</span><span style="background-color: #333333;"> </span><span style="color: #ff69b4; background-color: #333333;">REAL</span><span style="background-color: #333333;">* params, </span><span style="color: #afd8af; background-color: #333333;">REAL</span><span style="background-color: #333333;">* </span><span style="color: #ff69b4; background-color: #333333;">x</span><span style="background-color: #333333;">) {
+    </span><span style="color: #4c83ff; background-color: #333333; font-weight: bold;">return</span><span style="background-color: #333333;"> exponential_log(params[0], x[0] - 1)
+        + gaussian_log(params[1], params[2], x[1])
+        + gaussian_log(params[3], params[4], x[2])
+        + uniform_log(params[5], params[6], x[3]);
+
+}
+</span>
+</pre>
+</div>
+
+</section>
+<section id="slide-orgheadline29">
+<h3 id="orgheadline29">Running the inference on the GPU</h3>
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><span style="color: #8b0000; background-color: #333333;">(</span><span style="color: #4c83ff; background-color: #333333; font-weight: bold;">def</span><span style="background-color: #333333;"> </span><span style="color: #ff69b4; background-color: #333333;">result</span><span style="background-color: #333333;"> </span><span style="color: #006400; background-color: #333333;">(</span><span style="background-color: #333333;">atom
+</span><span style="color: #ff1493; background-color: #333333;">(</span><span style="background-color: #333333;">with-default-bayadera
+  </span><span style="color: #ffff00; background-color: #333333;">(</span><span style="background-color: #333333;">with-release
+    </span><span style="color: #00ff00; background-color: #333333;">[</span><span style="background-color: #333333;">prior </span><span style="color: #add8e6; background-color: #333333;">(</span><span style="background-color: #333333;">distribution rlr-prior</span><span style="color: #add8e6; background-color: #333333;">)</span><span style="background-color: #333333;">
+     prior-dist </span><span style="color: #add8e6; background-color: #333333;">(</span><span style="background-color: #333333;">prior </span><span style="color: #ffa500; background-color: #333333;">(</span><span style="background-color: #333333;">sv 10 -100 100 5 10 0.001 1000</span><span style="color: #ffa500; background-color: #333333;">)</span><span style="color: #add8e6; background-color: #333333;">)</span><span style="background-color: #333333;">
+
+     post </span><span style="color: #add8e6; background-color: #333333;">(</span><span style="background-color: #333333;">posterior </span><span style="color: #61CE3C; background-color: #333333;">"rlr_300"</span><span style="background-color: #333333;"> </span><span style="color: #ffa500; background-color: #333333;">(</span><span style="background-color: #333333;">rlr-likelihood </span><span style="color: #6a5acd; background-color: #333333;">(</span><span style="background-color: #333333;">dim params-300</span><span style="color: #6a5acd; background-color: #333333;">)</span><span style="color: #ffa500; background-color: #333333;">)</span><span style="background-color: #333333;"> prior-dist</span><span style="color: #add8e6; background-color: #333333;">)</span><span style="background-color: #333333;">
+     post-dist </span><span style="color: #add8e6; background-color: #333333;">(</span><span style="background-color: #333333;">post params-300</span><span style="color: #add8e6; background-color: #333333;">)</span><span style="background-color: #333333;">
+     post-sampler </span><span style="color: #add8e6; background-color: #333333;">(</span><span style="background-color: #333333;">sampler post-dist </span><span style="color: #ffa500; background-color: #333333;">{</span><span style="color: #96CBFE; background-color: #333333;">:limits</span><span style="background-color: #333333;"> </span><span style="color: #6a5acd; background-color: #333333;">(</span><span style="background-color: #333333;">sge 2 4 </span><span style="color: #d3d3d3; background-color: #333333;">[</span><span style="background-color: #333333;">1 10 -400 100 0 20 0.01 100</span><span style="color: #d3d3d3; background-color: #333333;">]</span><span style="color: #6a5acd; background-color: #333333;">)</span><span style="color: #ffa500; background-color: #333333;">}</span><span style="color: #add8e6; background-color: #333333;">)</span><span style="color: #00ff00; background-color: #333333;">]</span><span style="background-color: #333333;">
+
+    </span><span style="color: #00ff00; background-color: #333333;">(</span><span style="background-color: #333333;">mix! post-sampler </span><span style="color: #add8e6; background-color: #333333;">{</span><span style="color: #96CBFE; background-color: #333333;">:step</span><span style="background-color: #333333;"> 384</span><span style="color: #add8e6; background-color: #333333;">}</span><span style="color: #00ff00; background-color: #333333;">)</span><span style="background-color: #333333;">
+
+    </span><span style="color: #00ff00; background-color: #333333;">(</span><span style="background-color: #333333;">histogram! post-sampler 1000</span><span style="color: #00ff00; background-color: #333333;">)</span><span style="color: #ffff00; background-color: #333333;">)</span><span style="color: #ff1493; background-color: #333333;">)</span><span style="color: #006400; background-color: #333333;">)</span><span style="color: #8b0000; background-color: #333333;">)</span><span style="background-color: #333333;">
+</span>
+</pre>
+</div>
+
+</section>
+<section id="slide-orgheadline30">
+<h3 id="orgheadline30">Generate posterior diagrams</h3>
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><span style="color: #8b0000; background-color: #333333;">(</span><span style="color: #4c83ff; background-color: #333333; font-weight: bold;">defn</span><span style="background-color: #333333;"> </span><span style="color: #ff1493; background-color: #333333;">var-plot</span><span style="background-color: #333333;"> </span><span style="color: #006400; background-color: #333333;">[]</span><span style="background-color: #333333;"> </span><span style="color: #006400; background-color: #333333;">(</span><span style="background-color: #333333;">plot2d </span><span style="color: #ff1493; background-color: #333333;">(</span><span style="color: #afd8af; background-color: #333333;">qa</span><span style="color: #d3d3d3; background-color: #333333;">/</span><span style="background-color: #333333;">current-applet</span><span style="color: #ff1493; background-color: #333333;">)</span><span style="background-color: #333333;"> </span><span style="color: #ff1493; background-color: #333333;">{</span><span style="color: #96CBFE; background-color: #333333;">:width</span><span style="background-color: #333333;"> 900 </span><span style="color: #96CBFE; background-color: #333333;">:height</span><span style="background-color: #333333;"> 500</span><span style="color: #ff1493; background-color: #333333;">}</span><span style="color: #006400; background-color: #333333;">)</span><span style="color: #8b0000; background-color: #333333;">)</span><span style="background-color: #333333;">
+
+</span><span style="color: #8b0000; background-color: #333333;">(</span><span style="color: #4c83ff; background-color: #333333; font-weight: bold;">defn</span><span style="background-color: #333333;"> </span><span style="color: #ff1493; background-color: #333333;">setup</span><span style="background-color: #333333;"> </span><span style="color: #006400; background-color: #333333;">[]</span><span style="background-color: #333333;">
+  </span><span style="color: #006400; background-color: #333333;">(</span><span style="color: #afd8af; background-color: #333333;">q</span><span style="color: #d3d3d3; background-color: #333333;">/</span><span style="background-color: #333333;">background 0</span><span style="color: #006400; background-color: #333333;">)</span><span style="background-color: #333333;">
+  </span><span style="color: #006400; background-color: #333333;">(</span><span style="color: #afd8af; background-color: #333333;">q</span><span style="color: #d3d3d3; background-color: #333333;">/</span><span style="background-color: #333333;">image </span><span style="color: #ff1493; background-color: #333333;">(</span><span style="background-color: #333333;">show </span><span style="color: #ffff00; background-color: #333333;">(</span><span style="background-color: #333333;">render-histogram </span><span style="color: #00ff00; background-color: #333333;">(</span><span style="background-color: #333333;">var-plot</span><span style="color: #00ff00; background-color: #333333;">)</span><span style="background-color: #333333;"> @result 1</span><span style="color: #ffff00; background-color: #333333;">)</span><span style="color: #ff1493; background-color: #333333;">)</span><span style="background-color: #333333;"> 0 0</span><span style="color: #006400; background-color: #333333;">)</span><span style="background-color: #333333;">
+  </span><span style="color: #006400; background-color: #333333;">(</span><span style="color: #afd8af; background-color: #333333;">q</span><span style="color: #d3d3d3; background-color: #333333;">/</span><span style="background-color: #333333;">image </span><span style="color: #ff1493; background-color: #333333;">(</span><span style="background-color: #333333;">show </span><span style="color: #ffff00; background-color: #333333;">(</span><span style="background-color: #333333;">render-histogram </span><span style="color: #00ff00; background-color: #333333;">(</span><span style="background-color: #333333;">var-plot</span><span style="color: #00ff00; background-color: #333333;">)</span><span style="background-color: #333333;"> @result 2</span><span style="color: #ffff00; background-color: #333333;">)</span><span style="color: #ff1493; background-color: #333333;">)</span><span style="background-color: #333333;"> 950 0</span><span style="color: #006400; background-color: #333333;">)</span><span style="background-color: #333333;">
+  </span><span style="color: #006400; background-color: #333333;">(</span><span style="color: #afd8af; background-color: #333333;">q</span><span style="color: #d3d3d3; background-color: #333333;">/</span><span style="background-color: #333333;">image </span><span style="color: #ff1493; background-color: #333333;">(</span><span style="background-color: #333333;">show </span><span style="color: #ffff00; background-color: #333333;">(</span><span style="background-color: #333333;">render-histogram </span><span style="color: #00ff00; background-color: #333333;">(</span><span style="background-color: #333333;">var-plot</span><span style="color: #00ff00; background-color: #333333;">)</span><span style="background-color: #333333;"> @result 3</span><span style="color: #ffff00; background-color: #333333;">)</span><span style="color: #ff1493; background-color: #333333;">)</span><span style="background-color: #333333;"> 0 550</span><span style="color: #006400; background-color: #333333;">)</span><span style="background-color: #333333;">
+  </span><span style="color: #006400; background-color: #333333;">(</span><span style="color: #afd8af; background-color: #333333;">q</span><span style="color: #d3d3d3; background-color: #333333;">/</span><span style="background-color: #333333;">image </span><span style="color: #ff1493; background-color: #333333;">(</span><span style="background-color: #333333;">show </span><span style="color: #ffff00; background-color: #333333;">(</span><span style="background-color: #333333;">render-histogram </span><span style="color: #00ff00; background-color: #333333;">(</span><span style="background-color: #333333;">var-plot</span><span style="color: #00ff00; background-color: #333333;">)</span><span style="background-color: #333333;"> @result 0</span><span style="color: #ffff00; background-color: #333333;">)</span><span style="color: #ff1493; background-color: #333333;">)</span><span style="background-color: #333333;"> 950 550</span><span style="color: #006400; background-color: #333333;">)</span><span style="background-color: #333333;">
+
+  </span><span style="color: #006400; background-color: #333333;">(</span><span style="color: #afd8af; background-color: #333333;">q</span><span style="color: #d3d3d3; background-color: #333333;">/</span><span style="background-color: #333333;">save </span><span style="color: #61CE3C; background-color: #333333;">"robust-linear-regression.png"</span><span style="color: #006400; background-color: #333333;">)</span><span style="color: #8b0000; background-color: #333333;">)</span><span style="background-color: #333333;">
+
+#_</span><span style="color: #8b0000; background-color: #333333; font-style: italic;">(</span><span style="color: #8B8989; background-color: #333333; font-style: italic;">q/defsketch diagrams :renderer :p2d :size :fullscreen</span><span style="background-color: #333333;">
+</span><span style="color: #8B8989; background-color: #333333; font-style: italic;">    :setup setup :middleware </span><span style="color: #006400; background-color: #333333; font-style: italic;">[</span><span style="color: #8B8989; background-color: #333333; font-style: italic;">pause-on-error</span><span style="color: #006400; background-color: #333333; font-style: italic;">]</span><span style="color: #8b0000; background-color: #333333; font-style: italic;">)</span><span style="background-color: #333333;">
+</span>
+</pre>
+</div>
+
+</section>
+<section id="slide-orgheadline31">
+<h3 id="orgheadline31">Posteriors</h3>
+<p>
+&beta;<sub>0</sub>, &beta;<sub>1,&sigma;</sub>, &nu;
+<img src="robust-linear-regression.png" alt="robust-linear-regression.png" />
+</p>
+
+</section>
+</section>
+<section>
+<section id="slide-orgheadline34">
+<h2 id="orgheadline34">How fast is it?</h2>
+<ul>
+<li>Bayadera
+<ul>
+<li>61,208,576 samples in 267 ms.</li>
+<li>4.36 ns per (computationally heavy) sample</li>
+<li>very precise histogram</li>
+
+</ul></li>
+<li>JAGS/Stan (state-of-the-art bayesian C++ tools)
+<ul>
+<li>20,000 samples in 180/485 seconds</li>
+<li>9 ms per sample</li>
+<li>rough histogram</li>
+
+</ul></li>
+<li><font color = "red">2,000,000 &times;</font> faster per sample</li>
+<li>more precise results, <font color = "red">1000 &times;</font> faster</li>
+
+</ul>
+
+<aside class="notes">
+<p>
+What I really wanted to show you is this: despite <b>MCMC being sequential by nature</b>,
+Bayadera runs circles around the best state of the art Bayesian environments!
+</p>
+
+<p>
+For this particular analysis, Bayadera took 60 M samples during the
+exploration of that complex multi-dimensional space in just 267 ms, which is 4 ns per sample!
+</p>
+
+<p>
+JAGS and Stan, two best popular R/Python tools implemented in C++ spent 180/485 seconds
+to get 20K samples.
+</p>
+
+<p>
+This is 2 million times less per sample. However, it is not fair to compare those
+directly, since Stan tries to spend more time on getting supposedly better convergence.
+</p>
+
+<p>
+But, when we compare the <b>whole analysis</b>, we can see that Bayadera was roughly
+1000 times faster, and yet produced a better result with much more precise histograms
+(not shown here)!
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgheadline33">
+<h3 id="orgheadline33">In real life</h3>
+<ul>
+<li>1 second vs a couple of hours</li>
+<li>1 minute vs several days!</li>
+<li>1 hour vs couple months/ a year</li>
+
+</ul>
+
+<aside class="notes">
+<p>
+Now, you might think - but who cares if something is 1000 times faster or slower?
+So what if it takes a couple of milliseconds instead of a few nanoseconds? Both are
+faster than the blink of an eye.
+</p>
+
+<p>
+Well, considering number of seconds in a day, hours in a month, etc&#x2026;
+This is a difference of having to wait 1 second instead of an hour,
+or 1 minute instead of a few days, or 1 hour instead of months or even a year!
+</p>
+
+</aside>
+
+
+</section>
+</section>
+<section>
+<section id="slide-orgheadline35">
+<h2 id="orgheadline35">Thank You</h2>
+<p>
+The presentation can be reached through my blog:
+</p>
+<ul>
+<li><a href="http://dragan.rocks">http://dragan.rocks</a></li>
+
+</ul>
+
+<p>
+Find more at:
+</p>
+<ul>
+<li><a href="http://bayadera.uncomplicate.org">http://bayadera.uncomplicate.org</a></li>
+<li><a href="http://clojurecl.uncomplicate.org">http://clojurecl.uncomplicate.org</a></li>
+<li><a href="http://neanderthal.uncomplicate.org">http://neanderthal.uncomplicate.org</a></li>
+<li><a href="http://fluokitten.uncomplicate.org">http://fluokitten.uncomplicate.org</a></li>
+
+</ul>
+</section>
+</section>
+</div>
+</div>
+<script src="./reveal.js/lib/js/head.min.js"></script>
+<script src="./reveal.js/js/reveal.js"></script>
+
+<script>
+// Full list of configuration options available here:
+// https://github.com/hakimel/reveal.js#configuration
+Reveal.initialize({
+
+controls: true,
+progress: true,
+history: false,
+center: true,
+slideNumber: 'c',
+rollingLinks: false,
+keyboard: true,
+overview: true,
+
+theme: Reveal.getQueryHash().theme, // available themes are in /css/theme
+transition: Reveal.getQueryHash().transition || 'default', // default/cube/page/concave/zoom/linear/fade/none
+transitionSpeed: 'default',
+multiplex: {
+    secret: '', // null if client
+    id: '', // id, obtained from socket.io server
+    url: '' // Location of socket.io server
+},
+
+// Optional libraries used to extend on reveal.js
+dependencies: [
+ { src: './reveal.js/lib/js/classList.js', condition: function() { return !document.body.classList; } },
+ { src: './reveal.js/plugin/markdown/marked.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
+ { src: './reveal.js/plugin/markdown/markdown.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
+ { src: './reveal.js/plugin/zoom-js/zoom.js', async: true, condition: function() { return !!document.body.classList; } },
+ { src: './reveal.js/plugin/notes/notes.js', async: true, condition: function() { return !!document.body.classList; } }]
+});
+</script>
+</body>
+</html>
