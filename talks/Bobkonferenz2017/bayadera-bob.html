@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"/>
-<title>Bayadera: Bayes + Clojure + GPU</title>
+<title><font color = "OrangeRed">Bayadera</font><br/> <font color = "red">Bayes</font> + <font color = "lime">Clojure</font> + <font color = "yellow">GPU</font></title>
 <meta name="author" content="(Dragan Djuric)"/>
 <style type="text/css">
 .underline { text-decoration: underline; }
@@ -28,9 +28,15 @@
 <body>
 <div class="reveal">
 <div class="slides">
-<section id="sec-title-slide"><h2>Bayadera: Bayes + Clojure + GPU</h2><h3>Dragan Djuric</h3><strong><a href="mailto:dragandj@gmail.com">dragandj@gmail.com</a></strong>
+<section id="sec-title-slide"><h2><font color = "OrangeRed">Bayadera</font><br/> <font color = "red">Bayes</font> + <font color = "lime">Clojure</font> + <font color = "yellow">GPU</font></h2><h3>Dragan Djuric</h3><strong><a href="mailto:dragandj@gmail.com">dragandj@gmail.com</a></strong>
 </section>
+<aside class="notes">
+<p>
+Hello. This is a presentation of Bayadera. It's a Bayesian statistics and machine learning library,
+implemented in Clojure, that get its speed from GPU's.
+</p>
 
+</aside>
 <section>
 <section id="slide-orgheadline1">
 <h2 id="orgheadline1">Dragan Djuric</h2>
@@ -50,9 +56,20 @@
 <aside class="notes">
 <p>
 My name is Dragan Djuric, I am a professor of software engineering at
-the University of Belgrade. I've been using Clojure as my primary programming language since 2009,
-and I teach it since 2010. I am interested in ML, especially the bayesian kind.
-You can find me on github, or read my blog at dragan.rocks.
+the University of Belgrade.
+</p>
+
+<p>
+ I've been using Clojure as my primary programming language since 2009,
+and I teach it since 2010.
+</p>
+
+<p>
+I am interested in ML, especially the bayesian kind.
+</p>
+
+<p>
+You can find me on github, or read my blog at dragan.rocks, where you can also find this presentation.
 </p>
 
 </aside>
@@ -118,7 +135,13 @@ Clojure is great! It's a modern, pragmatical lisp, that integrates well into tod
 <aside class="notes">
 <p>
 But, is it good at number crunching?
+</p>
+
+<p>
 It is certainly not bad, but compared to what's available elsewhere, it is not great either.
+</p>
+
+<p>
 One of my goals is to make Clojure great for implementing numerical-heavy algorithms.
 </p>
 
@@ -139,6 +162,9 @@ One of my goals is to make Clojure great for implementing numerical-heavy algori
 What about other managed platforms? Those are even worse than JVM when it comes
 to number crunching. It is true that they have rich libraries that fall back
 to native code, but&#x2026; writing <b>custom</b> algorithms is very difficult&#x2026;
+</p>
+
+<p>
 And CPU itself is not so great either! CPUs have rich instruction sets, but
 that requires lots of transistors that devours energy.
 </p>
@@ -182,12 +208,24 @@ It's a shame that the programming platforms are from the stone age!
 <aside class="notes">
 <p>
 Uncomplicate is a family of open-source Clojure libraries for scientific and high-performance computing.
+</p>
+
+<p>
 My main goal was to create a state-of-the art Bayesian machine learning infrastructure. For that to fly,
 I also had to provide lower-level libraries, since what was available at the time on JVM, was lot worse
 than the best tools available elsewhere.
+</p>
+
+<p>
 ClojureCL is a Clojure library for taking <b>full</b> control of the GPU with minimal overhead.
+</p>
+
+<p>
 Neanderthal leverages battle-tested native linear algebra libraries for the CPU and latest GPU libraries
 to provide the full-speed matrix support tailored to Clojure with almost no overhead.
+</p>
+
+<p>
 Bayadera goes beyond that - a library for Bayesian statistics on the GPU that is much faster than
 the fastest available mainstream offerings!
 </p>
@@ -196,13 +234,13 @@ the fastest available mainstream offerings!
 
 </section>
 <section id="slide-orgheadline7">
-<h3 id="orgheadline7">What does all this has to do with Bayes stuff?</h3>
+<h3 id="orgheadline7">What does all this has to do with Bayes?</h3>
 <ul>
 <li>BDA is conceptually simple</li>
 <li>Real models must be calculated numerically</li>
 <li>MCMC sampling and related methods</li>
 <li>In higher dimensions, requires huge samples</li>
-<li>Analyses typically runs in minutes, hours, weeks</li>
+<li>Analyses typically run in minutes, hours, weeks</li>
 
 </ul>
 <p>
@@ -213,16 +251,28 @@ the fastest available mainstream offerings!
 <li>Challenge: <b>MCMC is sequential</b></li>
 
 </ul>
+
 <aside class="notes">
 <p>
 Bayesian methods are conceptually simple and elegant (although not always easy to learn).
+</p>
+
+<p>
 The main challenge is that <b>real-world</b> models are not possible to solve analytically, and require
 <b>enormous</b> computational resources. Main numerical methods are variants of MCMC simulation, and analyses
 typically run in minutes, hours, days, weeks or even more.
-GPU are an obvious help, but with a caveat: <b>MCMC is inherently sequential</b> so it is difficult to parallelize.
+</p>
+
+<p>
+GPU are an obvious help. Numerical methods can typically be fast on GPU's.
+</p>
+
+<p>
+But there's a challenge: <b>MCMC is inherently sequential</b> so it is difficult to parallelize.
 </p>
 
 </aside>
+
 </section>
 </section>
 <section>
@@ -233,9 +283,10 @@ How to know something we cannot observe?
 </p>
 
 <ul>
-<li>All credible hypotheses and prior distribution</li>
-<li>Measure something it influences (get data)</li>
-<li>And calculate "backwards", using Bayes' rule</li>
+<li>Probabilities of all answers (<b>prior</b>)</li>
+<li>Probability of measured data (<b>evidence</b> and <b>likelihood</b>)</li>
+<li>Calculate "backwards", using Bayes' rule and get</li>
+<li><b>posterior</b> probabilities of answers</li>
 
 </ul>
 <div>
@@ -245,18 +296,24 @@ How to know something we cannot observe?
 
 </div>
 
-<ul>
-<li><b>No one true hypothesis</b> wins</li>
-<li>posterior probability <b>distribution</b></li>
-
-</ul>
-
 <aside class="notes">
 <p>
-When would be use BDA? Often we cannot measure a phenomenon directly. We can only measure something <b>else</b>,
-that we suspect is caused by the phenomenon. We pose some hypotheses about the relation. There is <b>rarely</b> one true
-hypotheses. More likely, they have more or less credibility. BDA helps us discover that probability by taking into
-account what we knew previously, what we predicted, and what we measured in the data.
+When could BDA be useful? Whenever we have too little data and too much uncertainty.
+</p>
+
+<p>
+Often we cannot directly measure what we are interested in.
+</p>
+
+<p>
+We can only measure something <b>else</b>, that we think influences it.
+There is <b>rarely</b> one true answer. More likely, possible answers are more or less probable.
+</p>
+
+<p>
+BDA helps us discover the probability of each potential answer by taking into
+account what we knew previously (<b>prior</b>), our knowledge of the random process itself (<b>likelihoodh</b>),
+and what we measured in the data (<b>evience</b>). We do that calculation using Bayes' rule.
 </p>
 
 </aside>
@@ -307,6 +364,29 @@ By Bayes' rule:
 
 </div>
 
+<aside class="notes">
+<p>
+Since we are programmers, we would like to start with the Hello World! In BDA, hello world example
+is the coin throwing experiment.
+</p>
+
+<p>
+We are interested in the coin's "fairness", the tendency to fall on the head, or tale. We describe
+that with the parameter &theta;.
+</p>
+
+<p>
+Unfortunately, &theta; is not directly accessible. However, we can make experimet, in which we know
+that the process of coin throwing have binomial <b>likelihood</b>. We measure outcomes, that we know
+(by the construction of the experiment) are influenced by &theta;, - we gather <b>evidence</b>.
+</p>
+
+<p>
+Using Bayes' rule, posterior = likelihood &times; prior divided by evidence.
+</p>
+
+</aside>
+
 </section>
 <section id="slide-orgheadline11">
 <h3 id="orgheadline11">Analytical solution</h3>
@@ -331,6 +411,28 @@ Posterior, conveniently:
 Pr(&theta;|z,N) = beta(&theta;|z+a, N - z + b)
 </p>
 
+<aside class="notes">
+<p>
+Fortunately, for this simple setup, we can calculate the posterior <b>analytically</b>, and the
+result is a general formula.
+</p>
+
+<p>
+By the design of the experiment, likelihood is binomial.
+</p>
+
+<p>
+Then, if we conveniently choose a prior that "fits" with this likelihood, we can easily calculate
+the general formula for the posterior distribution of probabilities.
+</p>
+
+<p>
+In this case, we choose  the Beta distribution, which is a conjugate prior of binomial likelihood,
+and give another Beta distribution as the answer.
+</p>
+
+</aside>
+
 </section>
 <section id="slide-orgheadline12">
 <h3 id="orgheadline12">Example from Kruschke's book</h3>
@@ -339,7 +441,28 @@ Pr(&theta;|z,N) = beta(&theta;|z+a, N - z + b)
 <p><img src="coin-analytical.png" alt="coin-analytical.png" height="50%," width="50%" />
 </p>
 </div>
+<aside class="notes">
+<p>
+Kruschke's book gives an example with specific numbers. Fe first believe that the coin is most
+probably fair (&theta; around 0.5), but we are not very convinced that it is. That prior is in the first diagram.
+</p>
 
+<p>
+On the middle diagram, we see what the likelihood of the actual data, 1 head out of 10 flips is, <b>for each possible &theta;</b>
+If just one head comes out of 10 throws, it is much more likely that theta is, say. 0.1 or 0.18 than 7.45. However,
+7.65 is still somewhat likely, just much less likely than 0.1.
+</p>
+
+<p>
+So, do we trust our prior knowledge, or the specific data outcome?
+</p>
+
+<p>
+Actually, <b>both</b>. The posterior is actually a compromise that includes both prior knowledge and the
+actual data that happened.
+</p>
+
+</aside>
 </section>
 <section id="slide-orgheadline13">
 <h3 id="orgheadline13">Easy computation</h3>
@@ -351,6 +474,27 @@ Q: What is Pr(0.4&lt;&theta;&lt;0.6)?
 A: Pr(&theta;&lt;0.6) - Pr(&theta;&lt;0.4)
 </p>
 
+
+<aside class="notes">
+<p>
+Since we have analytical solution for this model, it is very easy to quickly get the answer when we
+plug in the specific numbers.
+</p>
+
+<p>
+In this case, we consider the coin somewhat fair if the &theta; is "around" 0.5. Arbitrarily, we set the
+wide bounds of 0.4 - 0.6. The probability of that range can be calculated by computing <b>cumulate probability</b>.
+</p>
+
+<p>
+Bayadera and other statistical software usually have CDF functions of all common probability distributions.
+</p>
+
+<p>
+Result: 0.15. It is possible that this coin is fair, but I wouldn't bet on it.
+</p>
+
+</aside>
 <div class="org-src-container">
 
 <pre  class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #4c83ff; font-weight: bold;">let</span> <span style="color: #006400;">[</span>a-prior 5
@@ -375,10 +519,15 @@ A: Pr(&theta;&lt;0.6) - Pr(&theta;&lt;0.4)
 <ul>
 <li>Only the simplest models are "nice"</li>
 <li>The curse of dimensionality</li>
-<li>We have to use numerical methods (MCMC)</li>
 
 </ul>
 
+<aside class="notes">
+<p>
+Unfortunately, only the simplest models are such "nice". Usually, we do not have analytical solution.
+</p>
+
+</aside>
 </section>
 </section>
 <section>
@@ -434,7 +583,7 @@ build on it to do machine learning.
 
 <aside class="notes">
 <p>
-Bayadera aims to be a well-designed software product.
+Bayadera aims at being a well-designed software product.
 </p>
 
 <p>
@@ -534,7 +683,7 @@ computing zillions of "only" hard to compute things.
 </p>
 
 <p>
-That's why CPU-based Bayesian is notoriously slow. Luckily,
+That's why CPU-based Bayesian tools are notoriously slow. Luckily,
 GPU can help us in bringing that time to acceptable levels.
 </p>
 
@@ -552,6 +701,14 @@ GPU can help us in bringing that time to acceptable levels.
 
 </ul>
 
+<aside class="notes">
+<p>
+Now, we will compute the same coin model as before, but now with Bayadera's MCMC engine,
+as if we didin't have analytical solution. It is good for illustration, and the bonus is that we can
+compare it with the analytical solution and see whether it is correct.
+</p>
+
+</aside>
 </section>
 <section id="slide-orgheadline20">
 <h3 id="orgheadline20">Run the analysis on the GPU</h3>
@@ -581,6 +738,26 @@ GPU can help us in bringing that time to acceptable levels.
 </pre>
 </div>
 
+<aside class="notes">
+<p>
+This listing shows a real code, an I purposefully made it low-level, to
+show you important steps in Bayadera architecture. Once you create a model,
+you can use all usual Clojure abstractions, to encapsulate most of those details,
+so they could be used with a line or two of code.
+</p>
+
+<ul>
+<li>Distribution</li>
+<li>Sampler</li>
+<li>Pdf</li>
+<li>Models</li>
+<li>Posterior (beta * binomial)</li>
+<li><b>mix!</b> - running MCMC</li>
+
+</ul>
+
+</aside>
+
 </section>
 <section id="slide-orgheadline21">
 <h3 id="orgheadline21">Prior and posterior - samples!</h3>
@@ -590,6 +767,13 @@ GPU can help us in bringing that time to acceptable levels.
 </p>
 </div>
 
+<aside class="notes">
+<p>
+So, once we take many thousands of (almost free!) samples, we can simply plot each of those,
+and we get perfectly fine-grained plots. Yes, it is an overkill :)
+</p>
+
+</aside>
 </section>
 </section>
 <section>
@@ -600,7 +784,25 @@ GPU can help us in bringing that time to acceptable levels.
 <p><img src="kruschke-hlr-data.png" alt="kruschke-hlr-data.png" height="50%," width="50%" />
 </p>
 </div>
+<aside class="notes">
+<p>
+But, it is not an overkill in difficult multidimensional model. There, the more samples we can get, the better.
+</p>
 
+<p>
+Here is another example from Kruschke's book. We have a sample data of 300 measures of people's height and weight.
+</p>
+
+<p>
+We would like to know what's correlation between them. Since data obviously does not fall on one line,
+we decide that we'll try to find a <b>distribution</b> of all lines that could approximate this linear correlation.
+</p>
+
+<p>
+Blue lines represent some of the most probable lines, and the noise at each region.
+</p>
+
+</aside>
 </section>
 <section id="slide-orgheadline23">
 <h3 id="orgheadline23">Hierarchical Model</h3>
@@ -610,6 +812,41 @@ GPU can help us in bringing that time to acceptable levels.
 </p>
 </div>
 
+<aside class="notes">
+<p>
+Here's the model.
+</p>
+
+<ul>
+<li>x(i) is <b>height</b> of person i</li>
+<li>y(i) is <b>weight</b> of person i</li>
+
+</ul>
+
+<p>
+We suppose that there is a connection x -&gt; y, such that y(i) is t-distributed around &beta;<sub>0</sub> + &beta;<sub>1</sub> * x<sub>i</sub>.
+That t distribution <b>also</b> has uncertain parameters &nu; and &sigma;.
+</p>
+
+<p>
+&nu; is exponentially distributed
+&sigma; comes from an uniform distribution
+</p>
+
+<p>
+&beta;<sub>0</sub> and &beta;<sub>1</sub> are themselves uncertain, they are normally distributed
+</p>
+
+<p>
+Practically, this model is *4-dimensional: &beta;<sub>0</sub>, beta<sub>1</sub>, &nu; and &sigma; are the 4 dimensions
+of that joint random variable, while K, M<sub>0</sub>, S<sub>0</sub>, M<sub>1</sub>, S<sub>1</sub>, L and H are parameters of that 4-dimensional distribution.
+</p>
+
+<p>
+Don't forget those 300 data points. We'd have to fit the whole thing with them!
+</p>
+
+</aside>
 </section>
 <section id="slide-orgheadline24">
 <h3 id="orgheadline24">Resulting Posterior</h3>
@@ -618,6 +855,23 @@ GPU can help us in bringing that time to acceptable levels.
 <p><img src="kruschke-hlr-posterior.png" alt="kruschke-hlr-posterior.png" />
 </p>
 </div>
+
+<aside class="notes">
+<p>
+Kruschke calculates this model using Stan, and gets those quite <b>rough</b> histograms, that show
+the marginal probabilities of the 4 dimensions. Black line denotes the region that contains 95% probability
+(note: NOT the same as confidence intervals).
+</p>
+
+<p>
+We see that &beta;<sub>0</sub> is between -200 and -80, &beta;<sub>1</sub> between 3.5 and 5.3, &sigma; around 24 and &nu; around 5.
+</p>
+
+<p>
+It took Kruschke <b>several hundred seconds</b> to complete this calculation with Stan/JAGS!
+</p>
+
+</aside>
 
 </section>
 <section id="slide-orgheadline25">
@@ -636,6 +890,23 @@ GPU can help us in bringing that time to acceptable levels.
 <span style="color: #8b0000;">(</span><span style="color: #4c83ff; font-weight: bold;">def</span> <span style="color: #ff69b4;">params-300</span> <span style="color: #006400;">(</span>sv <span style="color: #ff1493;">(</span>read-data <span style="color: #ffff00;">(</span>slurp <span style="color: #00ff00;">(</span><span style="color: #afd8af;">io</span><span style="color: #d3d3d3; background-color: #000000;">/</span>file <span style="color: #61CE3C;">"ht-wt-data-300.csv"</span><span style="color: #00ff00;">)</span><span style="color: #ffff00;">)</span><span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
 </pre>
 </div>
+
+<aside class="notes">
+<p>
+Let's do the same thing with Bayadera. I'm writing quite plain and low-level code here
+to show that even without additional Clojure abstractions, it is still not more complex
+than the alternative R/Python models.
+</p>
+
+<p>
+First, we use <b>plain Clojure</b> to read the data and put it into a vector of parameters that
+we will feed to Bayadera's engine.
+</p>
+
+</aside>
+<pre class="example">
+#'user/read-data#'user/params-300
+</pre>
 
 </section>
 <section id="slide-orgheadline26">
@@ -657,6 +928,23 @@ GPU can help us in bringing that time to acceptable levels.
   <span style="color: #006400;">(</span>cl-likelihood-model rlr-source <span style="color: #96CBFE;">:name</span> <span style="color: #61CE3C;">"rlr"</span> <span style="color: #96CBFE;">:params-size</span> n<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
 </pre>
 </div>
+
+<aside class="notes">
+<p>
+We use some Bayadera's built-in models of common distribution and combine them
+into GPU code of this specific hierarchical model.
+</p>
+
+<p>
+Although we use some stock distribution, the actual hierarchy is specific for this model.
+We have to specify that in some <b>straightforward</b> OpenCL C code.
+</p>
+
+</aside>
+
+<pre class="example">
+#'user/rlr-source#'user/rlr-prior#'user/rlr-likelihood
+</pre>
 
 </section>
 <section id="slide-orgheadline27">
@@ -686,6 +974,15 @@ GPU can help us in bringing that time to acceptable levels.
 </pre>
 </div>
 
+<aside class="notes">
+<p>
+Here is the likelihood function corresponding to the model from the diagrams. We use
+built-in t<sub>log</sub><sub>unscaled</sub> function and feed it the appropriate parameters, and do this in
+the loop for all 300 data points.
+</p>
+
+</aside>
+
 </section>
 <section id="slide-orgheadline28">
 <h3 id="orgheadline28">Model's prior function</h3>
@@ -701,6 +998,25 @@ GPU can help us in bringing that time to acceptable levels.
 </pre>
 </div>
 
+<aside class="notes">
+<p>
+Prior is much easier. You can recognize that distributions from the hierarchical
+diagram are simply combined to compute the probability for any combination of parameters
+that we give it.
+</p>
+
+<p>
+The user does not call those functions explicitly. They are just specific parts of the
+engine that will be automagically compiled into GPU code by Bayadera.
+</p>
+
+<p>
+In the coin model, we did not have to do this step, because we could just reuse stock
+models that are already built in Bayadera. Once we created <b>this</b> model, we can also reuse
+it in a similar way.
+</p>
+
+</aside>
 </section>
 <section id="slide-orgheadline29">
 <h3 id="orgheadline29">Running the inference on the GPU</h3>
@@ -722,6 +1038,19 @@ GPU can help us in bringing that time to acceptable levels.
 </pre>
 </div>
 
+
+<aside class="notes">
+<p>
+Running the inference is even simpler than in the coin example.
+</p>
+
+<p>
+The new thing is that the sample itself is multidimensional, so we must make histogram to
+calculate marginal probabilities that we are interested in. But, this is something that Bayadera
+can do blazingly fast with its built in functions.
+</p>
+
+</aside>
 </section>
 <section id="slide-orgheadline30">
 <h3 id="orgheadline30">Generate posterior diagrams</h3>
@@ -745,12 +1074,17 @@ GPU can help us in bringing that time to acceptable levels.
 
 </section>
 <section id="slide-orgheadline31">
-<h3 id="orgheadline31">Posteriors</h3>
+<h3 id="orgheadline31">Fine grained histograms!</h3>
 <p>
-&beta;<sub>0</sub>, &beta;<sub>1,&sigma;</sub>, &nu;
+Posteriors: &beta;<sub>0</sub>, &beta;<sub>1,&sigma;</sub>, and &nu;
 <img src="robust-linear-regression.png" alt="robust-linear-regression.png" />
 </p>
+<aside class="notes">
+<p>
+The diagram.
+</p>
 
+</aside>
 </section>
 </section>
 <section>
