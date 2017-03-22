@@ -1,0 +1,104 @@
+---
+date: 2017-03-22
+tags:
+- OpenCL
+- MKL
+- Neanderthal
+- CUDA
+- Clojure
+- number crunching
+- high-performance computing
+- data nalysis
+author: dragan
+layout: post
+title: Neanderthal 0.9.0 with major improvements is around the corner
+categories:
+- OpenCL
+- MKL
+- Neanderthal
+- CUDA
+- Clojure
+- number crunching
+- high-performance computing
+- data nalysis
+excerpt: The upcoming version of Neanderthal, the library for vector and matrix computations in Clojure, brings improvements to Clojure's numerical computing capabilities that are so important, that I think there's no harm in talking about them in advance. If you like what you're about to read, you won't have to wait for long, since the implementation is mostly done.
+---
+<p>
+Most often, I prefer to wait for the release and then write about it (or not write at all :).
+The upcoming version of <a href="http://neanderthal.uncomplicate.org">Neanderthal</a>, the library for vector and matrix computations in Clojure,
+brings improvements to Clojure's numerical computing capabilities that are so important, that I think
+there's no harm in talking about them in advance. If you like what you're about to read,
+you won't have to wait for long, since the implementation is mostly done. What's left is mostly the
+documentation update and a fine polishing touch. The release should be ready within a week, if not earlier.
+</p>
+
+<div id="outline-container-orgheadline1" class="outline-2">
+<h2 id="orgheadline1">New functionality</h2>
+<div class="outline-text-2" id="text-orgheadline1">
+<p>
+Let's start from the end: Neanderthal now has support for a significant number of solvers and factorizations!
+Expect to find extremely fast functions to do LU, QR, RQ, LQ, QL factorizations, linear equation and
+linear least squares solvers, eigenvalue and eigenvectors computing, and singular value decomposition.
+That should be a major chunk of functionality that was missing in Clojure and even Java world
+(at least with the speed and convenience that Neanderthal has). Expect even more varieties in versions after next.
+There's also a full support for triangular matrices.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline2" class="outline-2">
+<h2 id="orgheadline2">Easier installation and distribution</h2>
+<div class="outline-text-2" id="text-orgheadline2">
+<p>
+Although the previous versions worked as a charm once you set up your machine, Java programmers who are
+not comfortable with native libraries sometimes had trouble with installing optimized versions of the native
+libraries, depending on their operating system. From the upcoming version of Neanderthal, I switched to
+Intel's MKL as the default native library, since it recently became free to use and redistribute. That means
+that you'll have 2 relatively easy way to install the optimized binaries on all major operating systems.
+One of those is a classical click-through installer. The other is simply to drop the appropriate files on
+the path.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline3" class="outline-2">
+<h2 id="orgheadline3">Even faster!</h2>
+<div class="outline-text-2" id="text-orgheadline3">
+<p>
+The switch to MKL brought another improvement: even greater speed. Who else can squeeze the last drop of
+performance from the modern CPU than the devil himself? Intel's MKL is even faster than the optimized ATLAS,
+for some operations twice as fast, for some even 10 times. I was surprised, but here it is - i doubt
+it can be faster than what we have with this version&#x2026;
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline4" class="outline-2">
+<h2 id="orgheadline4">Future upgrades</h2>
+<div class="outline-text-2" id="text-orgheadline4">
+<p>
+There are other improvements of Neanderthal's internals that:
+</p>
+
+<ul class="org-ul">
+<li>make it easier and more consistent;</li>
+<li>allow better integration of various matrix types that will come in next versions;</li>
+<li>allow easier and more transparent programming of GPUs;</li>
+</ul>
+
+<p>
+The major new things to expect in version after this one are (not necessarily in this order):
+</p>
+
+<ul class="org-ul">
+<li>Various special dense and packed matrices (symmetric, banded, etc.);</li>
+<li>Sparse matrices;</li>
+<li>CUDA support (although the existing GPU engine already supports Nvidia GPUs!). This is important for the interoperability with Nvidia's libraries for LAPACK and Deep learning.</li>
+<li>Tensors are also going to be in Neanderthal, maybe even before you expect ;)</li>
+</ul>
+
+<p>
+I'll be back once Neanderthal 0.9.0 is ready with more news and details.
+</p>
+</div>
+</div>
