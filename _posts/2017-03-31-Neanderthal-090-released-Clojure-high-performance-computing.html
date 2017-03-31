@@ -1,0 +1,220 @@
+---
+date: 2017-03-31
+tags:
+- OpenCL
+- MKL
+- Neanderthal
+- CUDA
+- Clojure
+- number crunching
+- high-performance computing
+- data nalysis
+author: dragan
+layout: post
+title: Neanderthal 0.9.0 released - Clojure's high-performance computing story is getting into shape
+categories:
+- OpenCL
+- MKL
+- Neanderthal
+- CUDA
+- Clojure
+- number crunching
+- high-performance computing
+- data nalysis
+excerpt: Today, I have the pleasure to announce the new release of Neanderthal, the high-performance Clojure matrix library, which brings some important major improvements, and beats the path to even better stuff that will follow in subsequent versions. Let's explore major stuff (and also see some code :)
+title: Neanderthal 0.9.0 released - Clojure's high-performance computing story is getting into shape
+---
+<p>
+Today, I have the pleasure to announce the new release of <a href="http://neanderthal.uncomplicate.org">Neanderthal</a>, the high-performance <a href="http://clojure.org">Clojure</a> matrix library, which brings some important
+major improvements, and beats the path to even better stuff that will follow in subsequent versions. If you are not
+sure why you would even need such a library in Clojure, I recommend <a href="https://www.youtube.com/watch?v=bEOOYbscyTs">this EuroClojure talk</a> (<a href="http://dragan.rocks/talks/EuroClojure2016/clojure-is-not-afraid-of-the-gpu.html">slides</a>). Let's explore major
+stuff (and also see some code :)
+</p>
+
+<div id="outline-container-orgheadline1" class="outline-2">
+<h2 id="orgheadline1">Streamlined installation</h2>
+<div class="outline-text-2" id="text-orgheadline1">
+<p>
+Neanderthal is written in Clojure, so you can explore its <a href="http://github.com/uncomplicate/neanderthal">source code</a>, improve it, or mold it to your needs in your favorite programming language. However,
+that Clojure code must rely on natively optimized low-level operations when it comes to linear algebra computations
+standardized as BLAS and LAPACK.
+Such stuff is a couple of orders of magnitudes faster than is possible with Java, and is also really hard to implement.
+Basically any competitive library in Python, R, and even C/C++ in this area uses the approach of calling those low-level
+libraries, only the Java world is reluctant. If you are still not convinced, I recommend <a href="https://www.youtube.com/watch?v=bEOOYbscyTs">my EuroClojure talk</a> again.
+</p>
+
+<p>
+In the earlier versions of Neanderthal, I used the ATLAS BLAS &amp; LAPACK library for such operations. It is fantastic - fast, and with a free
+open-source license. The only trouble (for some Linux, and many Windows users) was that it had to be compiled and tuned
+for your machine. On Windows, it was a really tricky task. On Linux, it was pretty well documented and straightforward,
+but the problem is that many Clojure programmers have zero experience with C, and its fairly messy build story.
+Only on OS X, it worked out of the box, without installing anything, since OS X comes with its own BLAS framework.
+</p>
+
+<p>
+From version 0.9.0, I switched to Intel's Math Kernel Library (MKL) instead of ATLAS. <b>MKL does not require compiling or tuning</b>,
+but is instead a <a href="http://neanderthal.uncomplicate.org/articles/getting_started.html#the-native-library-used-by-neanderthals-native-engine">drop-in installation</a>. The trade-off is that MKL is not open-source, but on the other hand <b>it is free as free beer</b>. On yet
+another hand, MKL is the fastest thing around, and also support many features that are missing from its open-source cousins.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline2" class="outline-2">
+<h2 id="orgheadline2">Even faster!</h2>
+<div class="outline-text-2" id="text-orgheadline2">
+<p>
+The switch to MKL came with another benefit: MKL is even faster than ATLAS. Don't get me wrong, ATLAS is quite fast.
+MKL is just a bit faster in some cases, but is considerably faster in others. In almost all benchmarks I could find
+on the Web, MKL was the fastest kid around, or almost as fast as the winner for the particular operation, so
+I guess I can say that it's the fastest offering around. This improvement came for free, so let's embrace it :)
+</p>
+
+<p>
+To see what you can expect from this, see <a href="http://neanderthal.uncomplicate.org/articles/benchmarks.html">the benchmarks.</a> I have done many more measurements, and Neanderthal is
+consistently fast across operations, but matrix multiplication is the most representative overall.
+</p>
+
+<p>
+Of course, <a href="http://neanderthal.uncomplicate.org/articles/tutorial_opencl.html">Neanderthal's GPU engine</a> is still here, and is much faster than CPU (even with MKL), if you have really large
+structues.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline3" class="outline-2">
+<h2 id="orgheadline3">Factorizations and solvers</h2>
+<div class="outline-text-2" id="text-orgheadline3">
+<p>
+The new Neanderthal finally comes with those higher level operations that usually fall under LAPACK umbrella!
+I was waiting a bit until I stabilize the core architecture properly, and ensure that both CPU and GPU engines
+ are straightforward, and fit well with a seamless Clojure API. Since I think that Neanderthal is well-shaped
+in that regard now, I added the major LAPACK functionalities: factorizations, eigenvalues, eigenvectors, and solvers.
+</p>
+
+<p>
+Here is a complete working example of solving linear equations:
+</p>
+
+<p>
+First, I'll require the necessary namespaces.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-clojure"><span style="color: #a71d5d;">(</span>require '<span style="color: #795da3;">[</span><span style="color: #795da3; font-weight: bold;">uncomplicate.neanderthal</span>
+           <span style="color: #183691;">[</span>native <span style="color: #0086b3;">:refer</span> <span style="color: #183691;">[</span>dge<span style="color: #183691;">]</span><span style="color: #183691;">]</span>
+           <span style="color: #183691;">[</span>linalg <span style="color: #0086b3;">:refer</span> <span style="color: #183691;">[</span>sv!<span style="color: #183691;">]</span><span style="color: #183691;">]</span><span style="color: #795da3;">]</span><span style="color: #a71d5d;">)</span>
+</pre>
+</div>
+
+<p>
+Next, create the matrices that describe the system of equasions that is going to be solved (\(A x = B\)):
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-clojure"><span style="color: #a71d5d;">(</span><span style="color: #a71d5d; font-weight: bold;">def</span> <span style="color: #ed6a43; font-weight: bold;">a</span> <span style="color: #795da3;">(</span>dge 3 3 <span style="color: #183691;">[</span>1 3 1
+                 2 5 1
+                 1 2 3<span style="color: #183691;">]</span>
+            <span style="color: #183691;">{</span><span style="color: #0086b3;">:order</span> <span style="color: #0086b3;">:row</span><span style="color: #183691;">}</span><span style="color: #795da3;">)</span><span style="color: #a71d5d;">)</span>
+<span style="color: #a71d5d;">(</span><span style="color: #a71d5d; font-weight: bold;">def</span> <span style="color: #ed6a43; font-weight: bold;">b</span> <span style="color: #795da3;">(</span>dge 3 1 <span style="color: #183691;">[</span>-2
+                 -5
+                 6<span style="color: #183691;">]</span>
+            <span style="color: #183691;">{</span><span style="color: #0086b3;">:order</span> <span style="color: #0086b3;">:row</span><span style="color: #183691;">}</span><span style="color: #795da3;">)</span><span style="color: #a71d5d;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#'user/a#'user/b
+</pre>
+
+<p>
+Finally, call the solver.
+</p>
+<div class="org-src-container">
+
+<pre class="src src-clojure"><span style="color: #a71d5d;">(</span><span style="color: #a71d5d; font-weight: bold;">do</span>
+  <span style="color: #795da3;">(</span>sv! a b<span style="color: #795da3;">)</span>
+  b<span style="color: #a71d5d;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealGEMatrix[double, mxn:3x1, order:row, offset:0, ld:1]
+
+  1.00
+ -2.00
+  3.00
+</pre>
+
+<p>
+We got our solution: \(x_1 = 0\), \(x_2 = -2\), and \(x_3 = 3\)!
+</p>
+
+<p>
+Of course, If I only needed to solve the simplest linear systems like this one, I might have used
+pen and paper, or any Java library that has that feature. The value of Neanderthal is that it can solve huge systems in a reasonable amount of time.
+</p>
+
+<p>
+To see what functions are available now, visit <a href="http://neanderthal.uncomplicate.org/codox">The API documentation, especially the section about the `linalg` namespace</a>.
+Do not skip it, there's valuable info there, including the links to the literature.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline4" class="outline-2">
+<h2 id="orgheadline4">What to expect in next versions?</h2>
+<div class="outline-text-2" id="text-orgheadline4">
+<p>
+Neanderthal is pretty useful in its current state, but it'll get even more useful:
+</p>
+</div>
+
+<div id="outline-container-orgheadline5" class="outline-3">
+<h3 id="orgheadline5">CUDA integration.</h3>
+<div class="outline-text-3" id="text-orgheadline5">
+<p>
+Neanderthal already <a href="http://neanderthal.uncomplicate.org/articles/tutorial_opencl.html">supports GPU computing</a> through OpenCL. This also helps when we need to build our own GPU kernels
+ through <a href="http://clojurecl.uncomplicate.org">ClojureCL</a>. However, this leaves a bunch of CUDA-based libraries out of the reach. I'll change that
+ and enable Neanderthal to have the same functionality based on CUDA, too. This is very important, since it will
+enable the code based on Neanderthal to easily communicate to Deep Learning libraries that are usually based
+on Nvidia's cuDNN.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline6" class="outline-3">
+<h3 id="orgheadline6">More specialized matrix formats</h3>
+<div class="outline-text-3" id="text-orgheadline6">
+<p>
+Neanderthal supports the most useful general dense matrices, and triangular matrices. More dense and packed formats are
+also going to be supported (symmetric, etc.), but the biggest addition will be the support for <b>sparse matrices</b>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline7" class="outline-3">
+<h3 id="orgheadline7">Tensors</h3>
+<div class="outline-text-3" id="text-orgheadline7">
+<p>
+Last, but not least, I also decided to support tensors. I can't promise when, but it will probably be sooner than expected.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgheadline8" class="outline-2">
+<h2 id="orgheadline8">Happy hacking!</h2>
+<div class="outline-text-2" id="text-orgheadline8">
+<p>
+If you find Neanderthal useful, do not forget to check out the <a href="http://neanderthal.uncomplicate.org/articles/guides.html">tutorials</a>, and other complementary Clojure libraries:
+<a href="http://clojurecl.uncomplicate.org">ClojureCL</a>, which brings GPU computing to Clojure, and <a href="http://fluokitten.uncomplicate.org">Fluokitten</a>, Clojure monadic library. Both of them have been used
+as Neanderthal's building blocks, and can be useful in your code.
+</p>
+
+<p>
+And, most important of all, if you tried Neanderthal, please write a few words about your experience, and send me the link.
+</p>
+</div>
+</div>
