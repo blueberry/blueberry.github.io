@@ -1,0 +1,170 @@
+---
+date: 2017-05-20
+tags:
+- Neanderthal
+- CUDA
+- Clojure
+- number crunching
+- high-performance computing
+- data analysis
+author: dragan
+layout: post
+title: CUDA and cuBLAS GPU matrices in Clojure
+excerpt: The new release of Neanderthal is here! The highlight of 0.11.0 is the new CUDA/cuBLAS based engine. The high-performance Clojure matrix library now supports all 3 major choices that you'd want to crunch those billions of numbers with - CPU, CUDA GPU on Nvidia, and OpenCL GPU on AMD, or other accellerators. Let's se why this new stuff is important (and it really is!).
+categories:
+- Neanderthal
+- CUDA
+- Clojure
+- number crunching
+- high-performance computing
+- data analysis
+---
+<p>
+The new <a href="http://neanderthal.uncomplicate.org/">Neanderthal</a> 0.11 comes with the new CUDA engine! The high-performance Clojure matrix library now supports all 3
+major choices that you'd want to crunch those billions of numbers with: CPU, Nvidia GPU with CUDA,
+and AMD's or Nvidia's GPU, or other accellerators with OpenCL. Let's see why this new stuff is important (and it really  is!).
+</p>
+
+<div id="outline-container-orgdc90200" class="outline-2">
+<h2 id="orgdc90200">CUDA/cuBLAS based GPU engine</h2>
+<div class="outline-text-2" id="text-orgdc90200">
+<p>
+I prefer free software, but many times I need access to the most powerful stuff. I've added a new engine to Neanderthal
+that gives us the full speed of Nvidia's CUDA based <a href="https://www.google.com/url?sa=t&amp;rct=j&amp;q=&amp;esrc=s&amp;source=web&amp;cd=1&amp;cad=rja&amp;uact=8&amp;ved=0ahUKEwiIrKyauP_TAhXDFSwKHXxVDKEQFggmMAA&amp;url=https%3A%2F%2Fdeveloper.nvidia.com%2Fcublas&amp;usg=AFQjCNHmKfv-KDA-xAN1DaOG4E6x_S6Wcg&amp;sig2=vSw5DuRWB_FaZ0UWkomfcg">cuBLAS</a> library. Since I have already stabilized Neanderthal's
+architecture by now, this is transparent to the user. If you've ever written code for native CPU engine or OpenCL GPU engine,
+you already know how to use it!
+</p>
+
+<p>
+The only thing you need to take care of is basic engine configuration, but even that only if the defaults
+are not the right thing for you. If you want to use the first available Nvidia GPU in your machine,
+here's the hello world:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>require '<span style="color: #006400;">[</span><span style="color: #2F8B58; font-weight: bold;">uncomplicate.commons.core</span> <span style="color: #F5666D;">:refer</span> <span style="color: #ff1493;">[</span>with-release<span style="color: #ff1493;">]</span><span style="color: #006400;">]</span>
+         '<span style="color: #006400;">[</span><span style="color: #2F8B58; font-weight: bold;">uncomplicate.neanderthal</span>
+           <span style="color: #ff1493;">[</span>core <span style="color: #F5666D;">:refer</span> <span style="color: #ffff00;">[</span>asum mm! copy<span style="color: #ffff00;">]</span><span style="color: #ff1493;">]</span>
+           <span style="color: #ff1493;">[</span>cuda <span style="color: #F5666D;">:refer</span> <span style="color: #ffff00;">[</span>cuv cuge with-default-engine<span style="color: #ffff00;">]</span><span style="color: #ff1493;">]</span><span style="color: #006400;">]</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>with-default-engine
+  <span style="color: #006400;">(</span>with-release <span style="color: #ff1493;">[</span>gpu-x <span style="color: #ffff00;">(</span>cuv 1 -2 5<span style="color: #ffff00;">)</span><span style="color: #ff1493;">]</span>
+    <span style="color: #ff1493;">(</span>asum gpu-x<span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<p>
+You can study <a href="https://github.com/uncomplicate/neanderthal/blob/master/examples/hello-world/src/hello_world/cuda.clj">Hello World project</a> example on the GitHub,
+which shows a basic Leiningen project setup based on Neanderthal, and examples of using CPU, OpenCL and CUDA code.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org4c4d39e" class="outline-2">
+<h2 id="org4c4d39e">Even faster!</h2>
+<div class="outline-text-2" id="text-org4c4d39e">
+<p>
+Neanderthal was already optimized for <a href="http://neanderthal.uncomplicate.org/articles/benchmarks.html">top CPU speed</a>, and <a href="http://neanderthal.uncomplicate.org/articles/tutorial_opencl.html">even more speed</a> on both AMD's and Nvidia's GPU.
+You could write very concise Clojure code using vector and matrix API, and also
+easily combine those with customized GPU code in <a href="http://clojurecl.uncomplicate.org">ClojureCL</a>.
+</p>
+
+<p>
+One major thing was still left untapped though: Nvidia's proprietary CUDA-based libraries that require
+Nvidia's proprietary and closed source CUDA technology that is also tied to the Nvidia hardware. Bad.
+<a href="https://www.youtube.com/watch?v=1jPmnDZ6ab8">Saint IGNUcius</a> does not approve this sinful technology and I am ashamed to indulge in this blasphemy.
+On the other hand it gives us the access to a ridiculously well optimized set of libraries ranging from linear
+algebra to deep learning that Nvidia offers at no charge. How fast it is? Let's see&#x2026;
+</p>
+
+<p>
+In the <a href="http://neanderthal.uncomplicate.org/articles/tutorial_opencl.html">OpenCL engine tutorial</a>, I did a basic exploration of the capabilities of the OpenCL-based Neanderthal engine, that is based on
+Cedric Nugteren's excellent open-source library <a href="https://github.com/CNugteren/CLBlast">CLBlast</a>. It is amazingly fast. For example, it multiplies three
+8192 &times; 8192
+matrices (\(C_{8192\times8192} = \alpha A_{8192\times8192} \cdot B_{8192\times8192}\)) in 220 ms on Nvidia GTX 1080.
+</p>
+
+<p>
+Theoretically, matrix computations require \(2\times m \times k \times n\) floating point operations (FLOPS).
+(This does not even count memory operations, but that's the problem of the implementer.)
+\((2 * 8192^3) \div 0.220\) is 4.99 TFLOPS (\(10^{12}\)). This boils down to 5 TFLOPS out of 8.228 that
+the card is theoretically capable of. That's 60% utilization, which is quite impressive for a
+one-man team working part-time! Now I'm trying the same stuff on the same hardware with the CUDA-based engine:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>require '<span style="color: #006400;">[</span><span style="color: #2F8B58; font-weight: bold;">uncomplicate.clojurecuda.core</span> <span style="color: #F5666D;">:refer</span> <span style="color: #ff1493;">[</span>synchronize!<span style="color: #ff1493;">]</span><span style="color: #006400;">]</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>with-default-engine
+  <span style="color: #006400;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #ff1493;">[</span>cnt 8192<span style="color: #ff1493;">]</span>
+    <span style="color: #ff1493;">(</span>with-release <span style="color: #ffff00;">[</span>gpu-a <span style="color: #00ff00;">(</span>cuge cnt cnt <span style="color: #add8e6;">(</span>range <span style="color: #ffa500;">(</span>* cnt cnt<span style="color: #ffa500;">)</span><span style="color: #add8e6;">)</span><span style="color: #00ff00;">)</span>
+                   gpu-b <span style="color: #00ff00;">(</span>copy gpu-a<span style="color: #00ff00;">)</span>
+                   gpu-c <span style="color: #00ff00;">(</span>copy gpu-a<span style="color: #00ff00;">)</span><span style="color: #ffff00;">]</span>
+      <span style="color: #ffff00;">(</span>time <span style="color: #00ff00;">(</span><span style="color: #A52A2A; font-weight: bold;">do</span> <span style="color: #add8e6;">(</span>mm! 3 gpu-a gpu-b 2 gpu-c<span style="color: #add8e6;">)</span>
+                <span style="color: #add8e6;">(</span>synchronize!<span style="color: #add8e6;">)</span> <span style="color: #5F7F5F;">;;</span><span style="color: #204A87; font-style: italic;">Wait for asynchronious mm!</span>
+                gpu-c<span style="color: #00ff00;">)</span><span style="color: #ffff00;">)</span><span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#CUGEMatrix[float, mxn:8192x8192, order:column, offset:0, ld:8192]
+
+</pre>
+
+<p>
+<b><b>141 ms!</b></b> \((2 * 8192^3) \div 0.141\) is 7.798 TFLOPS, almost at the specification maximum of the hardware!
+Nvidia did a really good job here, and the performance difference is, according to Cedric's experiments,
+even larger for smaller or non-quadratic matrices. In Clojure land, now we have the choice between
+a great free OpenCL backend, and an impressive proprietary Nvidia backend with unbeatable speed!
+</p>
+</div>
+</div>
+
+<div id="outline-container-org5172d02" class="outline-2">
+<h2 id="org5172d02">Access to the Nvidia CUDA ecosystem</h2>
+<div class="outline-text-2" id="text-org5172d02">
+<p>
+What is left for you to do now, write a few lines of high-level Clojure function calls of these GPU operations,
+and easily create top-notch machine learning cash machine? Well&#x2026; not so fast. Yes, linear algebra
+operations can take us a long way, but there is always some custom stuff that needs to be written. Sometimes
+it is because we cannot express what we need to do with standard operations, sometimes because we need
+to optimize for our special use case.
+</p>
+
+<p>
+Neanderthal got us covered - we can still use its data structures and automatic transfer methods
+to manage our data, and combine it with our custom CUDA kernels with the help of <a href="http://clojurecuda.uncomplicate.org">ClojureCUDA</a>. That's
+where real power is.
+</p>
+
+<p>
+And that's not all. Nvidia ships several libraries for domains beyond linear algebra. Neanderthal helps
+with connecting with those in a similar way it helps with our custom ClojureCUDA-based stuff - by
+taking data management task off our shoulders. Expect some of those Nvidia libraries to be
+integrated into Clojure ecosystem  as additional Neanderthal engines, or as separate <a href="http://uncomplicate.org">Uncomplicate</a> libraries.
+</p>
+
+<p>
+I expect to integrate at least <a href="https://developer.nvidia.com/cusparse">cuSPARSE</a> and <a href="https://developer.nvidia.com/cusolver">cuSOLVER</a> into Neanderthal, and I'm eyeing <a href="https://developer.nvidia.com/cudnn">cuDNN</a> as
+an engine for a possible deep learning library. That shouldn't stop you from creating those before I do!
+</p>
+</div>
+</div>
+
+<div id="outline-container-org275d359" class="outline-2">
+<h2 id="org275d359">Wrap it up</h2>
+<div class="outline-text-2" id="text-org275d359">
+<p>
+I've just remembered that I had skipped the announcement post for <a href="http://clojurecuda.uncomplicate.org">ClojureCUDA</a> last month when it was released.
+So, check out that library also :)
+I had in mind a couple of additional things to say, but this post is getting long, so, until the next time,
+please check out the new <a href="http://neanderthal.uncomplicate.org">Neanderthal</a> 0.11.0, <a href="http://clojurecuda.uncomplicate.org">ClojureCUDA</a> 0.2.0, play with the examples, experiment, and write about what you discovered!
+</p>
+</div>
+</div>
