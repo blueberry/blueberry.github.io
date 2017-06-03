@@ -1,0 +1,782 @@
+---
+date: 2017-06-03
+tags:
+- Neanderthal
+- Clojure
+- vector spaces
+- linear algebra
+author: dragan
+layout: post
+title: Clojure Linear Algebra Refresher (1) - Vector Spaces
+excerpt: This article is a starting article in a series that is going to briefly skim through a good engineering textbook on linear algebra, making notes that help you relate that material to the Clojure code.
+categories:
+- Neanderthal
+- Clojure
+- vector spaces
+- linear algebra
+---
+<p>
+If you are at least a bit like me, you had learned (some) linear algebra during your university days, had done well
+at those math courses playing the human calculator role, multiplying matrices with pen and paper, but then
+buried these experiences deep down in your brain during those many years at typical programming tasks
+(which are not famous for using much linear algebra).
+</p>
+
+<p>
+ Now, you want to do some machine learning,
+or deep learning, or simply some random number crunching, and intuition takes you a long way, but not far enough:
+as soon as you hit more serious tasks, beyond the cats and dogs deep learning tutorials, there are things such as eigenvalues, or LU factorization,
+or whatever-the-hell-that-was. You can follow the math formulas, especially when someone else have already
+implemented them in software, but not everything is clear, and sooner or later <b>you</b> are the one that needs
+to make working software out of that cryptic formula involving matrices.
+</p>
+
+<p>
+In other words, you are not completely illiterate when it comes to maths, but you can not really work out
+this proof or that out of the blue; your math-fu is way below your Clojure-fu.
+Fortunately, you are a good programmer, and do not need much hand holding when it comes to Clojure.
+You just need some dots connecting what you read in the math textbooks and the functions in the <a href="http://neanderthal.uncomplicate.org">Clojure linear algebra library Neanderthal</a>.
+</p>
+
+<p>
+This article is a starting article in a series that is going to briefly skim through a good engineering
+textbook on linear algebra, making notes that help you relate that material to Clojure code. I like this book:
+<a href="https://www.amazon.com/Applications-Alternate-Bartlett-Publishers-Mathematics/dp/0763782491">Linear Algebra With Applications, Alternate Edition</a> by Gareth Williams. The reasons I chose this book are the following:
+</p>
+
+<ul class="org-ul">
+<li>It is application oriented; it has more theorem proofs than I need, but it at least does not skip application examples</li>
+<li>It is a nice hardcover, printed in color, that can be purchased for whopping $8.78 worldwide second-hand (7th edition at least).</li>
+<li>The alternate edition starts with 100 pages of matrix applications before diving into more abstract theory; good for engineers!</li>
+</ul>
+
+<p>
+Any decent linear algebra textbook will cover the same topics, but not necessarily in the same order, or with
+the same grouping. This particular article covers chapter 4 from the book I recommended. A typical (non-alternate)
+textbook will have this chapter as a starting chapter.
+</p>
+
+<div id="outline-container-org80a0b15" class="outline-2">
+<h2 id="org80a0b15">The Vector Space \(R^n\)</h2>
+<div class="outline-text-2" id="text-org80a0b15">
+<p>
+To work with vectors in a vector space \(R^n\), I use <a href="http://neanderthal.uncomplicate.org">Neanderthal</a> vectors, and specify the dimension
+\(n\) as a part of the construction of the vector. Sometimes the general <code>vctr</code> function is appropriate,
+and sometimes it is easier to work with specialized functions such as <code>dv</code> and <code>sv</code> (for native vectors on the CPU),
+<code>clv</code> (OpenCL vectors on GPU or CPU), or <code>cuv</code> (CUDA GPU vectors).
+This tutorial will use native, double floating-point precision vectors on the CPU (<code>dv</code>).
+</p>
+
+<p>
+To get access to these constructors, I'll require the namespace that defines them. I'll also
+require the core namespace, where most functions that operate on vectors and matrices are located.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>require '<span style="color: #006400;">[</span><span style="color: #2F8B58; font-weight: bold;">uncomplicate.neanderthal</span>
+           <span style="color: #ff1493;">[</span>native <span style="color: #F5666D;">:refer</span> <span style="color: #F5666D;">:all</span><span style="color: #ff1493;">]</span>
+           <span style="color: #ff1493;">[</span>core <span style="color: #F5666D;">:refer</span> <span style="color: #F5666D;">:all</span><span style="color: #ff1493;">]</span><span style="color: #006400;">]</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<p>
+For example, vector <code>v1</code> is a vector in \(R^4\), while <code>v2</code> is a vector in \(R^{22}\).
+</p>
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">v1</span> <span style="color: #006400;">(</span>dv -1 2 5.2 0<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">v2</span> <span style="color: #006400;">(</span>dv <span style="color: #ff1493;">(</span>range 22<span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<p>
+If i print these vectors out in the REPL, I can find more details about them, including their <i>components</i> (elements, entries):
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure">v1
+</pre>
+</div>
+
+<pre class="example">
+#RealBlockVector[double, n:4, offset: 0, stride:1]
+[ -1.00   2.00   5.20   0.00 ]
+
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-clojure">v2
+</pre>
+</div>
+
+<pre class="example">
+#RealBlockVector[double, n:22, offset: 0, stride:1]
+[  0.00   1.00   2.00   3.00   4.00   5.00   6.00   7.00    ...    14.00  15.00  16.00  17.00  18.00  19.00  20.00  21.00 ]
+
+</pre>
+</div>
+
+<div id="outline-container-orgee751ed" class="outline-3">
+<h3 id="orgee751ed">Addition and Scalar Multiplication</h3>
+<div class="outline-text-3" id="text-orgee751ed">
+<p>
+Math books define vector spaces using surprisingly few (at least to us, programmers) things.
+These are addition and scalar multiplication.
+</p>
+
+<p>
+<i>Addition</i> in mathematics is simply and operation \(+\), but in programming, we are doing numerical computations,
+so we are also concerned with the implementation details that math textbooks do not discuss. One way to
+add two vectors would be the function <code>xpy</code> (vector x plus vector y):
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>xpy v1 v2<span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<p>
+This won't work, since we cannot add two vectors from different vector spaces (\(R^4\) and \(R^{22}\)), and when
+you evaluate this in your REPL, you'll get an exception thrown.
+</p>
+
+<p>
+The vectors have to be compatible, both in the mathematical sense (same vector space), and in an implementation
+specific way, in which there is no sense to add single-precision CUDA vector to a double-precision OpenCL vector.
+</p>
+
+<p>
+Let's try with <code>v3</code>, which is in \(R^4\):
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">v3</span> <span style="color: #006400;">(</span>dv -2 -3 1 0<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>xpy v1 v3<span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealBlockVector[double, n:4, offset: 0, stride:1]
+[  2.50   2.00  -3.60   0.00 ]
+
+</pre>
+
+<p>
+This function is pure; <code>v1</code> and <code>v2</code> haven't changed, while the result is a new vector instance (which
+in this case has not been kept, but went to the garbage).
+</p>
+
+<p>
+<i>Scalar multiplication</i> is done using the pure function <code>scal</code>. It accepts a scalar and a vector, and returns
+the scaled vector, while leaving the original as it was before:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>scal 2.5 v1<span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealBlockVector[double, n:4, offset: 0, stride:1]
+[ -2.50   5.00  13.00   0.00 ]
+
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-clojure">v1
+</pre>
+</div>
+
+<pre class="example">
+#RealBlockVector[double, n:4, offset: 0, stride:1]
+[ -1.00   2.00   5.20   0.00 ]
+
+</pre>
+
+<p>
+Pure functions are all fine and dandy, but in the real world of numerical computations, we are constrained with
+time and space: we need our vectors to fit into available memory, and the results to be available today. With vectors
+in \(R^4\), computers will achieve that no matter how bad and unoptimized our code is. For the real world applications though,
+we'll deal with billions of elements and demanding operations. For those cases, we'll want to do two things: minimize
+memory copying, and fuse multiple operations into one.
+</p>
+
+<p>
+When it comes to vector addition and scalar multiplication, this means that we can fuse <code>scal</code> and
+<code>xpy</code> into <code>axpy</code> (scalar a times vector x plus vector y) and avoid memory copying by using
+destructive functions such as <code>scal!</code> and <code>axpy!</code> (note the <code>!</code> suffix). For more varieties, please check <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html">the documentation
+of the neanderthal core namespace</a> out.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>axpy! 2.5 v1 v3<span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealBlockVector[double, n:4, offset: 0, stride:1]
+[  1.00   5.00   4.20   0.00 ]
+
+</pre>
+
+<p>
+Note that <code>v3</code> has changed as a result of this operation, and it now contains the result, written over its
+previous contents:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure">v3
+</pre>
+</div>
+
+<pre class="example">
+#RealBlockVector[double, n:4, offset: 0, stride:1]
+[  1.00   5.00   4.20   0.00 ]
+
+</pre>
+</div>
+</div>
+
+<div id="outline-container-orgbabcc1e" class="outline-3">
+<h3 id="orgbabcc1e">Special Vectors</h3>
+<div class="outline-text-3" id="text-orgbabcc1e">
+<p>
+<i>Zero vector</i> can be constructed by calling vector constructor with an integer argument that specifies dimension:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>dv 7<span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealBlockVector[double, n:7, offset: 0, stride:1]
+[  0.00   0.00   0.00   0.00   0.00   0.00   0.00 ]
+
+</pre>
+
+<p>
+When we already have a vector, and need a zero vector in the same vector space (with the same dimension),
+we can call the <code>zero</code> function:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>zero v2<span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealBlockVector[double, n:22, offset: 0, stride:1]
+[  0.00   0.00   0.00   0.00   0.00   0.00   0.00   0.00    ...     0.00   0.00   0.00   0.00   0.00   0.00   0.00   0.00 ]
+
+</pre>
+
+<p>
+<i>Negative</i> of a vector is computed simply by scaling with <code>-1</code>:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">v4</span> <span style="color: #006400;">(</span>scal -1 v1<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+v4
+</pre>
+</div>
+
+<pre class="example">
+#'user/v4#RealBlockVector[double, n:4, offset: 0, stride:1]
+[  1.00  -2.00  -5.20  -0.00 ]
+
+</pre>
+
+
+<p>
+How to do <i>vector subtraction</i>? As I mentioned earlier, there are only two independent operations in \(R^n\),
+vector addition and scalar multiplication. Vector subtraction is simply an addition with the negative vector.
+We can do this with one fused operation, be it <code>axpy</code> or <code>axpby</code>:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>axpby! 1 v1 -1 v3<span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealBlockVector[double, n:4, offset: 0, stride:1]
+[ -2.00  -3.00   1.00   0.00 ]
+
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org837b811" class="outline-3">
+<h3 id="org837b811">Linear Combinations of Vectors</h3>
+<div class="outline-text-3" id="text-org837b811">
+<p>
+To compute a linear combination such as \(a\mathbf{u} + b\mathbf{v} + c\mathbf{w}\), we can use multiple <code>axpy</code> calls or
+even let one <code>axpy</code> call sort this out (and waste less memory by not copying intermediate results)!
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #006400;">[</span>u <span style="color: #ff1493;">(</span>dv 2 5 -3<span style="color: #ff1493;">)</span>
+      v <span style="color: #ff1493;">(</span>dv -4 1 9<span style="color: #ff1493;">)</span>
+      w <span style="color: #ff1493;">(</span>dv 4 0 2<span style="color: #ff1493;">)</span><span style="color: #006400;">]</span>
+  <span style="color: #006400;">(</span>axpy 2 u -3 v 1 w<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealBlockVector[double, n:3, offset: 0, stride:1]
+[ 20.00   7.00 -31.00 ]
+
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org63d4643" class="outline-3">
+<h3 id="org63d4643">Column Vectors</h3>
+<div class="outline-text-3" id="text-org63d4643">
+<p>
+Both <i>row</i> vectors and <i>column</i> vectors are represented in the same way in Clojure: with Neanderthal dense vectors.
+Orientation does not matter, and the vector will simply fit into an operation that needs the vector to be horizontal
+or vertical in mathematical sense.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgeb98be2" class="outline-2">
+<h2 id="orgeb98be2">Dot Product, Norm, Angle, and Distance</h2>
+<div class="outline-text-2" id="text-orgeb98be2">
+<p>
+<i>Dot product</i> of two compatible vectors
+</p>
+
+<p>
+\(\mathbf{u}\cdot\mathbf{v} = u_1 v_1 + u_2 v_2 + \cdots + u_n v_n\)
+</p>
+
+<p>
+can be computed using the function with a predictably boring name <code>dot</code>:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #006400;">[</span>u <span style="color: #ff1493;">(</span>dv 1 -2 4<span style="color: #ff1493;">)</span>
+      v <span style="color: #ff1493;">(</span>dv 3 0 2<span style="color: #ff1493;">)</span><span style="color: #006400;">]</span>
+  <span style="color: #006400;">(</span>dot u v<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+11.0
+
+</pre>
+
+<p>
+<i>Norm</i> (aka length, or magnitude, or L2 norm) most often refers to Euclidean distance between two vectors
+(although other norms can be used):
+</p>
+
+<p>
+\(\lVert \mathbf{u} \lVert = \sqrt{u_1^2 + u_2^2 + \cdots + u_n^2}\)
+</p>
+
+<p>
+In Clojure, we use the <code>nrm2</code> function to compute this norm:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>nrm2 <span style="color: #006400;">(</span>dv 1 3 5<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+5.916079783099616
+
+</pre>
+
+<p>
+A <i>unit vector</i> is a vector whose norm is 1. Given a vector <code>v</code>, we can construct a unit vector <code>u</code> in
+the same direction:
+</p>
+
+<p>
+\(\mathbf{u} = \frac{1}{\lVert \mathbf{v} \lVert} \mathbf{v}\)
+</p>
+
+<p>
+or, in Clojure code:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #006400;">[</span>v <span style="color: #ff1493;">(</span>dv 1 3 5<span style="color: #ff1493;">)</span><span style="color: #006400;">]</span>
+  <span style="color: #006400;">(</span>scal <span style="color: #ff1493;">(</span>/ <span style="color: #ffff00;">(</span>nrm2 v<span style="color: #ffff00;">)</span><span style="color: #ff1493;">)</span> v<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealBlockVector[double, n:3, offset: 0, stride:1]
+[  0.17   0.51   0.85 ]
+
+</pre>
+
+<p>
+This process is called <i>normalizing</i> the vector.
+</p>
+</div>
+
+<div id="outline-container-org5bb087a" class="outline-3">
+<h3 id="org5bb087a">Angle Between Vectors</h3>
+<div class="outline-text-3" id="text-org5bb087a">
+<p>
+Any linear algebra book will teach you how to compute the cosine of an angle between two vectors:
+</p>
+
+<p>
+\(cos\theta = \frac{\mathbf{u \cdot v}}{\lVert \mathbf{u} \lVert \lVert \mathbf{v} \lVert}\)
+</p>
+
+<p>
+or, in Clojure:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #006400;">[</span>u <span style="color: #ff1493;">(</span>dv 1 0 0<span style="color: #ff1493;">)</span>
+      v <span style="color: #ff1493;">(</span>dv 1 0 1<span style="color: #ff1493;">)</span><span style="color: #006400;">]</span>
+  <span style="color: #006400;">(</span>/ <span style="color: #ff1493;">(</span>dot u v<span style="color: #ff1493;">)</span> <span style="color: #ff1493;">(</span>nrm2 u<span style="color: #ff1493;">)</span> <span style="color: #ff1493;">(</span>nrm2 v<span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+0.7071067811865475
+
+</pre>
+
+<p>
+You can compute &theta; out of this cosine, but sometimes you do not even need to do that. For example, two vectors
+are <i>orthogonal</i> if the angle between them is \(90^\circ\). Since we know that \(cos{\frac{\pi}{4}} = 0\), we can simply
+test whether the dot product is 0.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>dot <span style="color: #006400;">(</span>dv 2 -3 1<span style="color: #006400;">)</span> <span style="color: #006400;">(</span>dv 1 2 4<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+0.0
+
+</pre>
+
+<p>
+These two vectors seem to be orthogonal.
+</p>
+
+<p>
+We can determine <i>distance between points</i> in a vector space by calculating the norm of the difference
+between their direction vectors:
+</p>
+
+<p>
+\(d(\mathbf{x},\mathbf{y}) = \lVert \mathbf{x} - \mathbf{y} \lVert\)
+</p>
+
+<p>
+In Clojure, that is as simple to do as:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #006400;">[</span>x <span style="color: #ff1493;">(</span>dv 4 0 -3 5<span style="color: #ff1493;">)</span>
+      y <span style="color: #ff1493;">(</span>dv 1 -2 3 0<span style="color: #ff1493;">)</span><span style="color: #006400;">]</span>
+  <span style="color: #006400;">(</span>nrm2 <span style="color: #ff1493;">(</span>axpy -1 y x<span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+8.602325267042627
+
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org68e3bfa" class="outline-2">
+<h2 id="org68e3bfa">General Vector Spaces</h2>
+<div class="outline-text-2" id="text-org68e3bfa">
+<p>
+It is important to note that real vectors are not the only "kind" of vector spaces there is. Anything that
+has operations of addition and scalar multiplication that have certain properties (see the textbooks for details) is
+a vector space. Some well known vector spaces are real vectors (\(R^n\)), <i>matrices</i> (\(M^{mn}\)), complex vectors (\(C^n\)),
+and, of course - functions. However, when we do numerical computing, we usually work with real or complex vectors and matrices,
+so in the following discussion I'll refer only to the parts of the textbook that deal with those. For the
+abstract theoretical parts, you won't use Clojure anyway, but your trusty pen and paper.
+</p>
+
+<p>
+Neanderthal currently supports only real vectors and matrices; complex vectors and matrices will be
+supported in some of the upcoming versions.
+</p>
+
+<p>
+I have already shown you how to use vectors. With matrices, it's similar, just with more options.
+The first difference is that we can use different optimized implementations of matrices, to exploit knowledge
+of their structure. Therefore, there are dense matrices (GE), dense triangular matrices (TR), dense symmetrical matrices (SY),
+various banded storages for symmetric and triangular matrices, sparse matrices (Sp), etc. Some of those
+are already implemented and supported in Neanderthal at the time of this writing, some are waiting their
+turn to be implemented (and may be at the time you're reading this - check <a href="http://neanderthal.uncomplicate.org/codox">Neanderthal API docs</a> out).
+</p>
+
+<p>
+Anyway, let's construct a matrix and compute its norm:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">m</span> <span style="color: #006400;">(</span>dge 2 3 <span style="color: #ff1493;">(</span>range 6<span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+m
+</pre>
+</div>
+
+<pre class="example">
+#'user/m#RealGEMatrix[double, mxn:2x3, order:column, offset:0, ld:2]
+
+  0.00   2.00   4.00
+  1.00   3.00   5.00
+
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>nrm2 m<span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+7.416198487095663
+
+</pre>
+
+<p>
+Euclidean norm applied to matrices is known as Frobenius norm (FYI).
+</p>
+
+<p>
+Most of the functions that can be applied to vectors, can also be applied to matrices. Furthermore,
+there are many more functions in linear algebra that work exclusively with matrices. <a href="http://neanderthal.uncomplicate.org/codox">Neanderthal API docs</a>
+list what is available in Clojure at the moment when you read this.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org74a5e70" class="outline-2">
+<h2 id="org74a5e70">Skip Some Theory</h2>
+<div class="outline-text-2" id="text-org74a5e70">
+<p>
+The following two sections, <i>Subspaces</i> and <i>Linear Combinations</i> are theoretical. We skip them, since
+I can not show you anything in Clojure code related to this.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgd91c3cd" class="outline-2">
+<h2 id="orgd91c3cd">Linear Dependence and Independence</h2>
+<div class="outline-text-2" id="text-orgd91c3cd">
+<p>
+Lots of theory here, but when it comes to computation, I can note that two vectors are linearly dependent if they
+are on the same line, implying that the angle between them is 0, meaning the cosine is 1. If cosine is not 1, they
+are independent. There is a catch, though: floating-point computations are not absolutely precise. For very
+large vectors, sometime there will be rounding error, so you might get something like 0.99999999 or 1.000001.
+Equality comparison of floating-point numbers is a tricky business. Keep that in mind, and know that even
+there Neanderthal can help you, since it offers functions that take some imprecision margin into account.
+See the <a href="http://neanderthal.uncomplicate.org/codox">Neanderthal API docs</a> and look up for functions such as <code>f=</code> in the math namespace.
+</p>
+
+<p>
+So, in Clojure:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #006400;">[</span>x <span style="color: #ff1493;">(</span>dv 2 -1 3<span style="color: #ff1493;">)</span>
+      y <span style="color: #ff1493;">(</span>dv 4 -2 6<span style="color: #ff1493;">)</span><span style="color: #006400;">]</span>
+  <span style="color: #006400;">(</span>/ <span style="color: #ff1493;">(</span>dot x y<span style="color: #ff1493;">)</span> <span style="color: #ff1493;">(</span>nrm2 x<span style="color: #ff1493;">)</span> <span style="color: #ff1493;">(</span>nrm2 y<span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+1.0
+
+</pre>
+
+<p>
+These two vectors are linearly dependent indeed.
+</p>
+
+<p>
+But, what if we have more than two vectors, and are tasked with ckecking whether their set is dependent or not?
+See example 1 from the page 170 of the book I recommended. There is a set of vectors \({x = (1,2,0), y = (0,1,-1), z = (1,1,2)}\),
+and we need to find whether there are scalars \(c_1, c_2, \text{and } c_3\) such that \(c_1\mathbf{x} + c_2\mathbf{y} + c_3\mathbf{z} = 0\).
+This leads to a system of linear equations that, when solved, could have an unique solution, in which case the vectors
+are linearly independent, or to more than one solution, in which case the vectors are linearly dependent.
+</p>
+
+<p>
+Luckily for us, Neanderhal offers functions for solving systems of linear equations. Require the <code>linalg</code> namespace
+to reach for them:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>require '<span style="color: #006400;">[</span><span style="color: #2F8B58; font-weight: bold;">uncomplicate.neanderthal.linalg</span> <span style="color: #F5666D;">:refer</span> <span style="color: #F5666D;">:all</span><span style="color: #006400;">]</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<p>
+Now, we can set up and solve the system that will find the answer for us:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #006400;">[</span>cs <span style="color: #ff1493;">(</span>dge 3 1<span style="color: #ff1493;">)</span><span style="color: #006400;">]</span>
+  <span style="color: #006400;">(</span>sv! <span style="color: #ff1493;">(</span>dge 3 3 <span style="color: #ffff00;">[</span>1 2 0
+                 0 1 -1
+                 1 1 2<span style="color: #ffff00;">]</span><span style="color: #ff1493;">)</span>
+       cs<span style="color: #006400;">)</span>
+  cs<span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealGEMatrix[double, mxn:3x1, order:column, offset:0, ld:3]
+
+  0.00
+  0.00
+  0.00
+
+</pre>
+
+<p>
+Just like in the textbook, the solution is: \(c_1=0, c_2=0, c_3=0\). If we tried with obviously dependent vectors,
+we would have got an exception complaining that the solution could not be computed. Not bad&#x2026;
+</p>
+</div>
+</div>
+
+<div id="outline-container-org5edf255" class="outline-2">
+<h2 id="org5edf255">Basis and Dimension</h2>
+<div class="outline-text-2" id="text-org5edf255">
+<p>
+Some more theory here that does not relate directly to Clojure code.
+</p>
+
+<p>
+Note that the dimension of the space of a vector could be inquired with the <code>(dim x)</code> function. The dimension
+of the space of the matrix is \(m \times n\), so <code>(* (mrows a) (ncols a))</code>. All the spaces we deal with here have
+<i>finite dimension</i>, while we leave <i>infinite dimension</i> vectors to pen and paper adventures.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org9af53e2" class="outline-2">
+<h2 id="org9af53e2">Rank</h2>
+<div class="outline-text-2" id="text-org9af53e2">
+<p>
+Rank of a matrix is useful since it relates matrices to vectors, and can tell us some useful properties
+of a matrix at hand. See the textbook (or wikipedia) for the definition and use. What is the question right
+now is how do we compute it? It is not easy at all, but, fortunately, I can use Neanderthal. When we inquire
+about the rank, we expect a natural number as a result.
+</p>
+
+<p>
+We can get rank by doing singular value decomposition by calling function <code>svd!</code>, and inspecting
+one of its results, namely the sorted vector of singular values <code>s</code>. The number of singular values
+in <code>s</code> that are greater than 0 is the rank of the matrix. As before, take into account that floating
+point numbers should be compared with equality carefully.
+</p>
+
+<p>
+Here's example 3 (page 185 from the textbook) done in Clojure:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #006400;">[</span>a <span style="color: #ff1493;">(</span>dge 4 4 <span style="color: #ffff00;">[</span>1 0 0 0
+                  2 0 0 0
+                  0 1 0 0
+                  0 0 1 0<span style="color: #ffff00;">]</span><span style="color: #ff1493;">)</span>
+      s <span style="color: #ff1493;">(</span>dv 4<span style="color: #ff1493;">)</span>
+      superb <span style="color: #ff1493;">(</span>dv 4<span style="color: #ff1493;">)</span><span style="color: #006400;">]</span>
+  <span style="color: #006400;">(</span>svd! a s superb<span style="color: #006400;">)</span>
+  s<span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealBlockVector[double, n:4, offset: 0, stride:1]
+[  2.24   1.00   1.00   0.00 ]
+
+</pre>
+
+<p>
+After inspecting vector <code>s</code> for non-zero values (visually, or by writing a small function that checks its elements)
+I am a little smarter than before since I know now that \(rank(A) = 3\).
+</p>
+
+<p>
+Seems so cumbersome. Why isn't there a function <code>rank</code> in Neanderthal that does this for me? Well, the problem
+is that I rarely need only rank. Often I also need those other results from <code>svd!</code> or
+similar functions. If <code>rank</code> was so easy to access, it would have promoted wasteful computations of other
+results that go with it. If you really need <code>rank</code> it is easy to write that function as part
+of your personal toolbox. Maybe I'll include such functions in Neanderthal later. Who knows. What is important
+is that the cake is available right now, so you can easily add your own cherries on top of it.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org8a02385" class="outline-2">
+<h2 id="org8a02385">Orthonormal Vectors and Projections</h2>
+<div class="outline-text-2" id="text-org8a02385">
+<p>
+This is yet another theoretical section. From the computational point of view, what could be
+interesting, is computing projection of a vector onto another vector or a subspace.
+</p>
+
+<p>
+\(proj_u v = \frac{v \cdot u}{u \cdot u} u\)
+</p>
+
+<p>
+Basically, it boils down to be able to compute dot product and then scale vector u.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #006400;">[</span>v <span style="color: #ff1493;">(</span>dv 6 7<span style="color: #ff1493;">)</span>
+      u <span style="color: #ff1493;">(</span>dv 1 4<span style="color: #ff1493;">)</span><span style="color: #006400;">]</span>
+  <span style="color: #006400;">(</span>scal <span style="color: #ff1493;">(</span>/ <span style="color: #ffff00;">(</span>dot u v<span style="color: #ffff00;">)</span> <span style="color: #ffff00;">(</span>dot u u<span style="color: #ffff00;">)</span><span style="color: #ff1493;">)</span> u<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealBlockVector[double, n:2, offset: 0, stride:1]
+[  2.00   8.00 ]
+
+</pre>
+
+<p>
+It's similar for subspaces, so that might be the obligatory trivial exercise that is being left to
+the reader.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org1db883c" class="outline-2">
+<h2 id="org1db883c">Until the next post</h2>
+<div class="outline-text-2" id="text-org1db883c">
+<p>
+That's all folks&#x2026; For this post, at least. I've covered most (or perhaps all) numerical stuff that is typically
+covered in a Vector Spaces chapter of a typical textbook. I am not a mathematician, so if you
+are, please forgive me for not being precise enough, and if I've made errors (I'm sure I have), please
+send me corrections.
+</p>
+
+<p>
+I hope that this post helped you started with doing linear algebra computations in Clojure.
+The next topic will be <i>Eigenvalues and eigenvectors</i>.
+</p>
+</div>
+</div>
