@@ -14,6 +14,7 @@ categories:
 - Clojure
 - vector spaces
 - linear algebra
+latex_header: \usepackage{amsmath}
 ---
 <p>
 If you are at least a bit like me, you had learned (some) linear algebra during your university days, had done well
@@ -46,7 +47,7 @@ textbook on linear algebra, making notes that help you relate that material to C
 
 <ul class="org-ul">
 <li>It is application oriented; it has more theorem proofs than I need, but it at least does not skip application examples</li>
-<li>It is a nice hardcover, printed in color, that can be purchased for whopping $8.78 worldwide second-hand (7th edition at least).</li>
+<li>It is a nice hardcover, printed in color, that can be purchased for whopping <del>$8.78</del> worldwide second-hand (7th edition at least). EDIT: After this article spent a day at Hacker News frontpage, the price increased and number of available copies dropped. I do not recommend getting a PDF from the well-known Russian online library.</li>
 <li>The alternate edition starts with 100 pages of matrix applications before diving into more abstract theory; good for engineers!</li>
 </ul>
 
@@ -73,9 +74,9 @@ require the core namespace, where most functions that operate on vectors and mat
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>require '<span style="color: #006400;">[</span><span style="color: #2F8B58; font-weight: bold;">uncomplicate.neanderthal</span>
-           <span style="color: #ff1493;">[</span>native <span style="color: #F5666D;">:refer</span> <span style="color: #F5666D;">:all</span><span style="color: #ff1493;">]</span>
-           <span style="color: #ff1493;">[</span>core <span style="color: #F5666D;">:refer</span> <span style="color: #F5666D;">:all</span><span style="color: #ff1493;">]</span><span style="color: #006400;">]</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span><span style="color: #2F8B58; font-weight: bold;">uncomplicate.neanderthal</span>
+           <span style="color: #909183;">[</span>native <span style="color: #F5666D;">:refer</span> <span style="color: #F5666D;">:all</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>core <span style="color: #F5666D;">:refer</span> <span style="color: #F5666D;">:all</span><span style="color: #909183;">]</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -83,8 +84,8 @@ require the core namespace, where most functions that operate on vectors and mat
 For example, vector <code>v1</code> is a vector in \(R^4\), while <code>v2</code> is a vector in \(R^{22}\).
 </p>
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">v1</span> <span style="color: #006400;">(</span>dv -1 2 5.2 0<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
-<span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">v2</span> <span style="color: #006400;">(</span>dv <span style="color: #ff1493;">(</span>range 22<span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">v1</span> <span style="color: #7388d6;">(</span>dv -1 2 5.2 0<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">v2</span> <span style="color: #7388d6;">(</span>dv <span style="color: #909183;">(</span>range 22<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -130,7 +131,7 @@ add two vectors would be the function <code>xpy</code> (vector x plus vector y):
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>xpy v1 v2<span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>xpy v1 v2<span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -149,18 +150,18 @@ Let's try with <code>v3</code>, which is in \(R^4\):
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">v3</span> <span style="color: #006400;">(</span>dv -2 -3 1 0<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">v3</span> <span style="color: #7388d6;">(</span>dv -2 -3 1 0<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>xpy v1 v3<span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>xpy v1 v3<span style="color: #707183;">)</span>
 </pre>
 </div>
 
 <pre class="example">
 #RealBlockVector[double, n:4, offset: 0, stride:1]
-[  2.50   2.00  -3.60   0.00 ]
+[ -5.50   4.00  19.20   0.00 ]
 
 </pre>
 
@@ -175,7 +176,7 @@ the scaled vector, while leaving the original as it was before:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>scal 2.5 v1<span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>scal 2.5 v1<span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -212,13 +213,13 @@ of the neanderthal core namespace</a> out.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>axpy! 2.5 v1 v3<span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>axpy! 2.5 v1 v3<span style="color: #707183;">)</span>
 </pre>
 </div>
 
 <pre class="example">
 #RealBlockVector[double, n:4, offset: 0, stride:1]
-[  1.00   5.00   4.20   0.00 ]
+[ -7.00   7.00  27.00   0.00 ]
 
 </pre>
 
@@ -234,7 +235,7 @@ previous contents:
 
 <pre class="example">
 #RealBlockVector[double, n:4, offset: 0, stride:1]
-[  1.00   5.00   4.20   0.00 ]
+[ -7.00   7.00  27.00   0.00 ]
 
 </pre>
 </div>
@@ -248,7 +249,7 @@ previous contents:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>dv 7<span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>dv 7<span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -264,7 +265,7 @@ we can call the <code>zero</code> function:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>zero v2<span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>zero v2<span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -279,7 +280,7 @@ we can call the <code>zero</code> function:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">v4</span> <span style="color: #006400;">(</span>scal -1 v1<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">v4</span> <span style="color: #7388d6;">(</span>scal -1 v1<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 v4
 </pre>
 </div>
@@ -298,13 +299,13 @@ We can do this with one fused operation, be it <code>axpy</code> or <code>axpby<
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>axpby! 1 v1 -1 v3<span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>axpby! 1 v1 -1 v3<span style="color: #707183;">)</span>
 </pre>
 </div>
 
 <pre class="example">
 #RealBlockVector[double, n:4, offset: 0, stride:1]
-[ -2.00  -3.00   1.00   0.00 ]
+[  6.00  -5.00 -21.80   0.00 ]
 
 </pre>
 </div>
@@ -319,10 +320,10 @@ even let one <code>axpy</code> call sort this out (and waste less memory by not 
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #006400;">[</span>u <span style="color: #ff1493;">(</span>dv 2 5 -3<span style="color: #ff1493;">)</span>
-      v <span style="color: #ff1493;">(</span>dv -4 1 9<span style="color: #ff1493;">)</span>
-      w <span style="color: #ff1493;">(</span>dv 4 0 2<span style="color: #ff1493;">)</span><span style="color: #006400;">]</span>
-  <span style="color: #006400;">(</span>axpy 2 u -3 v 1 w<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #7388d6;">[</span>u <span style="color: #909183;">(</span>dv 2 5 -3<span style="color: #909183;">)</span>
+      v <span style="color: #909183;">(</span>dv -4 1 9<span style="color: #909183;">)</span>
+      w <span style="color: #909183;">(</span>dv 4 0 2<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>axpy 2 u -3 v 1 w<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -362,9 +363,9 @@ can be computed using the function with a predictably boring name <code>dot</cod
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #006400;">[</span>u <span style="color: #ff1493;">(</span>dv 1 -2 4<span style="color: #ff1493;">)</span>
-      v <span style="color: #ff1493;">(</span>dv 3 0 2<span style="color: #ff1493;">)</span><span style="color: #006400;">]</span>
-  <span style="color: #006400;">(</span>dot u v<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #7388d6;">[</span>u <span style="color: #909183;">(</span>dv 1 -2 4<span style="color: #909183;">)</span>
+      v <span style="color: #909183;">(</span>dv 3 0 2<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>dot u v<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -387,7 +388,7 @@ In Clojure, we use the <code>nrm2</code> function to compute this norm:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>nrm2 <span style="color: #006400;">(</span>dv 1 3 5<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>nrm2 <span style="color: #7388d6;">(</span>dv 1 3 5<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -410,8 +411,8 @@ or, in Clojure code:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #006400;">[</span>v <span style="color: #ff1493;">(</span>dv 1 3 5<span style="color: #ff1493;">)</span><span style="color: #006400;">]</span>
-  <span style="color: #006400;">(</span>scal <span style="color: #ff1493;">(</span>/ <span style="color: #ffff00;">(</span>nrm2 v<span style="color: #ffff00;">)</span><span style="color: #ff1493;">)</span> v<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #7388d6;">[</span>v <span style="color: #909183;">(</span>dv 1 3 5<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>scal <span style="color: #909183;">(</span>/ <span style="color: #709870;">(</span>nrm2 v<span style="color: #709870;">)</span><span style="color: #909183;">)</span> v<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -442,9 +443,9 @@ or, in Clojure:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #006400;">[</span>u <span style="color: #ff1493;">(</span>dv 1 0 0<span style="color: #ff1493;">)</span>
-      v <span style="color: #ff1493;">(</span>dv 1 0 1<span style="color: #ff1493;">)</span><span style="color: #006400;">]</span>
-  <span style="color: #006400;">(</span>/ <span style="color: #ff1493;">(</span>dot u v<span style="color: #ff1493;">)</span> <span style="color: #ff1493;">(</span>nrm2 u<span style="color: #ff1493;">)</span> <span style="color: #ff1493;">(</span>nrm2 v<span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #7388d6;">[</span>u <span style="color: #909183;">(</span>dv 1 0 0<span style="color: #909183;">)</span>
+      v <span style="color: #909183;">(</span>dv 1 0 1<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>/ <span style="color: #909183;">(</span>dot u v<span style="color: #909183;">)</span> <span style="color: #909183;">(</span>nrm2 u<span style="color: #909183;">)</span> <span style="color: #909183;">(</span>nrm2 v<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -460,7 +461,7 @@ test whether the dot product is 0.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>dot <span style="color: #006400;">(</span>dv 2 -3 1<span style="color: #006400;">)</span> <span style="color: #006400;">(</span>dv 1 2 4<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>dot <span style="color: #7388d6;">(</span>dv 2 -3 1<span style="color: #7388d6;">)</span> <span style="color: #7388d6;">(</span>dv 1 2 4<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -487,9 +488,9 @@ In Clojure, that is as simple to do as:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #006400;">[</span>x <span style="color: #ff1493;">(</span>dv 4 0 -3 5<span style="color: #ff1493;">)</span>
-      y <span style="color: #ff1493;">(</span>dv 1 -2 3 0<span style="color: #ff1493;">)</span><span style="color: #006400;">]</span>
-  <span style="color: #006400;">(</span>nrm2 <span style="color: #ff1493;">(</span>axpy -1 y x<span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #7388d6;">[</span>x <span style="color: #909183;">(</span>dv 4 0 -3 5<span style="color: #909183;">)</span>
+      y <span style="color: #909183;">(</span>dv 1 -2 3 0<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>nrm2 <span style="color: #909183;">(</span>axpy -1 y x<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -532,7 +533,7 @@ Anyway, let's construct a matrix and compute its norm:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">m</span> <span style="color: #006400;">(</span>dge 2 3 <span style="color: #ff1493;">(</span>range 6<span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">m</span> <span style="color: #7388d6;">(</span>dge 2 3 <span style="color: #909183;">(</span>range 6<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 m
 </pre>
 </div>
@@ -546,7 +547,7 @@ m
 </pre>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>nrm2 m<span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>nrm2 m<span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -595,9 +596,9 @@ So, in Clojure:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #006400;">[</span>x <span style="color: #ff1493;">(</span>dv 2 -1 3<span style="color: #ff1493;">)</span>
-      y <span style="color: #ff1493;">(</span>dv 4 -2 6<span style="color: #ff1493;">)</span><span style="color: #006400;">]</span>
-  <span style="color: #006400;">(</span>/ <span style="color: #ff1493;">(</span>dot x y<span style="color: #ff1493;">)</span> <span style="color: #ff1493;">(</span>nrm2 x<span style="color: #ff1493;">)</span> <span style="color: #ff1493;">(</span>nrm2 y<span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #7388d6;">[</span>x <span style="color: #909183;">(</span>dv 2 -1 3<span style="color: #909183;">)</span>
+      y <span style="color: #909183;">(</span>dv 4 -2 6<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>/ <span style="color: #909183;">(</span>dot x y<span style="color: #909183;">)</span> <span style="color: #909183;">(</span>nrm2 x<span style="color: #909183;">)</span> <span style="color: #909183;">(</span>nrm2 y<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -624,7 +625,7 @@ to reach for them:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>require '<span style="color: #006400;">[</span><span style="color: #2F8B58; font-weight: bold;">uncomplicate.neanderthal.linalg</span> <span style="color: #F5666D;">:refer</span> <span style="color: #F5666D;">:all</span><span style="color: #006400;">]</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span><span style="color: #2F8B58; font-weight: bold;">uncomplicate.neanderthal.linalg</span> <span style="color: #F5666D;">:refer</span> <span style="color: #F5666D;">:all</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -633,12 +634,12 @@ Now, we can set up and solve the system that will find the answer for us:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #006400;">[</span>cs <span style="color: #ff1493;">(</span>dge 3 1<span style="color: #ff1493;">)</span><span style="color: #006400;">]</span>
-  <span style="color: #006400;">(</span>sv! <span style="color: #ff1493;">(</span>dge 3 3 <span style="color: #ffff00;">[</span>1 2 0
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #7388d6;">[</span>cs <span style="color: #909183;">(</span>dge 3 1<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>sv! <span style="color: #909183;">(</span>dge 3 3 <span style="color: #709870;">[</span>1 2 0
                  0 1 -1
-                 1 1 2<span style="color: #ffff00;">]</span><span style="color: #ff1493;">)</span>
-       cs<span style="color: #006400;">)</span>
-  cs<span style="color: #8b0000;">)</span>
+                 1 1 2<span style="color: #709870;">]</span><span style="color: #909183;">)</span>
+       cs<span style="color: #7388d6;">)</span>
+  cs<span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -695,14 +696,14 @@ Here's example 3 (page 185 from the textbook) done in Clojure:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #006400;">[</span>a <span style="color: #ff1493;">(</span>dge 4 4 <span style="color: #ffff00;">[</span>1 0 0 0
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #7388d6;">[</span>a <span style="color: #909183;">(</span>dge 4 4 <span style="color: #709870;">[</span>1 0 0 0
                   2 0 0 0
                   0 1 0 0
-                  0 0 1 0<span style="color: #ffff00;">]</span><span style="color: #ff1493;">)</span>
-      s <span style="color: #ff1493;">(</span>dv 4<span style="color: #ff1493;">)</span>
-      superb <span style="color: #ff1493;">(</span>dv 4<span style="color: #ff1493;">)</span><span style="color: #006400;">]</span>
-  <span style="color: #006400;">(</span>svd! a s superb<span style="color: #006400;">)</span>
-  s<span style="color: #8b0000;">)</span>
+                  0 0 1 0<span style="color: #709870;">]</span><span style="color: #909183;">)</span>
+      s <span style="color: #909183;">(</span>dv 4<span style="color: #909183;">)</span>
+      superb <span style="color: #909183;">(</span>dv 4<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>svd! a s superb<span style="color: #7388d6;">)</span>
+  s<span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -745,9 +746,9 @@ Basically, it boils down to be able to compute dot product and then scale vector
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #006400;">[</span>v <span style="color: #ff1493;">(</span>dv 6 7<span style="color: #ff1493;">)</span>
-      u <span style="color: #ff1493;">(</span>dv 1 4<span style="color: #ff1493;">)</span><span style="color: #006400;">]</span>
-  <span style="color: #006400;">(</span>scal <span style="color: #ff1493;">(</span>/ <span style="color: #ffff00;">(</span>dot u v<span style="color: #ffff00;">)</span> <span style="color: #ffff00;">(</span>dot u u<span style="color: #ffff00;">)</span><span style="color: #ff1493;">)</span> u<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #7388d6;">[</span>v <span style="color: #909183;">(</span>dv 6 7<span style="color: #909183;">)</span>
+      u <span style="color: #909183;">(</span>dv 1 4<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>scal <span style="color: #909183;">(</span>/ <span style="color: #709870;">(</span>dot u v<span style="color: #709870;">)</span> <span style="color: #709870;">(</span>dot u u<span style="color: #709870;">)</span><span style="color: #909183;">)</span> u<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -776,7 +777,7 @@ send me corrections.
 
 <p>
 I hope that this post helped you started with doing linear algebra computations in Clojure.
-The next topic will be <i>Eigenvalues and eigenvectors</i>.
+You might also want to continue reading the next article: <a href="./Clojure-Linear-Algebra-Refresher-Eigenvalues-and-Eigenvectors">Eigenvalues and Eigenvectors</a>.
 </p>
 </div>
 </div>

@@ -1,0 +1,442 @@
+---
+date: 2017-06-06
+tags:
+- Neanderthal
+- Clojure
+- eigenvalues
+- eigenvectors
+- linear algebra
+author: dragan
+layout: post
+title: Clojure Linear Algebra Refresher (2) - Eigenvalues and Eigenvectors
+excerpt: placeholder
+categories:
+- Neanderthal
+- Clojure
+- eigenvalues
+- eigenvectors
+- linear algebra
+latex_header: \usepackage{amsmath}
+---
+<p>
+I stumble upon <i>Eigenvectors</i> and <i>eigenvalues</i> regularly when reading about machine learning topics. They
+seem to be important. They are not introduced in those texts, though, so you might be scratching your head
+wondering how the authors got the idea in the first place to use them and why. Luckily, they are introduced
+soon enough in linear algebra textbooks, and they are available at high-speed in Clojure via <a href="http://neanderthal.uncomplicate.org">Neanderthal</a>, that we should
+be able to at least try them out easily, and then build upon that knowledge fearlessly when we encounter them
+in the wild.
+</p>
+
+<p>
+Before continuing this linear algebra series with Eigen-stuff, let me remind you that:
+</p>
+<ul class="org-ul">
+<li>These articles are <span class="underline">not self-contained</span>. You should follow along with a linear algebra textbook. I recommend <a href="https://www.amazon.com/Applications-Alternate-Bartlett-Publishers-Mathematics/dp/0763782491">Linear Algebra With Applications, Alternate Edition</a> by Gareth Williams (see more in part 1 of this series).</li>
+<li>The intention is to connect the dots from a math textbook to Clojure code, rather than explain math theory or teach you basics of Clojure.</li>
+<li>Please read <a href="./Clojure-Linear-Algebra-Refresher-Vector-Spaces">Clojure Linear Algebra Refresher (1) - Vector Spaces</a> first.</li>
+</ul>
+
+<p>
+This text covers relevant parts of chapter 5 of the alternate edition of the textbook.
+</p>
+
+<div id="outline-container-org798b76b" class="outline-2">
+<h2 id="org798b76b">Eigenvalues and Eigenvectors</h2>
+<div class="outline-text-2" id="text-org798b76b">
+<p>
+Let \(A\) be a \(m \times n\) matrix. If there are scalar \(\lambda\) and a non-zero vector \(\mathbf{x}\) such that \(A\mathbf{x} = \lambda\mathbf{x}\),
+we call such scalar <i>eigenvalue</i>, and such vector <i>eigenvector</i>.
+</p>
+
+<p>
+There can be more than one eigenvalue for a given matrix, and there is an infinite number of eigenvectors
+corresponding to one eigenvalue. All eigenvectors that correspond to one eigenvalue lie on the same
+line, but have different magnitudes.
+</p>
+
+<p>
+Seems simple, and it is, but so what? It looks like a trivial thing; how come these eigenvectors
+and eigenvalues are so ubiquitous in linear algebra? It turns out that some useful special matrices
+can be computed, and some useful theorems can be build upon this simple definition.
+<a href="https://en.wikipedia.org/wiki/IANAL">IANM (I Am Not a Mathematician)</a>, so I'll let you use your math textbook to discover that further.
+</p>
+
+<p>
+Let's do some Clojure: given a matrix, how do I find eigenvalues and eigenvectors? The function is called
+<a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#var-ev.21"><code>ev!</code></a> and it can be found in the <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html"><code>uncomplicate.neanderthal.linalg</code></a> namespace:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span><span style="color: #2F8B58; font-weight: bold;">uncomplicate.neanderthal</span>
+           <span style="color: #909183;">[</span>core <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>col entry nrm2 mv scal axpy copy mm dia<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>native <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>dge<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>linalg <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>ev! inv!<span style="color: #709870;">]</span><span style="color: #909183;">]</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+I'm following the example 1 from page 210; there is a matrix <code>a</code> and we are looking for 2 eigenvalues with
+corresponding eigenvectors. Calling <code>def</code> inside a let block is not a coding style to be proud of, but here I
+do it because I need an easy way to produce printable outputs in org-mode and org-babel, which is used to generate
+this nice text from live code.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #7388d6;">[</span>a <span style="color: #909183;">(</span>dge 2 2 <span style="color: #709870;">[</span>-4 3 -6 5<span style="color: #709870;">]</span><span style="color: #909183;">)</span> <span style="color: #204A87;">;;</span><span style="color: #204A87;">note: column-oriented!</span>
+      eigenvectors <span style="color: #909183;">(</span>dge 2 2<span style="color: #909183;">)</span>
+      eigenvalues <span style="color: #909183;">(</span>ev! a <span style="color: #F5666D;">nil</span> eigenvectors<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">lambda1</span> <span style="color: #909183;">(</span>entry eigenvalues 0 0<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">x1</span> <span style="color: #909183;">(</span>col eigenvectors 0<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">lambda2</span> <span style="color: #909183;">(</span>entry eigenvalues 1 0<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">x2</span> <span style="color: #909183;">(</span>col eigenvectors 1<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+The first eigenvector is \(\lambda = 1\) (the order is not important):
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure">lambda1
+</pre>
+</div>
+<pre class="example">
+-1.0
+
+</pre>
+
+<p>
+An infinite number of vectors correspond to this &lambda; value, but they are all linearly
+dependent: find one base vector, and you can construct any other by scaling that one.
+That base vector forms a subspace, or <i>eigenspace</i>. The base corresponding to \(\lambda = 1\)
+is \(r(-0.89, 0.45)\):
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure">x1
+</pre>
+</div>
+<pre class="example">
+#RealBlockVector[double, n:2, offset: 0, stride:1]
+[ -0.89   0.45 ]
+
+</pre>
+
+<p>
+Mathematicians warn us to always be skeptical. Let's check that &lambda;<sub>1</sub> and \(\mathbf{x_1}\) are
+really an eigenvalue and eigenvector:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #7388d6;">[</span>a <span style="color: #909183;">(</span>dge 2 2 <span style="color: #709870;">[</span>-4 3 -6 5<span style="color: #709870;">]</span><span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>axpy -1 <span style="color: #909183;">(</span>mv a x1<span style="color: #909183;">)</span> <span style="color: #909183;">(</span>scal lambda1 x1<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealBlockVector[double, n:2, offset: 0, stride:1]
+[  0.00   0.00 ]
+
+</pre>
+
+<p>
+Yes, they are.
+</p>
+
+<p>
+Perhaps you wonder why I haven't simply check these two vectors for equality with <code>=</code>. Recall
+from the part 1 of this tutorial that comparing floating point numbers for equality is a tricky business.
+Even a small difference of 0.00000001, that can appear due to inevitable rounding errors, would break such equality check.
+Even those numbers, 0.89, and 0.45 are not very precise - they have much more digits, but Neanderthal rounds them
+to two decimals for readability. These are the actual values to the max precision available by 64 bits:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">doall</span> <span style="color: #7388d6;">(</span>seq x1<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-right" />
+
+<col  class="org-right" />
+</colgroup>
+<tbody>
+<tr>
+<td class="org-right">-0.8944271909999159</td>
+<td class="org-right">0.4472135954999579</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+Another benefit of using a good numerical software (such as <a href="http://neanderthal.uncomplicate.org">Neanderthal</a>) is that the
+eigenvectors we get are normalized:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>nrm2 x1<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+1.0
+
+</pre>
+
+<p>
+We can repeat the same procedure for &lambda;<sub>2</sub>; it is a good idea if you test them as an exercise in
+your trusty Clojure REPL.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure">lambda2
+</pre>
+</div>
+<pre class="example">
+2.0
+
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-clojure">x2
+</pre>
+</div>
+<pre class="example">
+#RealBlockVector[double, n:2, offset: 2, stride:1]
+[  0.71  -0.71 ]
+
+</pre>
+
+<p>
+Eigenvalues are not necessarily distinct. Consider example 2 from page 214:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #7388d6;">[</span>a <span style="color: #909183;">(</span>dge 3 3 <span style="color: #709870;">[</span>5 4 2 4 5 2 2 2 2<span style="color: #709870;">]</span><span style="color: #909183;">)</span> <span style="color: #204A87;">;;</span><span style="color: #204A87;">note: column-oriented!</span>
+      eigenvectors <span style="color: #909183;">(</span>dge 3 3<span style="color: #909183;">)</span>
+      eigenvalues <span style="color: #909183;">(</span>ev! a <span style="color: #F5666D;">nil</span> eigenvectors<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">[</span><span style="color: #909183;">(</span>col eigenvalues 0<span style="color: #909183;">)</span> eigenvectors<span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+'(#RealBlockVector(double  n:3  offset: 0  stride:1)
+(  1.00  10.00   1.00 )
+ #RealGEMatrix(double  mxn:3x3  order:column  offset:0  ld:3)
+
+ -0.75   0.67  -0.03
+  0.60   0.67  -0.42
+  0.30   0.33   0.91
+)
+
+</pre>
+
+<p>
+\(\lambda = 1\) appears two times. The space corresponding to it has <i>multiplicity</i> 2, and the
+dimension of its corresponding eigenspace is 2. As an exercise, you might check whether any linear
+combination of these two eigenvectors (column 0 and column 2 from the result matrix) is indeed an
+eigenvector (it should be!).
+</p>
+
+<p>
+You might also wonder why those eigenvalues are in the first column of a result matrix.
+Eigenvalues are usually complex numbers. That matrix has \(m\times{2}\) dimensions.
+The first column contains the real part, and the second
+the imaginary part. These examples from the textbook are well-designed to be easily computed
+by hand, so I knew that the imaginary part was zero, and didn't bother to clutter the introductory code.
+In general, I guess that eigenvalues will have imaginary component more often than not (IANM).
+</p>
+</div>
+</div>
+
+<div id="outline-container-org7bc16a7" class="outline-2">
+<h2 id="org7bc16a7">Diagonalization of Matrices</h2>
+<div class="outline-text-2" id="text-org7bc16a7">
+<p>
+Consider square matrices \(A\) and \(B\) of the same size, and suppose there exists an invertible matrix \(C\),
+such that \(B = C^{-1}AC\). Then, we say that \(B\) is <i>similar</i> to \(A\), and the transformation from \(A\)
+to \(B\) is called <i>similarity transformation</i>.
+</p>
+
+<p>
+Let's compute an example in Clojure. We have matrices <code>a</code> and <code>c</code>, and would like to compute the similar
+matrix <code>b</code>. The first thing to ask is: how do we compute the inverse of <code>c</code>? Inverting a matrix is
+rather numerically intensive, so there exist several "shortcuts" to that.
+</p>
+
+<p>
+For example, one of the approaches
+is to first factorize the matrix into a product of two triangular matrices \(L\) and \(U\). That is
+easier than doing the full compute of the inverse. Then, we can reuse these factors for different tasks
+that ask for the inverse in a naive approach, but where the answer can be computed using only \(L\) and \(U\).
+Since \(L\) and \(U\) are <i>lower</i> and <i>upper</i> triangular or trapezoidal,
+it is easier to compute <i>their</i> inverses or diagonals. Or, if we still need
+an inverse of the whole matrix, we can compute it from \(LU\) factors.
+</p>
+
+<p>
+Relevant functions can be found in the <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html"><code>uncomplicate.neanderthal.linalg</code></a> namespace.
+Function <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#var-trf.21"><code>trf!</code></a> does the LU
+("tr" is for <i>triangular</i> and "f" for <i>factorization</i>) and <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#var-tri.21"><code>tri!</code></a> the inverse given the previously LU-processed
+input. There is also a convenience function <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#var-inv.21"><code>inv!</code></a> that will call <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#var-trf.21"><code>trf!</code></a> and <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#var-tri"><code>tri!</code></a> properly, but use it
+only when you absolutely need an inverse, and avoid it when LU (or QR etc.) factors are enough.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #7388d6;">[</span>a <span style="color: #909183;">(</span>dge 2 2 <span style="color: #709870;">[</span>7 3 -10 -4<span style="color: #709870;">]</span><span style="color: #909183;">)</span>
+      c <span style="color: #909183;">(</span>dge 2 2 <span style="color: #709870;">[</span>2 1 5 3<span style="color: #709870;">]</span><span style="color: #909183;">)</span>
+      inv-c <span style="color: #909183;">(</span>inv! <span style="color: #709870;">(</span>copy c<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">]</span><span style="color: #204A87;">;; </span><span style="color: #204A87;">we can not afford to destroy c!</span>
+<span style="color: #7388d6;">(</span>mm inv-c <span style="color: #909183;">(</span>mm a c<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealGEMatrix[double, mxn:2x2, order:column, offset:0, ld:2]
+
+  2.00   0.00
+  0.00   1.00
+
+</pre>
+
+<p>
+In this case, \(B\) is diagonal, which is a nice property, since many computations are easier with
+special cases such as diagonal or symmetric matrices than with any random matrix.
+</p>
+
+<p>
+A matrix is <i>diagonalizable</i> if there exists a similar matrix that is diagonal.
+</p>
+
+<p>
+What has this to do with eigenvalues? It turns out that similar matrices have the same eigenvalues, and
+eigenvectors can tell us whether the matrix is diagonalizable, and if it is, help us discover the transformation.
+</p>
+
+<p>
+Specifically, there is a theorem that states that, for a \(n\times{n}\) matrix \(A\):
+</p>
+<ul class="org-ul">
+<li>If \(A\) has n linearly independent eigenvectors, it is diagonalizable, <i>and vice versa</i>.</li>
+<li>The matrix \(C\), whose columns are n linearly independent eigenvectors can be used in similarity tranformation to give a diagonal matrix \(D\).</li>
+<li>The diagonal elements of \(D\) will be the eigenvalues of A.</li>
+</ul>
+
+<p>
+Huh, nice! So, we do not need to compute the inverse, or multiply matrices. We just do the eigen decomposition,
+and find \(D\), or find that \(D\) does not exist!
+</p>
+
+<p>
+Demonstration in Clojure:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #7388d6;">[</span>a <span style="color: #909183;">(</span>dge 2 2 <span style="color: #709870;">[</span>-4 3 -6 5<span style="color: #709870;">]</span><span style="color: #909183;">)</span>
+            evec <span style="color: #909183;">(</span>dge 2 2<span style="color: #909183;">)</span>
+            eval <span style="color: #909183;">(</span>ev! <span style="color: #709870;">(</span>copy a<span style="color: #709870;">)</span> <span style="color: #F5666D;">nil</span> evec<span style="color: #909183;">)</span>
+            inv-evec <span style="color: #909183;">(</span>inv! <span style="color: #709870;">(</span>copy evec<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+        <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">diag</span> <span style="color: #909183;">(</span>col eval 0<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+        <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">d</span> <span style="color: #909183;">(</span>mm inv-evec <span style="color: #709870;">(</span>mm a evec<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+I have computed the eigenvalues and have found the diagonal of \(D\):
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure">diag
+</pre>
+</div>
+
+<pre class="example">
+#RealBlockVector[double, n:2, offset: 0, stride:1]
+[ -1.00   2.00 ]
+
+</pre>
+
+<p>
+I have also computed \(D\) in a pedestrian way, using matrix inverse, to check (and demonstrate)
+whether I should believe what the textbooks tells me. Indeed, the textbook is right!
+</p>
+<div class="org-src-container">
+<pre class="src src-clojure">d
+</pre>
+</div>
+
+<pre class="example">
+#RealGEMatrix[double, mxn:2x2, order:column, offset:0, ld:2]
+
+ -1.00   0.00
+  0.00   2.00
+
+</pre>
+
+<p>
+Working with \(D\) is easier than working with \(A\). For example, instead of computing \(A^k\), we can use the
+identity \(A^k = CD^kC^{-1}\), knowing that \(D^k\) can be computed easily by just taking powers of its diagonal
+elements.
+</p>
+
+<p>
+I'll use <a href="http://neanderthal.uncomplicate.org">Neanderthal's</a> <code>dia</code> function to access the diagonal of \(D\), and <a href="http://fluokitten.uncomplicate.org">Fluokitten</a>'s <a href="http://fluokitten.uncomplicate.org/codox/uncomplicate.fluokitten.core.html#var-fmap.21"><code>fmap!</code></a> function
+to apply the <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.math.html#var-pow"><code>pow</code></a> function to each of its elements (<a href="http://fluokitten.uncomplicate.org/codox/uncomplicate.fluokitten.core.html#var-fmap.21"><code>fmap!</code></a> is similar to <code>map</code>, just more efficient, and polymorphic
+so it supports vectors, matrices and many more structures).
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span><span style="color: #2F8B58; font-weight: bold;">uncomplicate.fluokitten.core</span> <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>fmap!<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span><span style="color: #2F8B58; font-weight: bold;">uncomplicate.neanderthal.math</span> <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>pow<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">d9</span> <span style="color: #7388d6;">(</span>copy d<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>fmap! <span style="color: #7388d6;">(</span>pow 9<span style="color: #7388d6;">)</span> <span style="color: #7388d6;">(</span>dia d9<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+d9
+</pre>
+</div>
+
+<pre class="example">
+#'user/d9#RealBlockVector[double, n:2, offset: 0, stride:3]
+[ -1.00 512.00 ]#RealGEMatrix[double, mxn:2x2, order:column, offset:0, ld:2]
+
+ -1.00   0.00
+  0.00 512.00
+
+</pre>
+
+<p>
+I now leave as an exercise to the reader to compute \(CD^kC^{-1}\). (It seems I'm getting good at math writing; whenever
+you get bored of doing these step-by-step instructions, offload some work to the reader!)
+</p>
+
+<p>
+There is a theorem that claims that symmetric matrices are diagonalizable. That's also
+something that you might demonstrate as an exercise. There is an even more significant property of
+symmetric matrices: they are <i>orthogonaly diagonalizable</i>, meaning that \(D = C^tAC\) (since by definition
+\(C^{-1} = C^t\) for orthogonal matrices). Of course, \(C^t\) is much easier to compute than \(C^{-1}\), <a href="http://neanderthal.uncomplicate.org">Neanderthal's</a>
+<a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-trans"><code>trans</code></a> function will do that in \(O(1)\), that is - instantly.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org72e9d62" class="outline-2">
+<h2 id="org72e9d62">Conclusions</h2>
+<div class="outline-text-2" id="text-org72e9d62">
+<p>
+Here is an illuminating trivia that will help you associate eigenvalues with their usefulness.
+Eigen is not a mathematician, the term <i>eigen</i> is adopted from German, where it means "own", "special", "inherent".
+Eigenvalues and eigenvectors are then special values and vectors of a matrix, its own inherent properties.
+</p>
+
+<p>
+Next time, I'll write a bit about linear transformations, and, as always, show some Clojure code.
+In the meantime, you might be interested in checking out some <a href="http://neanderthal.uncomplicate.org/articles/guides.html">Neanderthal Tutorials</a>.
+</p>
+</div>
+</div>
