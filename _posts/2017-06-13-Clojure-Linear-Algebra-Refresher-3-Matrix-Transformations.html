@@ -1,0 +1,544 @@
+---
+date: 2017-06-13
+tags:
+- Neanderthal
+- Clojure
+- linear algebra
+- linear transformations
+- matrix transformations
+- rotations
+- dilations
+- contractions
+- reflections
+- compositon
+- affine transformations
+author: dragan
+layout: post
+title: Clojure Linear Algebra Refresher (3) - Matrix Transformations
+excerpt: A Clojure programmer will immediately feel at home with linear transformations - functions are also transformations. Linear transformations preserve the mathematical structure of a vector space. Just like functions define transformations, matrices define a king of linear transformations - matrix transformations. I often see programmers using matrices and vectors as dumb data structures and writing their own loops, or accessing elements one by one in a haphazard fashion. Matrices are useful data structures, but using them as transformations is what really gives them power. This is something that is very well understood in computer graphics, but is often neglected in other areas.
+categories:
+- Neanderthal
+- Clojure
+- linear algebra
+---
+<p>
+A Clojure programmer will immediately feel at home with linear transformations - functions are also transformations!
+<i>Linear transformations</i> preserve the mathematical structure of a <a href="./Clojure-Linear-Algebra-Refresher-Vector-Spaces">vector space</a>.
+Just like functions define transformations, matrices define a kind of linear transformations - <i>matrix transformations</i>.
+I often spot programmers using matrices and vectors as dumb data structures and writing their
+own loops, or accessing elements one by one in a haphazard fashion. Matrices are useful data structures,
+but using them as transformations is what really gives them power. This is something that is very well understood
+in computer graphics, but is often neglected in other areas.
+</p>
+
+<p>
+Before I continue, a few reminders:
+</p>
+<ul class="org-ul">
+<li>These articles are <span class="underline">not stand-alone</span>. You should follow along with a linear algebra textbook. I recommend <a href="https://www.amazon.com/Applications-Alternate-Bartlett-Publishers-Mathematics/dp/0763782491">Linear Algebra With Applications, Alternate Edition</a> by Gareth Williams (<a href="./Clojure-Linear-Algebra-Refresher-Vector-Spaces">see more in part 1 of this series</a>).</li>
+<li>The intention is to connect the dots from a math textbook to Clojure code, rather than explain math theory or teach you basics of Clojure.</li>
+<li>Please read <a href="./Clojure-Linear-Algebra-Refresher-Vector-Spaces">Clojure Linear Algebra Refresher (1) - Vector Spaces</a>, and, optionally, <a href="./Clojure-Linear-Algebra-Refresher-Eigenvalues-and-Eigenvectors">Clojure Linear Algebra Refresher (2) - Eigenvalues and Eigenvectors</a> first.</li>
+<li>Include <a href="http://neanderthal.uncomplicate.org">Neanderthal library</a> in your project to be able to use ready-made high-performance linear algebra functions.</li>
+</ul>
+
+<p>
+This text covers the first part of chapter 6 of the alternate edition of the textbook.
+</p>
+
+<div id="outline-container-org7e06461" class="outline-2">
+<h2 id="org7e06461">Transformations</h2>
+<div class="outline-text-2" id="text-org7e06461">
+<p>
+Consider a Clojure function <code>(fn [x] (+ (* x x) 4))</code>. The set of allowed values for x is called the <i>domain</i>
+of the function. For value <code>2</code>, for example, the result is <code>16</code>. We say that the <i>image</i> of <code>2</code> is <code>16</code>.
+In linear algebra, the term <i>transformation</i> is used, rather than the term function.
+</p>
+
+<p>
+As an example, take transformation \(T\) from \(R^3\) to \(R^2\) defined by \(T(x,y,z) = (2x,y-z)\) that the textbook I'm
+using presents. The <i>domain</i>, \(R^3\) is the set of all real vectors with dimension 3, while the <i>codomain</i>, the set
+of valid results, is \(R^2\), the set of all real vectors with dimension 2. The <i>image</i> of any vector can be
+found by filling in concrete values in formula for T. The image of \((1,4,-2)\) is \(((2\times1),(4-(-2)))\), that is \((2,6)\).
+</p>
+
+<p>
+We could write a function in Clojure that does exactly that:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span><span style="color: #2F8B58; font-weight: bold;">uncomplicate.neanderthal</span>
+           <span style="color: #909183;">[</span>native <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>dv dge<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>core <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>mv mm nrm2 dot axpy<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>math <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>sqrt sin cos pi<span style="color: #709870;">]</span><span style="color: #909183;">]</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">transformation-1</span> <span style="color: #7388d6;">[</span>x<span style="color: #7388d6;">]</span>
+ <span style="color: #7388d6;">(</span>dv <span style="color: #909183;">(</span>* 2.0 <span style="color: #709870;">(</span>x 0<span style="color: #709870;">)</span><span style="color: #909183;">)</span> <span style="color: #909183;">(</span>- <span style="color: #709870;">(</span>x 1<span style="color: #709870;">)</span> <span style="color: #709870;">(</span>x 2<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>transformation-1 <span style="color: #7388d6;">(</span>dv 1 4 -2<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealBlockVector[double, n:2, offset: 0, stride:1]
+[  2.00   6.00 ]
+
+</pre>
+
+<p>
+Although this way of working with vectors seems natural to a programmer, I'll show you a much easier method.
+And much faster if you have lots of those numbers!
+</p>
+
+<p>
+In general, a <i>transformation</i> T of \(R^n\) (<i>domain</i>) into \(R^m\) (<i>codomain</i>) is a rule that assigns
+ to each vector \(\mathbf{u}\) in \(R^n\) a unique vector \(\mathbf{v}\) (<i>image</i>) in \(R^m\) and write
+ \(T(\mathbf{u})=\mathbf{v}\). We can also use the term <i>mapping</i>, which is more familiar
+ to functional programmers.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org14d00fa" class="outline-2">
+<h2 id="org14d00fa">Dilations, Contractions, Reflections, Rotations</h2>
+<div class="outline-text-2" id="text-org14d00fa">
+<p>
+Let's look at some useful geometric transformations, and find out that <i>they can be
+described by matrices</i>. For graphical representations of these examples, see the textbook, of course.
+Here, I concentrate on showing you the code.
+</p>
+
+<p>
+Consider a transformation in \(R^2\) that simply scales a vector by some positive scalar \(r\).
+It maps every point in \(R^2\) into a point \(r\) times as far from the origin. If \(r>1\) it moves
+the point further from the origin (<i>dilation</i>), and if it is \(0< r < 1\), closer to the origin (<i>contraction</i>).
+</p>
+
+<p>
+This equation can be written in a matrix form:
+</p>
+
+\begin{equation}
+  T\left(\begin{bmatrix}x\\y\\\end{bmatrix}\right) =
+  \begin{bmatrix}
+    r & 0\\
+    0 & r
+  \end{bmatrix}
+  \begin{bmatrix}x\\y\\\end{bmatrix}
+\end{equation}
+
+<p>
+For example, when \(r=3\):
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>mv <span style="color: #7388d6;">(</span>dge 2 2 <span style="color: #909183;">[</span>3 0 0 3<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span> <span style="color: #7388d6;">(</span>dv 1 2<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealBlockVector[double, n:2, offset: 0, stride:1]
+[  3.00   6.00 ]
+
+</pre>
+
+<p>
+By multiplying our transformation matrix with a vector, we dilated the vector!
+</p>
+
+<p>
+Consider <i>reflection</i>: it maps every point in \(R^2\) into its mirror image in x-axis.
+</p>
+
+\begin{equation}
+  T\left(\begin{bmatrix}x\\y\\\end{bmatrix}\right) =
+  \begin{bmatrix}
+    1 &  0\\
+    0 & -1
+  \end{bmatrix}
+  \begin{bmatrix}x\\y\\\end{bmatrix}
+\end{equation}
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>mv <span style="color: #7388d6;">(</span>dge 2 2 <span style="color: #909183;">[</span>1 0 0 -1<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span> <span style="color: #7388d6;">(</span>dv 3 2<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealBlockVector[double, n:2, offset: 0, stride:1]
+[  3.00  -2.00 ]
+
+</pre>
+
+<p>
+<i>Rotation about the origin</i> through an angle \(\theta\) is a bit more complicated to guess.
+After recalling a bit of knowledge about trigonometry, we can convince ourselves that it can be described
+by a matrix of sines and cosines of that angle.
+</p>
+
+\begin{equation}
+  T\left(\begin{bmatrix}x\\y\\\end{bmatrix}\right) =
+  \begin{bmatrix}
+    \cos\theta &  -\sin\theta\\
+    \sin\theta & \cos\theta
+  \end{bmatrix}
+  \begin{bmatrix}x\\y\\\end{bmatrix}
+\end{equation}
+
+<p>
+If we'd like to do a rotation of \(\pi/2\), we'd use \(\sin\pi/2 = 1\) and \(\cos\pi/2 = 0\).
+For vector \((3,2)\):
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>mv <span style="color: #7388d6;">(</span>dge 2 2 <span style="color: #909183;">[</span>0 1 -1 0<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span> <span style="color: #7388d6;">(</span>dv 3 2<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealBlockVector[double, n:2, offset: 0, stride:1]
+[ -2.00   3.00 ]
+
+</pre>
+</div>
+</div>
+
+<div id="outline-container-orgfb4c0f9" class="outline-2">
+<h2 id="orgfb4c0f9">Matrix transformations</h2>
+<div class="outline-text-2" id="text-orgfb4c0f9">
+<p>
+Not only that we can construct matrices that represent transformations, it turns out that
+<i>every</i> matrix defines a transformation!
+</p>
+
+<p>
+According to the textbook definition: Let \(A\) be a \(m\times{n}\) matrix, and \(\mathbf{x}\) an element
+of \(R^n\). \(A\) defines a <i>matrix transformation</i> \(T(\mathbf{x})=A\mathbf{x}\) of \(R^n\) (domain)
+into \(R^m\) (codomain). The resulting vector \(A\mathbf{x}\) is the image of the transformation.
+</p>
+
+<p>
+Note that matrix dimensions <code>m</code> and <code>n</code> correspond to the dimensions of the
+codomain (<code>m</code>, number of rows) and domain (<code>n</code>, number of columns).
+</p>
+
+<p>
+Matrix transformations have the following geometrical properties:
+</p>
+
+<ul class="org-ul">
+<li>They map line segments into line segments (or points);</li>
+<li>If \(A\) is invertible, they also map parallel lines into parallel lines.</li>
+</ul>
+
+<p>
+Example 1 from page 248 illustrates this. Let \(T:R^2\rightarrow{R^2}\) be a transformation
+defined by the matrix \(A=\begin{bmatrix}4&2\\2&3\end{bmatrix}\). Define the image of the
+unit square under the transformation.
+</p>
+
+<p>
+The code:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #7388d6;">[</span>a <span style="color: #909183;">(</span>dge 2 2 <span style="color: #709870;">[</span>4 2 2 3<span style="color: #709870;">]</span><span style="color: #909183;">)</span>
+      p <span style="color: #909183;">(</span>dv 1 0<span style="color: #909183;">)</span>
+      q <span style="color: #909183;">(</span>dv 1 1<span style="color: #909183;">)</span>
+      r <span style="color: #909183;">(</span>dv 0 1<span style="color: #909183;">)</span>
+      o <span style="color: #909183;">(</span>dv 0 0<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">[</span><span style="color: #909183;">(</span>mv a p<span style="color: #909183;">)</span> <span style="color: #909183;">(</span>mv a q<span style="color: #909183;">)</span> <span style="color: #909183;">(</span>mv a r<span style="color: #909183;">)</span> <span style="color: #909183;">(</span>mv a o<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+'(#RealBlockVector(double  n:2  offset: 0  stride:1)
+(  4.00   2.00 )
+ #RealBlockVector(double  n:2  offset: 0  stride:1)
+(  6.00   5.00 )
+ #RealBlockVector(double  n:2  offset: 0  stride:1)
+(  2.00   3.00 )
+ #RealBlockVector(double  n:2  offset: 0  stride:1)
+(  0.00   0.00 )
+)
+
+</pre>
+
+<p>
+And, we got a parallelogram, since \(A\) is invertible. Check that as an exercise; a matrix is
+invertible if its determinant is non-zero (you can use the <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-det">det</a> function).
+</p>
+
+<p>
+Something bugs the programmer in me, though: what if we wanted to transform many points (vectors)?
+Do we use this pedestrian way, or we put those points in some sequence and use good old Clojure
+higher order functions such as <code>map</code>, <code>reduce</code>, <code>filter</code>, etc.? Let's try this.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #7388d6;">[</span>a <span style="color: #909183;">(</span>dge 2 2 <span style="color: #709870;">[</span>4 2 2 3<span style="color: #709870;">]</span><span style="color: #909183;">)</span>
+      points <span style="color: #909183;">[</span><span style="color: #709870;">(</span>dv 1 0<span style="color: #709870;">)</span> <span style="color: #709870;">(</span>dv 1 1<span style="color: #709870;">)</span> <span style="color: #709870;">(</span>dv 0 1<span style="color: #709870;">)</span> <span style="color: #709870;">(</span>dv 0 0<span style="color: #709870;">)</span><span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>map <span style="color: #909183;">(</span>partial mv a<span style="color: #909183;">)</span> points<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+'(#RealBlockVector(double  n:2  offset: 0  stride:1)
+(  4.00   2.00 )
+ #RealBlockVector(double  n:2  offset: 0  stride:1)
+(  6.00   5.00 )
+ #RealBlockVector(double  n:2  offset: 0  stride:1)
+(  2.00   3.00 )
+ #RealBlockVector(double  n:2  offset: 0  stride:1)
+(  0.00   0.00 )
+)
+
+</pre>
+
+<p>
+I could be pleased with this code. But I am not. I am not, because we only picked up
+the low-hanging fruit, and left a lot of simplicity and performance on the table. Consider this:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #7388d6;">[</span>a <span style="color: #909183;">(</span>dge 2 2 <span style="color: #709870;">[</span>4 2 2 3<span style="color: #709870;">]</span><span style="color: #909183;">)</span>
+      square <span style="color: #909183;">(</span>dge 2 4 <span style="color: #709870;">[</span>1 0 1 1 0 1 0 0<span style="color: #709870;">]</span><span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>mm a square<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealGEMatrix[double, mxn:2x4, order:column, offset:0, ld:2]
+
+  4.00   6.00   2.00   0.00
+  2.00   5.00   3.00   0.00
+
+</pre>
+
+<p>
+By multiplying matrix \(A\) with matrix \((\vec{p},\vec{q},\vec{r},\vec{o})\), we did the same
+operation as transforming each vector separately.
+</p>
+
+<p>
+I like this approach much more.
+</p>
+
+<ul class="org-ul">
+<li>It's <b>simpler</b>. Instead of maintaining disparate points of a unit square, we can treat them as one entity. If we still want access to points, we just call the <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-col">col</a> function.</li>
+<li>It's <b>faster</b>. Instead of calling <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-mv">mv</a> four times, we call <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-mm">mm</a> once. In addition to that, our data is concentrated next to each other, in a structure that is cache-friendly. This can give huge performance yields when we work with large matrices.</li>
+</ul>
+
+<p>
+This might be obvious in graphics programming, but I've seen too much data crunching code that uses
+matrices and vectors as dumb data structures, that I think this point is worth reiterating again and again.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org5ccdc85" class="outline-2">
+<h2 id="org5ccdc85">Composition of Transformations</h2>
+<div class="outline-text-2" id="text-org5ccdc85">
+<p>
+I hope that every Clojure programmer will immediately understand function composition with the <code>comp</code> function:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #7388d6;">[</span>report+ <span style="color: #909183;">(</span>comp <span style="color: #709870;">(</span>partial format <span style="color: #4E9A06;">"The result is: %f"</span><span style="color: #709870;">)</span> sqrt +<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>report+ 2 3<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+The result is: 2.236068
+
+</pre>
+
+<p>
+By composing the <code>+</code>, <code>sqrt</code> and <code>format</code> functions together, we got the function that transforms the
+input equivalently. Or more formally, \((f\circ{g}\circ{h})(x)=f(g(h(x)))\).
+</p>
+
+<p>
+Matrices are transformations just like functions are transformations; it's no surprise that matrices
+(as transformations) can also be composed!
+</p>
+
+<p>
+Let's consider \(T_1(\mathbf{x}) = A_1(\mathbf{x})\) and \(T_2(\mathbf{x}) = A_2(\mathbf{x})\). The composite
+transformation \(T=T_2\circ{T_1}\) is given by \(T(\mathbf{x})=T_2(T_1(\mathbf{x}))=T_2(A_1(\mathbf{x}))=A_2 A_1(\mathbf{x})\).
+</p>
+
+<p>
+Thus, the composed matrix transformation \(A_2\circ A_1\) is defined by the matrix product \(A_2{A_1}\).
+It can be extended naturally to a composition of \(n\) matrix transformations.
+\(A_n\circ{A_{n-1}}\circ\dots\circ{A_1}=A_n A_{n-1}\dots A_1\)
+</p>
+
+<p>
+In Clojure, I can compose matrices with the <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-mm">mm</a> function. Not only that <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-mm">mm</a> supports 2, 3, or more arguments,
+it also takes care of multiplying them optimally.
+</p>
+
+<p>
+Take a look at the Clojure code for the example 2 (page 250) form the textbook. There are 3 matrices given.
+One defines reflection, the other rotation, and the third dilation. By composing them, we get one complex
+transformation that does all three transformations combined.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #7388d6;">[</span>pi2 <span style="color: #909183;">(</span>/ pi 2<span style="color: #909183;">)</span>
+      reflexion <span style="color: #909183;">(</span>dge 2 2 <span style="color: #709870;">[</span>1 0 0 -1<span style="color: #709870;">]</span><span style="color: #909183;">)</span>
+      rotation <span style="color: #909183;">(</span>dge 2 2 <span style="color: #709870;">[</span><span style="color: #907373;">(</span>cos pi2<span style="color: #907373;">)</span> <span style="color: #907373;">(</span>sin pi2<span style="color: #907373;">)</span> <span style="color: #907373;">(</span>- <span style="color: #6276ba;">(</span>sin pi2<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span> <span style="color: #907373;">(</span>cos pi2<span style="color: #907373;">)</span><span style="color: #709870;">]</span><span style="color: #909183;">)</span>
+      dilation <span style="color: #909183;">(</span>dge 2 2 <span style="color: #709870;">[</span>3 0 0 3<span style="color: #709870;">]</span><span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">matrix-t</span> <span style="color: #909183;">(</span>mm dilation rotation reflexion<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure">matrix-t
+</pre>
+</div>
+
+<pre class="example">
+#RealGEMatrix[double, mxn:2x2, order:column, offset:0, ld:2]
+
+  0.00   3.00
+  3.00  -0.00
+
+</pre>
+
+<p>
+The image of the point \((1,2)\) is:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>mv matrix-t <span style="color: #7388d6;">(</span>dv 1 2<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealBlockVector[double, n:2, offset: 0, stride:1]
+[  6.00   3.00 ]
+
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org855cf5b" class="outline-2">
+<h2 id="org855cf5b">Orthogonal Transformations</h2>
+<div class="outline-text-2" id="text-org855cf5b">
+<p>
+Recall from  <a href="./Clojure-Linear-Algebra-Refresher-Vector-Spaces">Clojure Linear Algebra Refresher (1) - Vector Spaces</a> that <i>orthogonal matrix</i> is an invertible matrix
+for which \(A^{-1} = A^t\). An orthogonal transformation is a matrix transformation \(T(\mathbf{x})=A\mathbf{x}\), where
+\(A\) is orthogonal. Orthogonal transformations preserve <i>norms</i>, <i>angles</i>, and <i>distances</i>. They preserve shapes of
+rigid bodies.
+</p>
+
+<p>
+I'll illustrate this with example 3 (page 252):
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #7388d6;">[</span>sqrt12 <span style="color: #909183;">(</span>sqrt 0.5<span style="color: #909183;">)</span>
+      a <span style="color: #909183;">(</span>dge 2 2 <span style="color: #709870;">[</span>sqrt12 <span style="color: #907373;">(</span>- sqrt12<span style="color: #907373;">)</span> sqrt12 sqrt12<span style="color: #709870;">]</span><span style="color: #909183;">)</span>
+      u <span style="color: #909183;">(</span>dv 2 0<span style="color: #909183;">)</span>
+      v <span style="color: #909183;">(</span>dv 3 4<span style="color: #909183;">)</span>
+      tu <span style="color: #909183;">(</span>mv a u<span style="color: #909183;">)</span>
+      tv <span style="color: #909183;">(</span>mv a v<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">[</span><span style="color: #909183;">[</span><span style="color: #709870;">(</span>nrm2 u<span style="color: #709870;">)</span> <span style="color: #709870;">(</span>nrm2 tu<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+   <span style="color: #909183;">[</span><span style="color: #709870;">(</span>/ <span style="color: #907373;">(</span>dot u v<span style="color: #907373;">)</span> <span style="color: #907373;">(</span>* <span style="color: #6276ba;">(</span>nrm2 u<span style="color: #6276ba;">)</span> <span style="color: #6276ba;">(</span>nrm2 v<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span><span style="color: #709870;">)</span> <span style="color: #709870;">(</span>/ <span style="color: #907373;">(</span>dot tu tv<span style="color: #907373;">)</span> <span style="color: #907373;">(</span>* <span style="color: #6276ba;">(</span>nrm2 tu<span style="color: #6276ba;">)</span> <span style="color: #6276ba;">(</span>nrm2 tv<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+   <span style="color: #909183;">[</span><span style="color: #709870;">(</span>nrm2 <span style="color: #907373;">(</span>axpy -1 u v<span style="color: #907373;">)</span><span style="color: #709870;">)</span> <span style="color: #709870;">(</span>nrm2 <span style="color: #907373;">(</span>axpy -1 tu tv<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">]</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-right" />
+
+<col  class="org-right" />
+</colgroup>
+<tbody>
+<tr>
+<td class="org-right">2.0</td>
+<td class="org-right">2.0</td>
+</tr>
+
+<tr>
+<td class="org-right">0.6</td>
+<td class="org-right">0.6000000000000001</td>
+</tr>
+
+<tr>
+<td class="org-right">4.123105625617661</td>
+<td class="org-right">4.1231056256176615</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+We can see that norms, angles and distances are preserves (with a rather tiny differences due to
+rounding errors in floating-point operations).
+</p>
+</div>
+</div>
+
+<div id="outline-container-org5fe8059" class="outline-2">
+<h2 id="org5fe8059">Translation and Affine Transformation</h2>
+<div class="outline-text-2" id="text-org5fe8059">
+<p>
+There are transformations in vector spaces that are not truly matrix transformations, but are useful
+nevertheless. I'll show you <i>why</i> these transformations are not linear transformations in the next post;
+for now, let's look at how they are done.
+</p>
+
+<p>
+<i>Translation</i> is transformation \(T:R_n \rightarrow R_n\) defined by \(T(\mathbf{u}) = \mathbf{u} + \mathbf{v}\).
+This transformation slides points in the direction of vector \(\mathbf{v}\).
+</p>
+
+<p>
+In Clojure, the translation is done with the good old <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-axpy">axpy</a> function.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>axpy <span style="color: #7388d6;">(</span>dv 1 2<span style="color: #7388d6;">)</span> <span style="color: #7388d6;">(</span>dv 4 2<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealBlockVector[double, n:2, offset: 0, stride:1]
+[  5.00   4.00 ]
+
+</pre>
+
+<p>
+<i>Affine transformation</i> is a transformation \(T:R_n \rightarrow R_n\) defined by
+ \(T(\mathbf{u}) = A\mathbf{u} + \mathbf{v}\). It can be interpreted as a matrix transformation followed
+by a translation. See the textbook for more details, and you can do a Clojure example as a customary
+trivial exercise left to the reader. Hint: the <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-mv">mv</a> function can do affine transformations.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgd2d0235" class="outline-2">
+<h2 id="orgd2d0235">To be continued&#x2026;</h2>
+<div class="outline-text-2" id="text-orgd2d0235">
+<p>
+These were the basics of matrix transformations. In the next post, we will explore linear transformations more.
+I hope this was interesting and useful to you. If you have any suggestions, feel free to send feedback -
+this can make next guides better.
+</p>
+
+<p>
+Happy hacking!
+</p>
+</div>
+</div>
