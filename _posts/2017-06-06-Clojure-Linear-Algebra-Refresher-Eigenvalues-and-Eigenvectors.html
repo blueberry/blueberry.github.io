@@ -16,7 +16,6 @@ categories:
 - eigenvalues
 - eigenvectors
 - linear algebra
-latex_header: \usepackage{amsmath}
 ---
 <p>
 I stumble upon <i>eigenvectors</i> and <i>eigenvalues</i> regularly when reading about machine learning topics. They
@@ -402,8 +401,9 @@ d9
 </div>
 
 <pre class="example">
-#'user/d9#RealBlockVector[double, n:2, offset: 0, stride:3]
-[ -1.00 512.00 ]#RealGEMatrix[double, mxn:2x2, order:column, offset:0, ld:2]
+#'old/d9#RealBlockVector[double, n:2, offset: 0, stride:3]
+[ -1.00 512.00 ]
+#RealGEMatrix[double, mxn:2x2, order:column, offset:0, ld:2]
 
  -1.00   0.00
   0.00 512.00
@@ -435,7 +435,7 @@ Eigenvalues and eigenvectors are then special values and vectors of a matrix, it
 </p>
 
 <p>
-Next time, I'll write a bit about linear transformations, and, as always, show some Clojure code.
+You can continue with the next post in the series: <a href="./Clojure-Linear-Algebra-Refresher-Matrix-Transformations">Matrix Transformations</a>.
 In the meantime, you might be interested in checking out some <a href="http://neanderthal.uncomplicate.org/articles/guides.html">Neanderthal Tutorials</a>.
 </p>
 </div>
