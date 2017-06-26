@@ -1,0 +1,745 @@
+---
+date: 2017-06-26
+tags:
+- Neanderthal
+- Clojure
+- linear algebra
+- dense
+- packed
+- banded
+- sparse
+- triangular
+- symmetric
+- native
+- GPU
+- AMD
+- Nvidia
+author: dragan
+layout: post
+title: Clojure Numerics, Part 1 - Use Matrices Efficiently
+excerpt: It's time to step back from theory and look a bit more into implementation details of all that matrix stuff. In this post, I give an overview of data structures that I use to represent matrices in Clojure, methods to manipulate them, and a few tips and tricks that you can use to make your code fast.
+categories:
+- Neanderthal
+- Clojure
+- linear algebra
+---
+<p>
+It's time to step back from <a href="./Clojure-Linear-Algebra-Refresher-Vector-Spaces">theory</a> and look a bit more into implementation details of all that matrix stuff.
+In this post, I give an overview of data structures that I use to represent matrices in Clojure,
+methods to manipulate them, and a few tips and tricks that you can use to make your code fast.
+</p>
+
+<p>
+Before I continue, a few reminders:
+</p>
+<ul class="org-ul">
+<li>You should keep a linear algebra textbook around. I recommend <a href="https://www.amazon.com/Applications-Alternate-Bartlett-Publishers-Mathematics/dp/0763782491">Linear Algebra With Applications, Alternate Edition</a> by Gareth Williams (<a href="./Clojure-Linear-Algebra-Refresher-Vector-Spaces">see more in part 1 of Clojure Linear Algebra Refresher</a>).</li>
+<li>Include <a href="http://neanderthal.uncomplicate.org">Neanderthal library</a> in your project to be able to use ready-made high-performance linear algebra functions.</li>
+<li>Read my <a href="./Clojure-Linear-Algebra-Refresher-Vector-Spaces">Clojure Linear Algebra Refresher</a> series.</li>
+</ul>
+
+<p>
+The namespaces we'll use:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span><span style="color: #2F8B58; font-weight: bold;">uncomplicate.neanderthal</span>
+           <span style="color: #909183;">[</span>native <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>dv dge fge dtr native-float<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>cuda <span style="color: #F5666D;">:as</span> cuda<span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>opencl <span style="color: #F5666D;">:as</span> ocl<span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>core <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>copy copy! row submatrix scal! transfer! transfer mrows ncols nrm2 mm cols <span style="color: #ee82ee; background-color: #333333;">view-tr</span><span style="color: #709870; background-color: #333333;">]</span><span style="color: #909183; background-color: #333333;">]</span>
+           <span style="color: #909183;">[</span>real <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>entry entry!<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>linalg <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>trf tri det<span style="color: #709870;">]</span><span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span><span style="color: #2F8B58; font-weight: bold;">uncomplicate.commons.core</span> <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>with-release<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span><span style="color: #2F8B58; font-weight: bold;">uncomplicate.clojurecl.core</span> <span style="color: #F5666D;">:as</span> clojurecl<span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div id="outline-container-org69badc1" class="outline-2">
+<h2 id="org69badc1">Dense Matrices</h2>
+<div class="outline-text-2" id="text-org69badc1">
+<p>
+A matrix is a rectangular array of numbers. That's the usual mathematical definition.
+Something like this: \(A=\begin{bmatrix}1&1&1&2\\2&3&1&3\\1&-1&-2&-6\end{bmatrix}\).
+</p>
+
+<p>
+When we have lots of data, or want top performance, we have to be aware of (at least) three major issues:
+</p>
+<ul class="org-ul">
+<li>Are we wasting space by storing unnecessary elements (usually zeros)?</li>
+<li>Does the way we store the data optimally matches the way we access (read/write) and compute data?</li>
+<li>Are we using the right algorithm for the data structure at hand?</li>
+</ul>
+
+<p>
+Let's say that the data is <i>dense</i>, so we have to store all entries. Why the order we store the elements is
+important?
+</p>
+
+<p>
+Most programming languages have means to construct and manipulate 2-d arrays. Code such as <code>a[i][j]</code> is a straightforward
+way to access the element (number) at i-th row and j-th column of a Java (or C) array of arrays.
+Straightforward, and good enough for <span class="underline">small or medium</span> matrices. A good way to waste performance though!
+</p>
+
+<p>
+The catch here is that, although a programming language might provide a fine abstraction for 2-dimensional
+(or even N-dimensional) arrays, <span class="underline">typical computer memory holds data only in one dimension</span>. If we are careful,
+the data will be stored in consecutive locations, if not - the chunks will be scattered all over! This is a big
+problem because memory access times are highly variable, by orders of magnitude. When a modern processor
+needs to access some data, it is best if the data is in registers. The next best is the first
+level of cache, which is slower. If it's not there, then from the second level, still much slower, and so on.
+Once the data is fetched to the faster, but smaller, level closer to the processor, the data that was
+in that place is kicked out, and the data that was near the data that was fetched is also brought in,
+in the hope that there is increased chance that it will be asked for next. If we access the numbers that are
+near each other in memory, we will have more <i>cache hits</i> (good) than <i>cache misses</i> (bad).
+</p>
+
+<p>
+Take a look at how Java handles access to 2-d arrays: <code>a[343][4098]</code>. You might think that this gets you direct
+access to the element at index \(343,4098\) but it does not. Java arrays are always one-dimensional. In the
+case of 2-d arrays, the first-level array actually holds references to <code>m</code> object arrays, each holding
+the actual numbers, <code>n</code> of them. <code>a[343][4098]</code> fetches 343-rd reference from the first array, and then
+it's 4098-th element. This is a huge problem because those second level arrays will be scattered through
+memory.
+</p>
+
+<p>
+What I want, is to lay \(A\) in memory in a way that is efficient, but still easy to work with. Obviously,
+those two dimensions have to be projected into one. But how? Should it be
+</p>
+
+<p>
+\(\begin{bmatrix}1&1&1&2&|&2&3&1&3&|&1&-1&-2&-6\end{bmatrix}\),
+</p>
+
+<p>
+or \(\begin{bmatrix}1&2&1&|&1&3&-1&|&1&1&-2&|&2&3&-6\end{bmatrix}\)?
+</p>
+
+<p>
+The answer is: it depends on how your algorithm accesses it most often.
+</p>
+
+<p>
+<a href="http://neanderthal.uncomplicate.org">Neanderthal</a> gives you both options. When you create any kind of matrix, you can specify whether you
+want it to be <i>column-oriented</i> (<code>:column</code>, which is the default), or <i>row-oriented</i> (<code>:row</code>). In the
+following example, we will use CPU matrices from the <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.native.html">native</a> namespace. The same options also work
+for functions that create GPU CUDA matrices (<a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.cuda.html">cuda</a> namespace), or OpenCL's GPU and CPU matrices
+(<a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.opencl.html">opencl</a> namespace).
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>dge 3 2 <span style="color: #7388d6;">[</span>1 2 3 4 5 6<span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealGEMatrix[double, mxn:3x2, order:column, offset:0, ld:3]
+
+   1.00    4.00
+   2.00    5.00
+   3.00    6.00
+
+</pre>
+
+<p>
+This created a dense \(3\times{2}\) column-oriented matrix. Notice how the 1-d Clojure sequence
+that we used as data source has been read column-by-column.
+</p>
+
+<p>
+The other option is row orientation:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>dge 3 2 <span style="color: #7388d6;">[</span>1 2 3 4 5 6<span style="color: #7388d6;">]</span> <span style="color: #7388d6;">{</span><span style="color: #F5666D;">:order</span> <span style="color: #F5666D;">:row</span><span style="color: #7388d6;">}</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealGEMatrix[double, mxn:3x2, order:row, offset:0, ld:2]
+
+   1.00    2.00
+   3.00    4.00
+   5.00    6.00
+
+</pre>
+
+<p>
+In this case, the elements have been laid out row-by-row.
+</p>
+
+<p>
+When printing the matrix out in the REPL, we can also see the information about its structure.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org8145a2f" class="outline-2">
+<h2 id="org8145a2f">Memory, Reuse, and (Co)Location</h2>
+<div class="outline-text-2" id="text-org8145a2f">
+<p>
+Neanderthal can support any kind of memory implementation or layout. This is what's possible,
+but what is important is what works well in real use cases. We could have implemented a dense matrix
+storage that is backed by Clojure's persistent vectors-in-vectors. Something like this:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">[</span><span style="color: #7388d6;">[</span>1 2<span style="color: #7388d6;">]</span>
+ <span style="color: #7388d6;">[</span>3 4<span style="color: #7388d6;">]</span>
+ <span style="color: #7388d6;">[</span>5 6<span style="color: #7388d6;">]</span><span style="color: #707183;">]</span>
+</pre>
+</div>
+
+
+<p>
+This is nice, looks pretty and uncluttered, and it's products can even be calculated quickly! Why not this, then?
+Keep in mind that today's computers have amazing performance. While the data is reasonably small,
+everything and anything will be fast. But, once the size gets a bit more serious, the naive approach tragically
+falls apart. It is common that a naive and elegant implementation of an algorithm works fine
+while you're playing with toy examples, but starts running in hours (or weeks!) once you get to even moderately
+large sizes.
+</p>
+
+<p>
+For anything that involves many numbers and operations on them, we have to avoid objects and use
+<b>primitive</b> numbers. Clojure persistent vectors and sequences hold boxed numbers that are scattered all
+over the memory. That has terrible access times and does not take advantage of how memory cache works.
+It is good and flexible for data structures that hold http requests, employee records, and other objects,
+but is a bad match for numbers.
+</p>
+
+<p>
+The next thing we need to take care is that those primitive numbers are <b>co-located</b> in memory.
+We need to make sure the data is as tightly packed in memory, so we get as many cache hits as possible,
+and have as much data as close to the processor as possible.
+</p>
+
+<p>
+Next, we want to <b>avoid memory allocations</b>. Yes, JVM is good at that, but it can still be relatively slow
+if we do it too often compared to (destructively!) <b>reusing</b> structures that we already have. We also
+have to be aware that, for example, GPU memory is at a premium, and that JVM garbage collector
+can not manage memory on the GPU. Sometimes we need to reuse memory because, simply, there is not enough
+space to create new instance. Isn't that mutability a bad thing? Yes, it is! That's why, generally,
+it is a good idea to keep these mutations tamed inside the main function of your algorithm, and,
+for example, do mutations inside a tight loop, not visible to outside world. That is a technique that
+is well known and used with Clojure transients.
+</p>
+
+<p>
+I also want to do as little <b>data movement</b> as possible. Neanderthal is very efficient about this -
+it does not need to copy memory to make it available to highly efficient computational routines outside JVM
+optimized for native platforms. Then, do not degrade that performance by needlessly moving the data
+yourself.
+</p>
+
+<p>
+Recall that Neanderthal even supports different devices: CPU's, but also GPU's and even other
+accelerators. These are typically <b>discrete devices</b> having their own memory. No matter how fast these
+devices are, transferring data to and from that separate memory is rather slow, compared to
+accessing data in CPU registers.
+</p>
+
+<p>
+Having all this in mind, let's see how Neanderthal can help you do the right thing and avoid
+shooting yourself in the foot, or, worse, in the hip.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org2a970e8" class="outline-2">
+<h2 id="org2a970e8">How Neanderthal Handles Memory</h2>
+<div class="outline-text-2" id="text-org2a970e8">
+<p>
+Typically, each Neanderthal data structure is backed by an efficient primitive buffer, that
+holds raw primitive data. This buffer is what the implementer of a highly-efficient computation
+routine (such as matrix multiplication) uses, but the caller of the routine should, typically,
+not need to access this directly.
+</p>
+
+<p>
+The data structure may access the whole buffer, on only a part. Let's look at a few examples:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>row <span style="color: #7388d6;">(</span>dge 2 3 <span style="color: #909183;">(</span>range 6<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span> 1<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealBlockVector[double, n:3, offset: 1, stride:2]
+[   1.00    3.00    5.00 ]
+
+</pre>
+
+<p>
+Note how the resulting vector has offset 1 and stride 2. That's because it does not hold a copy
+of original matrix's buffer. It reuses the original buffer, and just takes care to access the right entries.
+</p>
+
+<p>
+In this case, the original matrix is the owner of the buffer, which is responsible for it's eventual
+releasing (necessary for GPU data, optional for native CPU buffers), and all sub-structures that have been
+created from it are <i>views</i> that look at the same memory. That also means that, when views change the
+data, the original structure also changes!
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #7388d6;">[</span>a <span style="color: #909183;">(</span>dge 2 3 <span style="color: #709870;">(</span>range 6<span style="color: #709870;">)</span><span style="color: #909183;">)</span>
+      b <span style="color: #909183;">(</span>submatrix a 0 1 1 2<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>scal! 100 b<span style="color: #7388d6;">)</span>
+  a<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealGEMatrix[double, mxn:2x3, order:column, offset:0, ld:2]
+
+   0.00  200.00  400.00
+   1.00    3.00    5.00
+
+</pre>
+
+<p>
+By scaling the submatrix \(B\) by 100, we also changed the "master" matrix. Neanderthal
+offers two variants of many functions: pure and destructive. The destructive variant, <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-scal.21">scal!</a>,
+changes the original data, while the pure variant <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-scal">scal</a>, would keep the data intact, and work
+on the copy of the data instead. That is often desirable, but can be inefficient, especially if we
+work with large data, or change data a lot. You'll probably have to use the destructive variants
+more often than not, and it's not a matter of taste, but of brutal necessity.
+</p>
+
+<p>
+When it comes to memory movement, there are two types in Neanderthal: <b>copy</b> and <b>transfer</b>.
+Copy works in the same memory space, for example in the main native RAM, or in the GPU RAM. You can
+copy data from a native matrix to a native matrix, but you have to transfer the data from a native matrix
+to a GPU matrix, or from a Clojure list to a native vector. Copying is obviously faster,
+so it should be preferred when necessary, while transfer may involve copying and other kinds of
+memory movements and coercions under the hood.
+</p>
+
+<p>
+When it comes to memory copying and transfer, there are also destructive and pure variants:
+The destructive <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-copy.21">copy!</a> function moves the data from the existing source to the existing and pre-allocated
+destination. The pure <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-copy">copy</a> function accepts the source and returns a fresh objects with the same contents,
+which is not a view of the buffer, but a master of a separate copy of its own.
+</p>
+
+<p>
+Here's a quick demonstration of the copy operation:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #7388d6;">[</span>a <span style="color: #909183;">(</span>dge 3 2 <span style="color: #709870;">(</span>range 6<span style="color: #709870;">)</span><span style="color: #909183;">)</span>
+      b <span style="color: #909183;">(</span>dge 3 2<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>copy! a b<span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>entry! a 1 1 800<span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>copy b<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealGEMatrix[double, mxn:3x2, order:column, offset:0, ld:3]
+
+   0.00    3.00
+   1.00    4.00
+   2.00    5.00
+
+</pre>
+
+<p>
+I've created matrices <code>a</code> and <code>b</code>, then copied <code>a</code> to <code>b</code>, overwriting b, then changed an element of <code>a</code>,
+and finally created a new copy of b. Since <code>b</code> has its own buffer independent of <code>a</code>, it is unaffected
+by the changes to a.
+</p>
+
+<p>
+Copy works whenever objects are compatible, meaning they have the same structure, and are in the same memory space.
+</p>
+
+<p>
+If I want to move data from a Clojure list to a matrix, I need to transfer it. Constructors,
+such as <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-ge">ge</a>, or <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.native.html#var-dge">dge</a>, will attempt to transfer the source, as we've already seen.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #7388d6;">[</span>a <span style="color: #909183;">(</span>dge 3 2<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>transfer! <span style="color: #909183;">(</span>list 1 2 3 4 5 6<span style="color: #909183;">)</span> a<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealGEMatrix[double, mxn:3x2, order:column, offset:0, ld:3]
+
+   1.00    4.00
+   2.00    5.00
+   3.00    6.00
+
+</pre>
+
+<p>
+Or, the other way, from a native matrix to a Java array:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #7388d6;">[</span>a <span style="color: #909183;">(</span>dge 3 2 <span style="color: #709870;">(</span>range 6<span style="color: #709870;">)</span> <span style="color: #709870;">{</span><span style="color: #F5666D;">:order</span> <span style="color: #F5666D;">:row</span><span style="color: #709870;">}</span><span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>seq <span style="color: #909183;">(</span>transfer! a <span style="color: #709870;">(</span>double-array <span style="color: #907373;">(</span>* <span style="color: #6276ba;">(</span>mrows a<span style="color: #6276ba;">)</span> <span style="color: #6276ba;">(</span>ncols a<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+</colgroup>
+<tbody>
+<tr>
+<td class="org-right">0.0</td>
+<td class="org-right">1.0</td>
+<td class="org-right">2.0</td>
+<td class="org-right">3.0</td>
+<td class="org-right">4.0</td>
+<td class="org-right">5.0</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+
+<div id="outline-container-orge675a6b" class="outline-2">
+<h2 id="orge675a6b">GPU Matrices and Explicit Memory Control</h2>
+<div class="outline-text-2" id="text-orge675a6b">
+<p>
+Let's do something exotic and transfer a matrix from an AMD GPU to an Nvidia GPU:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #2F8B58; font-weight: bold;">clojurecl</span><span style="color: #2E3436; background-color: #EDEDED;">/</span>with-default
+  <span style="color: #7388d6;">(</span><span style="color: #2F8B58; font-weight: bold;">ocl</span><span style="color: #2E3436; background-color: #EDEDED;">/</span>with-default-engine
+    <span style="color: #909183;">(</span><span style="color: #2F8B58; font-weight: bold;">cuda</span><span style="color: #2E3436; background-color: #EDEDED;">/</span>with-default-engine
+      <span style="color: #709870;">(</span>with-release <span style="color: #907373;">[</span>amd <span style="color: #6276ba;">(</span><span style="color: #2F8B58; font-weight: bold;">ocl</span><span style="color: #2E3436; background-color: #EDEDED;">/</span>clge 2 3 <span style="color: #858580;">(</span>range 6<span style="color: #858580;">)</span><span style="color: #6276ba;">)</span>
+                     nvidia <span style="color: #6276ba;">(</span><span style="color: #2F8B58; font-weight: bold;">cuda</span><span style="color: #2E3436; background-color: #EDEDED;">/</span>cuge 2 3<span style="color: #6276ba;">)</span><span style="color: #907373;">]</span>
+        <span style="color: #907373;">[</span><span style="color: #6276ba;">(</span>scal! <span style="color: #858580;">(</span>nrm2 amd<span style="color: #858580;">)</span> amd<span style="color: #6276ba;">)</span>
+         <span style="color: #6276ba;">(</span>transfer! amd nvidia<span style="color: #6276ba;">)</span>
+         <span style="color: #6276ba;">(</span>transfer native-float nvidia<span style="color: #6276ba;">)</span><span style="color: #907373;">]</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+'(#CLGEMatrix(float  mxn:2x3  order:column  offset:0  ld:2) #CUGEMatrix(float  mxn:2x3  order:column  offset:0  ld:2) #RealGEMatrix(float  mxn:2x3  order:column  offset:0  ld:2)
+
+   0.00   14.83   29.66
+   7.42   22.25   37.08
+)
+
+</pre>
+
+<p>
+We needed some default setup, with those <code>with-default</code> methods, to choose which platforms
+and GPU cards our code will run on (I have 2 AMDs and 1 Nvidia in my machine at the moment).
+Otherwise, the code is completely the same as the normal CPU code!
+</p>
+
+<p>
+Let's see what happened here. First, a lazy Clojure sequence <code>(range 6)</code> is transferred to a newly
+created general matrix in the memory of AMD card. That couldn't be done directly, since the sequence
+is a bunch of lazy function calls that produce 6 objects scattered through memory inside JVM. It first has
+to <span class="underline">transparently</span> be transferred to the native memory outside the JVM, and then efficiently to the
+memory of the AMD GPU card. Next, we would like to transfer from AMD to Nvidia GPU. Unfortunately,
+that cannot be done directly. Both cards communicate with CPU only through the PCIe. Thus, the most
+efficient available options is to pin both memories to native memory, and then do a <span class="underline">transparent</span> transfer
+through it. Finally, we would like the REPL to print the <code>nvidia</code> matrix to make sure the data has
+been transferred, but when the REPL get hold to that instance, its buffer has already been released
+by <code>with-release</code>. I've done one more transfer back to the native instance to print it out.
+</p>
+
+<p>
+Our data has traveled a lot! This example was done as a demonstration of Neanderthal's ability to find the
+most efficient way to move data even through a diverse jungle such as this multi-GPU setup. This
+kind of transfer should be done as little as possible, and only when there is no other choice. Data
+has to reach the GPU somehow, but let it be only once in its lifetime, not every time you call a
+computation routine!
+</p>
+
+<p>
+A very important new thing that we should notice here is the use of <code>with-release</code> method.
+It makes sure that the memory outside the JVM is cleaned and released as soon as it is not needed.
+When it comes to native memory, it is optional; direct byte buffers get cleaned by Java's garbage collector.
+However, even if it is optional, it is better to release it explicitly, since it may take quite a
+time until GC comes to it, and by that time you might need that precious space! Even when optional,
+that method is a great help that can boost performance quite a lot. GPU memory, though, is completely
+oblivious to JVM's GC. It is under the control of the appropriate GPU driver, and <span class="underline">it absolutely
+has to be explicitly released</span>. There are libraries out there that try to obscure this using techniques
+such are relying on Java's <code>finalize</code> method, and praying to GC by calling <code>GC.run()</code>. This relies
+on pure hope, and according to Java documentation, guaranteed to <b>not</b> work reliably.
+</p>
+
+<p>
+<b>GPU memory has to be released explicitly</b>, either by calling the <code>release</code> method, or wrapping
+with <code>with-release</code> macro! There is no way around this - we might like it or hate it, but,
+as Spider-Man, one of most well-known modern philosophers, says: "With great power comes great responsibility".
+</p>
+</div>
+</div>
+
+<div id="outline-container-org5da2d5a" class="outline-2">
+<h2 id="org5da2d5a">Specialized Matrix Storage</h2>
+<div class="outline-text-2" id="text-org5da2d5a">
+<p>
+Often, the data is not completely dense. For example, the matrix might be triangular, or symmetric,
+or having all non-zero data near diagonal, or, perhaps, only have a small percentage of non-zero
+elements scattered around huge spaces filled with zeros. Keeping such data in a dense structure
+might be wasteful at best or downright impossible, if the dimensions are so great that the zero-filled
+dense matrix cannot even fit into available memory.
+</p>
+
+<p>
+For these specific cases, there is a number of well-researched storage formats. It is a good idea
+to familiarize with their pros and cons, so you can select the right one when the need arises.
+</p>
+
+<p>
+There are four broad groups of storage:
+</p>
+
+<ul class="org-ul">
+<li><i>Full</i> storage: a matrix is stored densely, and all or only some elements are accessible. Matrix operations might be optimized for specific storage. Examples are:
+<ul class="org-ul">
+<li><i>General</i> matrices (<a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-ge">ge</a>), which use a dense rectangle,</li>
+<li><i>Triangular</i> matrices, (<a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-tr">tr</a>), use lower or upper triangle of a dense rectangle,</li>
+<li><i>Symmetric</i> matrices (<a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-sy">sy</a>) , use lower or upper triangle of dense storage.</li>
+</ul></li>
+
+<li><i>Packed</i> storage scheme stores special matrices more compactly. It stores only the data that is used.
+<ul class="org-ul">
+<li><i>Symmetric</i> packed (<a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-sp">sp</a>),</li>
+<li><i>Triangular</i> packed (<a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-tp">tp</a>).</li>
+</ul></li>
+
+<li><i>Banded</i> storage: matrices whose data are concentrated on a relatively narrow band around the diagonal, can take advantage and only store that band in memory.
+<ul class="org-ul">
+<li><i>General band</i> matrices (<a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-gb">gb</a>),</li>
+<li><i>Triangular band</i> matrices, (<a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-tb">tb</a>),</li>
+<li><i>Symmetric band</i> matrices (<a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-sb">sb</a>).</li>
+</ul></li>
+
+<li><i>Sparse</i> storage: for the case where we need to work with huge, but sparsely populated, matrices, there is a number of standard formats for compressing the data and storing only the (rare) entries that matter:
+<ul class="org-ul">
+<li>Compressed Sparse Row (CSR),</li>
+<li>Compressed Sparse Column (CSC),</li>
+<li>Coordinate format,</li>
+<li>Diagonal format,</li>
+<li>Skyline format,</li>
+<li>Block Sparse Row (BSR) format.</li>
+</ul></li>
+</ul>
+
+<p>
+Please note that at the time of writing this post Neanderthal does not yet implement all these formats.
+Some are already here, some are going to be implemented soon, so by the time you read this they might be
+ready, and for some, you might have to wait.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org488f7e2" class="outline-2">
+<h2 id="org488f7e2">Dense Triangular Matrices</h2>
+<div class="outline-text-2" id="text-org488f7e2">
+<p>
+Describing all of them might be too much for this post, which is already getting rather long, so I'll
+just give an example of how triangular matrices are being handled, and refer you to the Neanderthal
+documentation, and future articles for the rest.
+</p>
+
+<p>
+First, the basic stuff. I use <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.native.html#var-dtr">dtr</a> to create a dense triangular matrix in memory that is lower triangular,
+and has ones on the diagonal. Then I multiply it with a dense matrix.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>with-release <span style="color: #7388d6;">[</span>a <span style="color: #909183;">(</span>dtr 3 <span style="color: #709870;">(</span>range 1 7<span style="color: #709870;">)</span> <span style="color: #709870;">{</span><span style="color: #F5666D;">:order</span> <span style="color: #F5666D;">:row</span> <span style="color: #F5666D;">:diag</span> <span style="color: #F5666D;">:unit</span> <span style="color: #F5666D;">:uplo</span> <span style="color: #F5666D;">:lower</span><span style="color: #709870;">}</span><span style="color: #909183;">)</span>
+               b <span style="color: #909183;">(</span>dge 3 4 <span style="color: #709870;">(</span>range 1 13<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>mm a b<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealGEMatrix[double, mxn:3x4, order:column, offset:0, ld:3]
+
+   1.00    4.00    7.00   10.00
+   2.00    5.00    8.00   11.00
+   3.00    6.00    9.00   12.00
+
+</pre>
+
+<p>
+The result is, as you can see, a dense general matrix, since the product generally has all elements as
+non-zeros.
+</p>
+
+<p>
+Let's print out a triangular matrix:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>dtr 3 <span style="color: #7388d6;">(</span>range 1 7<span style="color: #7388d6;">)</span> <span style="color: #7388d6;">{</span><span style="color: #F5666D;">:order</span> <span style="color: #F5666D;">:row</span> <span style="color: #F5666D;">:diag</span> <span style="color: #F5666D;">:unit</span> <span style="color: #F5666D;">:uplo</span> <span style="color: #F5666D;">:lower</span><span style="color: #7388d6;">}</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealTRMatrix[double, mxn:3x3, order:row, uplo:lower, diag:unit, offset:0, ld:3]
+
+   1.00    0.00    0.00
+   1.00    1.00    0.00
+   2.00    3.00    1.00
+
+</pre>
+
+<p>
+As you can see, the triangular matrix prints out both the entries that it can change, and the
+zeroes and ones that are inaccessible.
+</p>
+
+<p>
+Now, how such a structure is useful at all? It does not save space (remember, it is dense, but
+only one half is accessible) and require some additional knowledge to use. It turns out that
+many numerical techniques produce one or a few triangular matrices as a result. Those results,
+that consist of two triangular matrices, for example, can be nicely packed into one rectangle,
+which is laid out as one chunk of memory. Further, such nicely packaged matrices can be used
+in further operations that are aware of this structure. This is something that many functions
+from the <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html">linalg</a> namespace.
+</p>
+
+<p>
+Take as an example the ubiquitous LU factorization. Its job is to find two triangular matrices,
+that can further be used in solving systems of linear equations, or finding determinants, or
+other tasks. In Clojure, we can use the <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#trf.21">trf!</a> and  <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#trf">trf</a> functions to compute that:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">lu</span> <span style="color: #7388d6;">(</span>trf <span style="color: #909183;">(</span>dge 3 3 <span style="color: #709870;">[</span>1 0 -1 3 -2 3 4 1 1<span style="color: #709870;">]</span> <span style="color: #709870;">{</span><span style="color: #F5666D;">:order</span> <span style="color: #F5666D;">:row</span><span style="color: #709870;">}</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#'user/lu
+
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-clojure">lu
+</pre>
+</div>
+
+<pre class="example">
+#uncomplicate.neanderthal.internal.common.LUFactorization{:lu #RealGEMatrix[double, mxn:3x3, order:row, offset:0, ld:3]
+
+   4.00    1.00    1.00
+   0.75   -2.75    2.25
+   0.25    0.09   -1.45
+, :a #RealGEMatrix[double, mxn:3x3, order:row, offset:0, ld:3]
+
+   1.00    0.00   -1.00
+   3.00   -2.00    3.00
+   4.00    1.00    1.00
+, :ipiv #IntegerBlockVector[int, n:3, offset: 0, stride:1](3 2 3), :master true, :fresh #atom[true 0x64adc80b]}
+</pre>
+
+<p>
+L and U factors as stored in one dense matrix, but we can take lower or upper triangular views:
+</p>
+
+<p>
+L (lower) factor is:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>view-tr <span style="color: #7388d6;">(</span><span style="color: #F5666D;">:lu</span> lu<span style="color: #7388d6;">)</span> <span style="color: #7388d6;">{</span><span style="color: #F5666D;">:uplo</span> <span style="color: #F5666D;">:lower</span> <span style="color: #F5666D;">:diag</span> <span style="color: #F5666D;">:unit</span><span style="color: #7388d6;">}</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealTRMatrix[double, mxn:3x3, order:row, uplo:lower, diag:unit, offset:0, ld:3]
+
+   1.00    0.00    0.00
+   0.75    1.00    0.00
+   0.25    0.09    1.00
+
+</pre>
+
+<p>
+U (upper) factor:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>view-tr <span style="color: #7388d6;">(</span><span style="color: #F5666D;">:lu</span> lu<span style="color: #7388d6;">)</span> <span style="color: #7388d6;">{</span><span style="color: #F5666D;">:uplo</span> <span style="color: #F5666D;">:upper</span><span style="color: #7388d6;">}</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealTRMatrix[double, mxn:3x3, order:row, uplo:upper, diag:non-unit, offset:0, ld:3]
+
+   4.00    1.00    1.00
+   0.00   -2.75    2.25
+   0.00    0.00   -1.45
+
+</pre>
+
+<p>
+When we once computed LU for a given matrix, we can reuse that result to find such
+expensive operations as inverse, solving the linear equations, or determinant at
+greatly discounted computation price:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>det lu<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+-16.0
+
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>mm  <span style="color: #7388d6;">(</span>tri lu<span style="color: #7388d6;">)</span> <span style="color: #7388d6;">(</span>dge 3 3 <span style="color: #909183;">[</span>1 0 -1 3 -2 3 4 1 1<span style="color: #909183;">]</span> <span style="color: #909183;">{</span><span style="color: #F5666D;">:order</span> <span style="color: #F5666D;">:row</span><span style="color: #909183;">}</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealGEMatrix[double, mxn:3x3, order:column, offset:0, ld:3]
+
+   1.00    0.00    0.00
+   0.00    1.00    0.00
+   0.00    0.00    1.00
+
+</pre>
+
+<p>
+That was the inverse, indeed!
+</p>
+</div>
+</div>
+
+<div id="outline-container-org4ca8750" class="outline-2">
+<h2 id="org4ca8750">This was a long post&#x2026;</h2>
+<div class="outline-text-2" id="text-org4ca8750">
+<p>
+So it should be the right time to wrap it up and remind you that there is more documentation
+at <a href="http://neanderthal.uncomplicate.org">Neanderthal</a>'s website. Next time you feel like doing some high-performance coding, you can check it out :)
+</p>
+</div>
+</div>
