@@ -1,0 +1,54 @@
+---
+date: 2017-08-18
+tags:
+- Neanderthal
+- Clojure
+- linear algebra
+- GPU
+- AMD
+- Nvidia
+author: dragan
+layout: post
+title: Setting up Neanderthal - High Performance Clojure Easy as 1,2,3
+excerpt: This is a flash post, written after having a sudden thought while reading a book totally unrelated to Clojure. How hard (or easy) is it to start with Neanderthal? This is only a rhetorical question, since I am not interested in _your_ answer. I'm interested in your opinion on another matter. Here it is.
+categories:
+- Neanderthal
+- Clojure
+- linear algebra
+---
+<p>
+This is a flash post, written after having a sudden thought while reading a book totally unrelated to Clojure.
+How hard (or easy) is it to start with Neanderthal? This is only a rhetorical question, since I am not
+interested in <span class="underline">your</span> answer. I'm interested in your opinion on another matter. Here it is.
+</p>
+
+<p>
+There might be two camps of people, when it comes to this:
+</p>
+
+<ol class="org-ol">
+<li>It's easy. In addition to Clojure environment, you need to setup MKL (and CUDA or OpenCL if you would like to do GPU computations), which was easy for our team. It would have been more convenient for deployment if that wasn't necessary, but so what?</li>
+<li>It's scary. What? I have to do some installation procedure? Huh, can I handle that?</li>
+</ol>
+
+<p>
+The first type I understand (who'd guess), but a mystery to me is the second type.
+I am still unsure whether a significant proportion of those developers really exist, or they are just
+a product of the imagination of the more experienced Clojurist. I'll skip the proverbial total Clojure
+beginners now (and I doubt they are target audience for ML and HPC anyway), but pose this question:
+</p>
+
+<p>
+Suppose a Clojure developer would like to program something related to machine learning or some
+other kind of program that requires high performance computing. Suppose also that installing
+the non-Clojure prerequisites for Neanderthal (Intel MKL / CUDA / OpenCL) is on the level
+of the simplest installation of a game on a computer (GPU drivers + another trivial installer).
+Then, If some aspiring user has a mental block or some other hesitation due to
+the installation process (something that an average teenage gamer trivially does all the time), how
+likely is it that that developer will be able to effective use matrix computations and linear algebra
+in their programs anyway?
+</p>
+
+<p>
+I'm puzzled. Does that developer exist or is just a product of our imagination?
+</p>
