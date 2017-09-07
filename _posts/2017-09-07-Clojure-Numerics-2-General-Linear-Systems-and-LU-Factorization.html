@@ -1,0 +1,503 @@
+---
+date: 2017-09-07
+tags:
+- LU Factorization
+- linear systems
+- Neanderthal
+- Clojure
+- linear algebra
+- dense
+- triangular
+author: dragan
+layout: post
+title: Clojure Numerics, Part 2 - General Linear Systems and LU Factorization
+excerpt: Solving systems of linear equations is a staple task of linear algebra. It can be applied as a part of many machine learning tasks, although it is not always obvious to spot the opportunity. Here, we explore the computational basics, and see how triangular systems are together with a way of transforming general systems to triangular systems are the foundation that we need to internalize well. Neanderthal has many functions that cover us well in this quest.
+categories:
+- Neanderthal
+- Clojure
+- linear algebra
+---
+<p>
+Solving systems of linear equations is a staple food of linear algebra. It can be applied as a part of many
+machine learning tasks, although it is not always obvious to spot the opportunity. Here, we explore how
+triangular systems are the foundation that we need to internalize well. We concentrate on computational details,
+and transformations of general systems to triangular systems . Neanderthal offers many functions to help us in this quest.
+</p>
+
+<p>
+Before I continue, a few reminders:
+</p>
+<ul class="org-ul">
+<li>You should keep a linear algebra textbook around. I recommend <a href="https://www.amazon.com/Applications-Alternate-Bartlett-Publishers-Mathematics/dp/0763782491">Linear Algebra With Applications, Alternate Edition</a> by Gareth Williams (<a href="./Clojure-Linear-Algebra-Refresher-Vector-Spaces">see more in part 1 of Clojure Linear Algebra Refresher</a>).</li>
+<li>Include <a href="http://neanderthal.uncomplicate.org">Neanderthal library</a> in your project to be able to use ready-made high-performance linear algebra functions.</li>
+<li>Read my <a href="./Clojure-Linear-Algebra-Refresher-Vector-Spaces">Clojure Linear Algebra Refresher</a> series.</li>
+</ul>
+
+<p>
+The namespaces we'll use:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #a71d5d;">(</span>require '<span style="color: #795da3;">[</span><span style="color: #795da3;">uncomplicate.neanderthal</span>
+           <span style="color: #183691;">[</span>native <span style="color: #a71d5d;">:refer</span> <span style="color: #183691;">[</span>dv dge fge dtr<span style="color: #183691;">]</span><span style="color: #183691;">]</span>
+           <span style="color: #183691;">[</span>core <span style="color: #a71d5d;">:refer</span> <span style="color: #183691;">[</span>col nrm1 copy nrm1 view-tr<span style="color: #183691;">]</span><span style="color: #183691;">]</span>
+           <span style="color: #183691;">[</span>linalg <span style="color: #a71d5d;">:refer</span> <span style="color: #183691;">[</span>sv! sv trf tri tri! trs trs! det con<span style="color: #183691;">]</span><span style="color: #183691;">]</span>
+           <span style="color: #183691;">[</span>aux <span style="color: #a71d5d;">:refer</span> <span style="color: #183691;">[</span>laswp!<span style="color: #183691;">]</span><span style="color: #183691;">]</span><span style="color: #795da3;">]</span>
+         '<span style="color: #795da3;">[</span><span style="color: #795da3;">uncomplicate.commons.core</span> <span style="color: #a71d5d;">:refer</span> <span style="color: #183691;">[</span>with-release<span style="color: #183691;">]</span><span style="color: #795da3;">]</span>
+         '<span style="color: #795da3;">[</span><span style="color: #795da3;">uncomplicate.clojurecl.core</span> <span style="color: #a71d5d;">:as</span> clojurecl<span style="color: #795da3;">]</span><span style="color: #a71d5d;">)</span>
+</pre>
+</div>
+
+<div id="outline-container-orgeddbbd1" class="outline-2">
+<h2 id="orgeddbbd1">General Linear Systems</h2>
+<div class="outline-text-2" id="text-orgeddbbd1">
+<p>
+I might have forgot many things that I learned in school, but I remember how to intuitively solve simple systems
+of equations involving a handful of those \(x\), \(y\), and \(z\) using <a href="https://en.wikipedia.org/wiki/Gaussian_elimination">Gaussian elimination</a>. If it rings a bell,
+but not particularly loudly, I recommend visiting that Wikipedia link for a quick refresher. If you are wondering what the hell
+I'm talking about, read the first chapter of <a href="https://www.amazon.com/Applications-Alternate-Bartlett-Publishers-Mathematics/dp/0763782491">Linear Algebra With Applications</a> before you continue.
+</p>
+
+<p>
+So, we start with a number of equations, let's say 3 equations, and a (hopefully) matching number of unknowns,
+and combine those equations in such a way that we eliminate some unknowns from each equation,
+until in one equation we are left with just one unknown, in the second with two unknowns, and in the third three.
+The first equation is then trivial to solve. We substitute the solution in the second, and find the second unknown,
+and do the same for the third. When done in school with pen and paper, it looked like a logical but tedious exercise
+in finding ways to combine those equations cleverly. Later, we learned that the system can be described by
+a matrix, and the same process can be described more formally as a series of operations on the rows of the matrix.
+</p>
+
+<p>
+Let's repeat this simple example from an earlier blog post, <a href="./Clojure-Linear-Algebra-Refresher-Matrix-Transformations">Clojure Linear Algebra Refresher (3) - Matrix Transformations</a>:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #a71d5d;">(</span><span style="color: #a71d5d;">let</span> <span style="color: #795da3;">[</span>a <span style="color: #183691;">(</span>dge 3 3 <span style="color: #183691;">[</span>1 0 1 1 -1 1 3 1 4<span style="color: #183691;">]</span><span style="color: #183691;">)</span>
+      y <span style="color: #183691;">(</span>dge 3 1 <span style="color: #183691;">[</span>11 -2 9<span style="color: #183691;">]</span><span style="color: #183691;">)</span>
+      b <span style="color: #183691;">(</span>copy y<span style="color: #183691;">)</span><span style="color: #795da3;">]</span>
+  <span style="color: #795da3;">(</span>sv! a b<span style="color: #795da3;">)</span>
+  <span style="color: #795da3;">[</span>a y b<span style="color: #795da3;">]</span><span style="color: #a71d5d;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+'(#RealGEMatrix(double  mxn:3x3  layout:column  offset:0)
+   ▥       ↓       ↓       ↓       ┓
+   →        1.0     1.0     3.0
+   →        0.0    -1.0     1.0
+   →        1.0    -0.0     1.0
+   ┗                               ┛
+ #RealGEMatrix(double  mxn:3x1  layout:column  offset:0)
+   ▥       ↓       ┓
+   →       11.0
+   →       -2.0
+   →        9.0
+   ┗               ┛
+ #RealGEMatrix(double  mxn:3x1  layout:column  offset:0)
+   ▥       ↓       ┓
+   →       17.0
+   →        0.0
+   →       -2.0
+   ┗               ┛
+)
+</pre>
+
+<p>
+We could conclude that a general system can be easily described by matrices, and solved using the <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#var-sv.21">sv!</a> function,
+and happily proceed punching in our fantastic Clojure code. However, numerical computing is full of traps
+for the careless programmer, rather than an idealized mathematical magic box. If it could compute idealized
+formulas from the book, this would be the last post in this series. Since it only approximately computes
+these numbers with floating point numbers, we'll have to learn how to set up the computations according to the
+problem, so that we minimize the accumulation of errors. Additionally, since those computations can
+stretch for a long wall clock time, we'll have to learn to exploit the structure of the problem at hand
+(if there is any to be exploited) and use the appropriate structures and algorithms to complete
+the task as fast as possible.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org39b7a1e" class="outline-2">
+<h2 id="org39b7a1e">Triangular Systems</h2>
+<div class="outline-text-2" id="text-org39b7a1e">
+<p>
+When it comes to complexity, the happiest problem to have at hand is when I can describe it by a triangular
+matrix.
+</p>
+
+<p>
+Like this one, for example:
+</p>
+\begin{equation}
+  \begin{bmatrix}
+    2 & 0 & 0\\
+    1 & 5 & 0\\
+    3 & 2 & 1\\
+  \end{bmatrix}
+  \begin{bmatrix}x_1\\x_2\\x_3\\\end{bmatrix}
+  =
+  \begin{bmatrix}6\\3\\4\\\end{bmatrix}
+\end{equation}
+
+<p>
+We can see that we don't even have to do any of the procedures learned at school to transform the equations
+into a convenient form; it's already pretty convenient! We can immediately find \(x_1=3\), then substitute it
+and find \(x_2\), then substitute it and find \(x_3\). The first lesson, thus, is that, when we <i>know</i> that our
+problem can be described by a triangular matrix, we should try triangular matrices (dense <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-tr">tr</a>, banded <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-tb">tb</a>, or packed <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-tp">tp</a>)
+instead the default (and the most versatile) general dense matrix <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-ge">ge</a>.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #a71d5d;">(</span><span style="color: #a71d5d;">let</span> <span style="color: #795da3;">[</span>a <span style="color: #183691;">(</span>dtr 3 <span style="color: #183691;">[</span>2 1 3 5 2 1<span style="color: #183691;">]</span><span style="color: #183691;">)</span>
+      b <span style="color: #183691;">(</span>dge 3 1 <span style="color: #183691;">[</span>6 3 4<span style="color: #183691;">]</span><span style="color: #183691;">)</span><span style="color: #795da3;">]</span>
+  <span style="color: #795da3;">[</span>a b <span style="color: #183691;">(</span>sv a b<span style="color: #183691;">)</span><span style="color: #795da3;">]</span><span style="color: #a71d5d;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+'(#RealUploMatrix(double  type:tr  mxn:3x3  layout:column  offset:0)
+   ▥       ↓       ↓       ↓       ┓
+   →        2.0    *       *
+   →        1.0     5.0    *
+   →        3.0     2.0     1.0
+   ┗                               ┛
+ #RealGEMatrix(double  mxn:3x1  layout:column  offset:0)
+   ▥       ↓       ┓
+   →        6.0
+   →        3.0
+   →        4.0
+   ┗               ┛
+ #RealGEMatrix(double  mxn:3x1  layout:column  offset:0)
+   ▥       ↓       ┓
+   →        3.0
+   →        0.0
+   →       -5.0
+   ┗               ┛
+)
+</pre>
+
+<p>
+At the first glance, this example is the same as the previous, which used a general dense matrix.
+And it is, with a distinction that Neanderthal will choose a much faster algorithm for the triangular
+system than for the general system. For such a small dimension as this (3x3) it does not matter, but
+with just a bit more complex systems it matters in two important ways:
+</p>
+
+<ol class="org-ol">
+<li>Solving triangular systems is quite efficient, and does not require any factorizations (to make the system triangular), so it can be noticeably faster.</li>
+<li>By not requiring factorizations, it leaves less room for rounding errors and other pitfalls of working with floating point numbers.</li>
+</ol>
+
+<p>
+In the last example, I've used the pure <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#var-sv">sv</a> function, rather than the destructive <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#var-sv.21">sv!</a>, just to show
+different possibilities. You should choose which one to use in your code based on the problem at hand, of course.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgb846e1b" class="outline-2">
+<h2 id="orgb846e1b">Multiple linear systems</h2>
+<div class="outline-text-2" id="text-orgb846e1b">
+<p>
+Often, the problem consists of applying the same operation when one of the parameters is the same.
+For example, I can have many linear systems at hand, that can be described with the same matrix on the left-hand side,
+but have different right-hand sides. The first thought of most programmers might be "I'll use loop/map/doall", but
+we can do even better: the <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#var-sv">sv</a> and <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#var-sv.21">sv!</a> functions could solve all these systems in one call! That's how
+Neanderthal usually works: if there is something that works with a vector, there is a similar thing that works
+with a matrix (whose columns or rows are those vectors that you could loop over but should avoid to do it).
+</p>
+
+<p>
+In this case:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #a71d5d;">(</span><span style="color: #a71d5d;">let</span> <span style="color: #795da3;">[</span>a <span style="color: #183691;">(</span>dtr 3 <span style="color: #183691;">[</span>2 1 3 5 2 1<span style="color: #183691;">]</span><span style="color: #183691;">)</span>
+      b <span style="color: #183691;">(</span>dge 3 4 <span style="color: #183691;">[</span>6 3 4 7 8 5 -3 -1 2 0 9 -1<span style="color: #183691;">]</span><span style="color: #183691;">)</span><span style="color: #795da3;">]</span>
+  <span style="color: #795da3;">[</span>a b <span style="color: #183691;">(</span>sv a b<span style="color: #183691;">)</span><span style="color: #795da3;">]</span><span style="color: #a71d5d;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+'(#RealUploMatrix(double  type:tr  mxn:3x3  layout:column  offset:0)
+   ▥       ↓       ↓       ↓       ┓
+   →        2.0    *       *
+   →        1.0     5.0    *
+   →        3.0     2.0     1.0
+   ┗                               ┛
+ #RealGEMatrix(double  mxn:3x4  layout:column  offset:0)
+   ▥       ↓       ↓       ↓       ↓       ┓
+   →        6.0     7.0    -3.0     0.0
+   →        3.0     8.0    -1.0     9.0
+   →        4.0     5.0     2.0    -1.0
+   ┗                                       ┛
+ #RealGEMatrix(double  mxn:3x4  layout:column  offset:0)
+   ▥       ↓       ↓       ↓       ↓       ┓
+   →        3.0     3.5    -1.5     0.0
+   →        0.0     0.9     0.1     1.8
+   →       -5.0    -7.3     6.3    -4.6
+   ┗                                       ┛
+)
+</pre>
+
+<p>
+Four systems solved in one quick sweep!
+</p>
+
+<p>
+Functions that deal with matrices can be broadly classified as Level 1, Level 2, and Level 3.
+Level 1 indicates \(O(n)\) complexity, Level 2 - \(O(n^2)\), and Level 3 - \(O(n^3)\) complexity.
+While a problem that can be solved by Level 1 is obviously the most desirable problem to have, Level 3 is
+a level where most flops can be used optimally and most gain can be get compared to a do-it-yourself
+code. In general, it is considerably faster to call one Level 3 function,
+than to call Level 2 function \(n\) times.
+</p>
+
+<p>
+Solving a <i>triangular</i> system is a Level 2 function. Solving multiple systems moves to Level 3.
+</p>
+
+<p>
+I'd take this as a valuable lesson (was it lesson 2?).
+</p>
+</div>
+</div>
+
+<div id="outline-container-org9fb690f" class="outline-2">
+<h2 id="org9fb690f">LU Factorization</h2>
+<div class="outline-text-2" id="text-org9fb690f">
+<p>
+When we have a triangular system, we can solve it easily in \(O(n^2)\). What do we do if our system is
+not triangular? Well, obviously, call <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#var-sv">sv</a>. By going the easy route, we'd leave a lot of potential on the table.
+Here's why: remember the Gaussian elimination from the start of the article? We first do some procedure on
+our system to make it triangular, and then another to find a solution. What if we can keep
+the result of that first procedure, and <i>reuse</i> it many times later? That's exactly what LU factorization is for.
+</p>
+
+<p>
+LU factorization is practically the triangularization of a general matrix into a couple of triangular matrices,
+that can later used in its place for solving linear systems <i>and other useful things</i>. It is an algorithmic
+description of Gaussian elimination.
+</p>
+
+<p>
+Look at this example (\(A=LU\)):
+</p>
+\begin{equation}
+  \begin{bmatrix}
+    3 & 5\\
+    6 & 7\\
+  \end{bmatrix}=
+  \begin{bmatrix}
+    1 & 0\\
+    2 & 1\\
+  \end{bmatrix}
+  \begin{bmatrix}
+    3 & 5\\
+    0 & -3\\
+  \end{bmatrix}
+\end{equation}
+
+<p>
+A general matrix has been described as a product of two triangular matrices: <b>L</b>, the <i>lower</i> triangle,
+and <b>U</b>, the <i>upper</i> triangle.
+</p>
+
+<p>
+How do we now proceed to use them? Our simple triangular system has only one triangle, what do we do with two?
+</p>
+
+<p>
+The original system is \(Ax=b\). We proceed as follows: we decide that \(y=Ux\) and then \(Ax=LUx=Ly=b\).
+First we solve the system \(Ly=b\), then \(Ux=y\), and we have our solution. Once we have triangularized the
+original general system, we can solve it by solving two triangular systems!
+</p>
+
+<p>
+Lesson number 3? Reuse the results as much as you can, since they are so expensive to compute.
+</p>
+
+<p>
+LU factorization seems quite straightforward once it's been laid out, but I've seen so many people trying to
+solve this problem as described in math textbooks: they see the formula \(Ax=b\), (correctly) conclude
+that \(x=A^{-1}y\), and (correctly but unwisely) start the quest of computing the inverse matrix.
+The inverse matrix is something that is <i>really hard to compute</i>, not only because it requires lots
+of FLOPs, but even more because there is a large possibility that the result will be rather
+imprecise.
+</p>
+
+<p>
+<b>Computing \(A^{-1}\) is seldom necessary!</b> The right approach is to solve the related system of linear equations.
+</p>
+
+<p>
+If the determinant of \(A\) is not 0, LU factorization exists. When \(A\) is non-singular,
+then the factorization is unique.
+</p>
+
+<p>
+On with our simple example, but in Clojure. We do a LU factorization by calling the function <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#var-trf.21">trf!</a>, or its
+pure cousin <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#var-trf">trf</a>. TRF stands for <i>TRiangular Factorization</i>.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #a71d5d;">(</span><span style="color: #a71d5d;">let</span> <span style="color: #795da3;">[</span>a <span style="color: #183691;">(</span>dge 3 3 <span style="color: #183691;">[</span>1 0 1 1 -1 1 3 1 4<span style="color: #183691;">]</span><span style="color: #183691;">)</span>
+      lu <span style="color: #183691;">(</span>trf a<span style="color: #183691;">)</span><span style="color: #795da3;">]</span>
+  <span style="color: #795da3;">[</span><span style="color: #183691;">(</span><span style="color: #a71d5d;">:lu</span> lu<span style="color: #183691;">)</span>
+   <span style="color: #183691;">(</span>view-tr <span style="color: #183691;">(</span><span style="color: #a71d5d;">:lu</span> lu<span style="color: #183691;">)</span> <span style="color: #183691;">{</span><span style="color: #a71d5d;">:uplo</span> <span style="color: #a71d5d;">:lower</span> <span style="color: #a71d5d;">:diag</span> <span style="color: #a71d5d;">:unit</span><span style="color: #183691;">}</span><span style="color: #183691;">)</span>
+   <span style="color: #183691;">(</span>view-tr <span style="color: #183691;">(</span><span style="color: #a71d5d;">:lu</span> lu<span style="color: #183691;">)</span> <span style="color: #183691;">{</span><span style="color: #a71d5d;">:uplo</span> <span style="color: #a71d5d;">:upper</span><span style="color: #183691;">}</span><span style="color: #183691;">)</span><span style="color: #795da3;">]</span><span style="color: #a71d5d;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+'(#RealGEMatrix(double  mxn:3x3  layout:column  offset:0)
+   ▥       ↓       ↓       ↓       ┓
+   →        1.0     1.0     3.0
+   →        0.0    -1.0     1.0
+   →        1.0    -0.0     1.0
+   ┗                               ┛
+ #RealUploMatrix(double  type:tr  mxn:3x3  layout:column  offset:0)
+   ▥       ↓       ↓       ↓       ┓
+   →     ·1·       *       *
+   →        0.0  ·1·       *
+   →        1.0    -0.0  ·1·
+   ┗                               ┛
+ #RealUploMatrix(double  type:tr  mxn:3x3  layout:column  offset:0)
+   ▥       ↓       ↓       ↓       ┓
+   →        1.0     1.0     3.0
+   →       *       -1.0     1.0
+   →       *       *        1.0
+   ┗                               ┛
+)
+</pre>
+
+<p>
+We called <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#var-trf">trf</a>, and got a record that contains (among other things that we'll look at later) a general matrix
+accessible through the <code>:lu</code> key. The <code>:lu</code> general matrix contains <i>both</i> L and U. The reason for
+that is that they perfectly fit together and can be tightly packed in memory and used efficiently in
+further computations. Since we are never particularly interested in L and U themselves, but in the
+results that we can get by supplying them to the other procedures, separating them at this point would
+be both inefficient and necessary.
+</p>
+
+<p>
+Maybe Lesson number 4 at this point? What looks more elegant at first glance (returning neatly separated
+L and U so we can look at them and worship them in all their glory) is sometimes exactly the naive
+and <i>wrong</i> choice.
+</p>
+
+<p>
+But anyway, if we really need to (or just like to because of their artistic appeal) see L and U, Neanderthal offers
+an easy way to do this: just take a view of <code>:upper</code> or <code>:lower</code>  triangle of that general matrix, by
+calling the <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#var-view-tr">view-tr</a> function. Just for your information, you can also take different <code>view-XX</code> of most
+matrix structures in Neanderthal.
+</p>
+
+<p>
+I know (by learning it from a numerical math textbook) that L is a lower triangular <i>unit</i> matrix
+that have 1 on the diagonal, and U is a upper triangular. If L weren't unit-diagonal, L and U couldn't
+have been so neatly packed into a general matrix. A nice and useful coincidence :)
+</p>
+
+<p>
+The key difference to <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#var-sv">sv</a>, again, is that we can <i>reuse</i> the LU to not only solve multiple systems, but to
+compute the condition number (<a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#var-con">con</a>), or even the notorious inverse matrix (<a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#var-tri">tri</a>; again, we rarely need the inverse).
+</p>
+
+<p>
+Let's do that:
+</p>
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #a71d5d;">(</span><span style="color: #a71d5d;">let</span> <span style="color: #795da3;">[</span>a <span style="color: #183691;">(</span>dge 3 3 <span style="color: #183691;">[</span>1 0 1 1 -1 1 3 1 4<span style="color: #183691;">]</span><span style="color: #183691;">)</span>
+      b <span style="color: #183691;">(</span>dge 3 5 <span style="color: #183691;">[</span>11 -2 9 6 3 4 7 8 5 -3 -1 2 0 9 -1<span style="color: #183691;">]</span><span style="color: #183691;">)</span>
+      lu <span style="color: #183691;">(</span>trf a<span style="color: #183691;">)</span><span style="color: #795da3;">]</span>
+  <span style="color: #795da3;">[</span><span style="color: #183691;">(</span>con lu <span style="color: #183691;">(</span>nrm1 a<span style="color: #183691;">)</span><span style="color: #183691;">)</span> <span style="color: #183691;">(</span>det lu<span style="color: #183691;">)</span> <span style="color: #183691;">(</span>trs! lu b<span style="color: #183691;">)</span> <span style="color: #183691;">(</span>tri! lu<span style="color: #183691;">)</span><span style="color: #795da3;">]</span><span style="color: #a71d5d;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+'(0.017857142857142856 1.0 #RealGEMatrix(double  mxn:3x5  layout:column  offset:0)
+   ▥       ↓       ↓       ↓       ↓       ↓       ┓
+   →       17.0    17.0    23.0   -24.0    13.0
+   →        0.0    -5.0   -10.0     6.0   -10.0
+   →       -2.0    -2.0    -2.0     5.0    -1.0
+   ┗                                               ┛
+ #RealGEMatrix(double  mxn:3x3  layout:column  offset:0)
+   ▥       ↓       ↓       ↓       ┓
+   →        5.0     1.0    -4.0
+   →       -1.0    -1.0     1.0
+   →       -1.0     0.0     1.0
+   ┗                               ┛
+)
+</pre>
+
+<p>
+That LU was reused to compute the reverse condition number, and the determinant, and to solve five systems of
+linear equations, and, finally, to compute the inverse matrix. I find that quite neat.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org3db533d" class="outline-2">
+<h2 id="org3db533d">Pivoting</h2>
+<div class="outline-text-2" id="text-org3db533d">
+<p>
+Solving things, in the sense of finding \(x\) that finely fits the numbers that you already have in the formula
+is usually clean and elegant on the page of a math textbook. However, for anything but very simple problems,
+the real world strikes mercilessly. The algorithms start getting slower much faster than the dimension increases. One remedy
+for that are various clever shortcuts, but that is something that often falls under the fields such as machine
+learning, so I'll skip that here. Another approach that works to a certain degree (and that machine learning
+has to build on top) is optimizing the code tightly for the hardware (Neanderthal helps with this effectively).
+</p>
+
+<p>
+The other important issue from the real world is that the computer does not work with real numbers, but
+an approximation of real numbers implemented as floating point. The implication is, of course, that
+there are many pitfalls that can make results completely wrong. Fortunately, many of those pitfalls are
+well researched by the field of numerical analysis, and applied in well written software, so the error
+can be bounded and minimized, for most real world use cases. I'm reminding you of this just to make you aware;
+although many algorithms that look relatively easy to implement on the surface, you should not try
+to implement them yourself unless <i>you really know what you're doing</i>.
+</p>
+
+<p>
+One of those pitfalls can be seen in <i>ill-conditioned</i> systems - the systems whose computed solutions
+swing wildly when some of the parameters change only a little bit. The main reason for this is that,
+due to limited precision of floating-point numbers, operations with one very large number with one very small
+number might not have enough precision to take into account the smaller one. But, even when the system
+is not ill-conditioned, vanilla Gaussian elimination is unstable, and can give poor results when a pivot in
+the elimination is <i>small</i>.
+</p>
+
+<p>
+This is indicated by very large entries in triangular factors. The solution is to exchange rows during the
+elimination - <i>pivoting</i>. Then, the computed factorization is \(PA=LU\).
+</p>
+
+<p>
+Fortunately for you, Neanderthal's functions take this into account, and manage pivots for you.
+You only have to be aware of the existence of pivoting, because the LU matrix that the procedure returns
+has its rows interchanged! You'll also get access to pivot index (:ipiv key). All other procedures
+accept the <i>pivoted</i> LU. You do not need to convert anything, and in the case that you'd like to
+look at L and U, you can use <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.aux.html#var-laswp.21">laswp!</a> to recover the desired matrix.
+</p>
+
+<p>
+You can check whether the matrix is well-conditioned by computing the <i>inverse</i> condition number. Small
+positive inverse condition number (thus, large condition number) indicates a well-conditioned matrix,
+while a relatively large inverse is ill-conditioned.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org3b5385f" class="outline-2">
+<h2 id="org3b5385f">What's next</h2>
+<div class="outline-text-2" id="text-org3b5385f">
+<p>
+We've taken a look at solving general rectangular matrices and triangular matrices. That is quite
+useful. However, there are some more specialized methods that are faster or more robust when we know
+additional details about the matrix at hand. The system might be symmetric, or positive definite, etc.
+We'll look at this in the next article.
+</p>
+</div>
+</div>
