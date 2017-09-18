@@ -1,0 +1,171 @@
+---
+date: 2017-09-18
+tags:
+- Neanderthal
+- Clojure
+- linear algebra
+- dense
+- triangular
+- symmetric
+- packed
+- diagonal
+- tridiagonal
+- bidiagonal
+- solvers
+- least squares
+author: dragan
+layout: post
+title: What's nice about Clojure numerical computing with new Neanderthal 0.16.0
+excerpt: I've spent some quality time with my Emacs sipping some CIDER, and it is a good moment to introduce the release 0.16.0 of Neanderthal, the linear algebra and numerical computing library for Clojure. The time spent over the summer on refactoring the foundations for 0.15.0, pays the dividends now. It has been much easier for me to add many new features and polish the old ones. And the best news is that I expect this to continue giving for the upcoming releases.
+categories:
+- Neanderthal
+- Clojure
+- linear algebra
+---
+<p>
+I've spent some quality time with my Emacs sipping some CIDER, and it is a good moment to introduce the release 0.16.0 of
+Neanderthal, <b>the</b> linear algebra and numerical computing library for Clojure. The time spent over the summer
+on refactoring the foundations for 0.15.0, pays the dividends now. It has been much easier for me to add many
+new features and polish the old ones. And the best news is that I expect this to continue giving for the upcoming
+releases.
+</p>
+
+<div id="outline-container-orgdae1519" class="outline-2">
+<h2 id="orgdae1519">Where to get it</h2>
+<div class="outline-text-2" id="text-orgdae1519">
+<p>
+I guess it is not difficult to Google it, but <a href="http://neanderthal.uncomplicate.org">here is the Neanderthal homepage</a>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org3d48774" class="outline-2">
+<h2 id="org3d48774">What's new</h2>
+<div class="outline-text-2" id="text-org3d48774">
+<p>
+After adding a wide choice of specialized matrix structures to the last release (triangular, symmetric, banded, packed, etc.),
+I've decided to round up the roster with a few more sparse types:
+</p>
+
+<ul class="org-ul">
+<li>Diagonal matrix (GD)</li>
+<li>Tridiagonal matrix (GT)</li>
+<li>Diagonally dominant tridiagonal (DT)</li>
+<li>Symmetric tridiagonal (ST)</li>
+</ul>
+
+<p>
+What's so great about them, you might ask? Remember that numerical linear algebra is a highly demanding
+when it comes to computing resources. Having some knowledge about the special structure of your data,
+<b>and having the actual tools in your programming language of choice</b> (Clojure, of course) to
+use that knowledge, enable you to make impossible task possible, and slow tasks fast.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org840224c" class="outline-2">
+<h2 id="org840224c">That's not all</h2>
+<div class="outline-text-2" id="text-org840224c">
+<p>
+Recently Neanderthal entered the territory that few, if any of the libraries on JVM and similar platforms claimed.
+NumPy and similar libraries are in wide use and are quite good, but you won't find such a breadth of
+ specialized matrices there. And, like in some infomercial, that's not all. Not only that Neanderthal
+ offers a <b>broad selection</b> of matrix structures, it also offers <b>deep</b> support for specialized polymorphic
+ operations for those specialized matrices. It would be bragging if I said that Neanderthal comes
+ with more high quality implementations for more operations than other performant Clojure/Java libraries even
+have an API for. But it's not bragging if it's reality.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgb59430b" class="outline-2">
+<h2 id="orgb59430b">There's even more</h2>
+<div class="outline-text-2" id="text-orgb59430b">
+<p>
+There's many things that Neanderthal now supports, but there's more to be added. Having pretty much
+cornered the data structures themselves, it's now much easier for me to add more advanced operations,
+which you've probably already seen if you explored the new stuff in the previous release.
+</p>
+
+<p>
+Don't forget that there's also support for GPU computing, and even there Neanderthal goes beyond
+what other libraries do, and supports not only Nvidia and CUDA, but AMD and Intel and Nvidia with OpenCL!
+</p>
+</div>
+</div>
+
+<div id="outline-container-org90f98b8" class="outline-2">
+<h2 id="org90f98b8">There will be even more</h2>
+<div class="outline-text-2" id="text-org90f98b8">
+<p>
+Depending on the demand, next in the waiting line are two more major things that are not there (yet):
+</p>
+
+<ul class="org-ul">
+<li>Unstructured sparse matrices (structured matrices are already supported!).</li>
+<li>Tensors (which is a much better thing than "NDArray").</li>
+</ul>
+
+<p>
+If you are among the people who need some of these two, please share some of your views on
+how you intend to use them. That might help me make them better.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orge882f13" class="outline-2">
+<h2 id="orge882f13">This stuff seems hard to learn&#x2026;</h2>
+<div class="outline-text-2" id="text-orge882f13">
+<p>
+Although many programmers are (thanks to the rising AI/ML hype) interested in the stuff that
+libraries like Neanderthal provide, most of them are frustrated by the apparent high barrier to
+entry due to the heavy reliance on math-heavy theory.
+</p>
+
+<p>
+I'll be direct: despite what various blogs say, you can't cheat here. Long time ago, there was
+ a popular line of computer books titled "Learn X in 21 days". Then it became popular to give
+ them titles like "Learn Y in 21 hours". Nowadays, the thing in vogue is a "A 5 minute blog post about Z".
+You can learn to blindly call some API quickly, but I can bet that you can not learn to use any of the libraries
+in this field by reading 2, or 5 blog posts. You have to learn at least the basics of linear algebra,
+ and the more advanced parts depending on the need, to be able to enter the ML/DL/DA field and do things
+<b>effectively</b>.
+</p>
+
+<p>
+There's good news though: Neanderthal can help you tremendously on this path. It's API is designed
+to do automatically as many things as possible, while still giving you the full control to be
+able to achieve the maximum performance. It's also designed to have a clear and logical correspondence
+to the math-y theoretical stuff from the textbooks.
+</p>
+
+<p>
+And, I have a series of blog posts on this blog that show you how to connect the dots from the textbooks to
+the top-performance code. I already have several more written and queued to be published, and even more are
+currently brewing.
+</p>
+
+<p>
+This requires lots of time, so, you can help me by sharing more of what you
+do in this area. Write some beginner's tutorials so I could concentrate on writing about more
+advanced stuff instead. Tell people about how you use Clojure for high performance stuff, so I can spend
+more time on adding features. Do more comparisons with other tools, so more users get to know
+about our great platform that (almost) nobody knows about.
+Hey, find some bugs, and write tests that demonstrate them, so I can
+spend more time fixing those, instead of hunting them myself.
+</p>
+
+<p>
+By the way, did you know that at this point Neanderthal has 3773 <b>hand written tests</b>? Yes, I wrote
+and rewrote those many times, by hand - that's one of the reasons why Neanderthal's API is so ergonomic,
+polished, and comprehensive.
+These tests are also a good way to learn about specific functionality of Neanderthal when the need arise.
+ Don't miss them.
+</p>
+
+<p>
+So, I do not have illusion that this will make everyone an AI expert, but I am sure that it makes
+Clojure a fairly good platform to start the journey for many bright people. Including you, of course!
+</p>
+</div>
+</div>
