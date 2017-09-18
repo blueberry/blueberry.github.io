@@ -66,10 +66,10 @@ Let's do some Clojure: given a matrix, how do I find eigenvalues and eigenvector
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span><span style="color: #2F8B58; font-weight: bold;">uncomplicate.neanderthal</span>
-           <span style="color: #909183;">[</span>core <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>col entry nrm2 mv scal axpy copy mm dia<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
-           <span style="color: #909183;">[</span>native <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>dge<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
-           <span style="color: #909183;">[</span>linalg <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>ev! inv!<span style="color: #709870;">]</span><span style="color: #909183;">]</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+<pre class="src src-clojure"><span style="color: #a71d5d;">(</span>require '<span style="color: #795da3;">[</span><span style="color: #795da3;">uncomplicate.neanderthal</span>
+           <span style="color: #183691;">[</span>core <span style="color: #a71d5d;">:refer</span> <span style="color: #183691;">[</span>col entry nrm2 mv scal axpy copy mm dia<span style="color: #183691;">]</span><span style="color: #183691;">]</span>
+           <span style="color: #183691;">[</span>native <span style="color: #a71d5d;">:refer</span> <span style="color: #183691;">[</span>dge<span style="color: #183691;">]</span><span style="color: #183691;">]</span>
+           <span style="color: #183691;">[</span>linalg <span style="color: #a71d5d;">:refer</span> <span style="color: #183691;">[</span>ev! tri! trf<span style="color: #183691;">]</span><span style="color: #183691;">]</span><span style="color: #795da3;">]</span><span style="color: #a71d5d;">)</span>
 </pre>
 </div>
 
@@ -81,13 +81,13 @@ this nice text from live code.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #7388d6;">[</span>a <span style="color: #909183;">(</span>dge 2 2 <span style="color: #709870;">[</span>-4 3 -6 5<span style="color: #709870;">]</span><span style="color: #909183;">)</span> <span style="color: #204A87;">;;</span><span style="color: #204A87;">note: column-oriented!</span>
-      eigenvectors <span style="color: #909183;">(</span>dge 2 2<span style="color: #909183;">)</span>
-      eigenvalues <span style="color: #909183;">(</span>ev! a <span style="color: #F5666D;">nil</span> eigenvectors<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
-  <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">lambda1</span> <span style="color: #909183;">(</span>entry eigenvalues 0 0<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
-  <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">x1</span> <span style="color: #909183;">(</span>col eigenvectors 0<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
-  <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">lambda2</span> <span style="color: #909183;">(</span>entry eigenvalues 1 0<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
-  <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">x2</span> <span style="color: #909183;">(</span>col eigenvectors 1<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<pre class="src src-clojure"><span style="color: #a71d5d;">(</span><span style="color: #a71d5d;">let</span> <span style="color: #795da3;">[</span>a <span style="color: #183691;">(</span>dge 2 2 <span style="color: #183691;">[</span>-4 3 -6 5<span style="color: #183691;">]</span><span style="color: #183691;">)</span> <span style="color: #c8c8fa;">;;</span><span style="color: #969896; font-style: italic;">note: column-oriented!</span>
+      eigenvectors <span style="color: #183691;">(</span>dge 2 2<span style="color: #183691;">)</span>
+      eigenvalues <span style="color: #183691;">(</span>ev! a <span style="color: #0086b3;">nil</span> eigenvectors<span style="color: #183691;">)</span><span style="color: #795da3;">]</span>
+  <span style="color: #795da3;">(</span><span style="color: #a71d5d;">def</span> <span style="color: #ed6a43;">lambda1</span> <span style="color: #183691;">(</span>entry eigenvalues 0 0<span style="color: #183691;">)</span><span style="color: #795da3;">)</span>
+  <span style="color: #795da3;">(</span><span style="color: #a71d5d;">def</span> <span style="color: #ed6a43;">x1</span> <span style="color: #183691;">(</span>col eigenvectors 0<span style="color: #183691;">)</span><span style="color: #795da3;">)</span>
+  <span style="color: #795da3;">(</span><span style="color: #a71d5d;">def</span> <span style="color: #ed6a43;">lambda2</span> <span style="color: #183691;">(</span>entry eigenvalues 1 0<span style="color: #183691;">)</span><span style="color: #795da3;">)</span>
+  <span style="color: #795da3;">(</span><span style="color: #a71d5d;">def</span> <span style="color: #ed6a43;">x2</span> <span style="color: #183691;">(</span>col eigenvectors 1<span style="color: #183691;">)</span><span style="color: #795da3;">)</span><span style="color: #a71d5d;">)</span>
 </pre>
 </div>
 
@@ -117,7 +117,7 @@ is \(r(-0.89, 0.45)\):
 </div>
 <pre class="example">
 #RealBlockVector[double, n:2, offset: 0, stride:1]
-[ -0.89   0.45 ]
+[  -0.89    0.45 ]
 
 </pre>
 
@@ -127,14 +127,14 @@ really an eigenvalue and eigenvector:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #7388d6;">[</span>a <span style="color: #909183;">(</span>dge 2 2 <span style="color: #709870;">[</span>-4 3 -6 5<span style="color: #709870;">]</span><span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
-  <span style="color: #7388d6;">(</span>axpy -1 <span style="color: #909183;">(</span>mv a x1<span style="color: #909183;">)</span> <span style="color: #909183;">(</span>scal lambda1 x1<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<pre class="src src-clojure"><span style="color: #a71d5d;">(</span><span style="color: #a71d5d;">let</span> <span style="color: #795da3;">[</span>a <span style="color: #183691;">(</span>dge 2 2 <span style="color: #183691;">[</span>-4 3 -6 5<span style="color: #183691;">]</span><span style="color: #183691;">)</span><span style="color: #795da3;">]</span>
+  <span style="color: #795da3;">(</span>axpy -1 <span style="color: #183691;">(</span>mv a x1<span style="color: #183691;">)</span> <span style="color: #183691;">(</span>scal lambda1 x1<span style="color: #183691;">)</span><span style="color: #795da3;">)</span><span style="color: #a71d5d;">)</span>
 </pre>
 </div>
 
 <pre class="example">
 #RealBlockVector[double, n:2, offset: 0, stride:1]
-[  0.00   0.00 ]
+[   0.00    0.00 ]
 
 </pre>
 
@@ -151,7 +151,7 @@ to two decimals for readability. These are the actual values to the max precisio
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">doall</span> <span style="color: #7388d6;">(</span>seq x1<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<pre class="src src-clojure"><span style="color: #a71d5d;">(</span><span style="color: #a71d5d;">doall</span> <span style="color: #795da3;">(</span>seq x1<span style="color: #795da3;">)</span><span style="color: #a71d5d;">)</span>
 </pre>
 </div>
 
@@ -177,7 +177,7 @@ eigenvectors we get are normalized:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span>nrm2 x1<span style="color: #707183;">)</span>
+<pre class="src src-clojure"><span style="color: #a71d5d;">(</span>nrm2 x1<span style="color: #a71d5d;">)</span>
 </pre>
 </div>
 
@@ -206,7 +206,7 @@ your trusty Clojure REPL.
 </div>
 <pre class="example">
 #RealBlockVector[double, n:2, offset: 2, stride:1]
-[  0.71  -0.71 ]
+[   0.71   -0.71 ]
 
 </pre>
 
@@ -215,21 +215,22 @@ Eigenvalues are not necessarily distinct. Consider example 2 from page 214:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #7388d6;">[</span>a <span style="color: #909183;">(</span>dge 3 3 <span style="color: #709870;">[</span>5 4 2 4 5 2 2 2 2<span style="color: #709870;">]</span><span style="color: #909183;">)</span> <span style="color: #204A87;">;;</span><span style="color: #204A87;">note: column-oriented!</span>
-      eigenvectors <span style="color: #909183;">(</span>dge 3 3<span style="color: #909183;">)</span>
-      eigenvalues <span style="color: #909183;">(</span>ev! a <span style="color: #F5666D;">nil</span> eigenvectors<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
-  <span style="color: #7388d6;">[</span><span style="color: #909183;">(</span>col eigenvalues 0<span style="color: #909183;">)</span> eigenvectors<span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+<pre class="src src-clojure"><span style="color: #a71d5d;">(</span><span style="color: #a71d5d;">let</span> <span style="color: #795da3;">[</span>a <span style="color: #183691;">(</span>dge 3 3 <span style="color: #183691;">[</span>5 4 2 4 5 2 2 2 2<span style="color: #183691;">]</span><span style="color: #183691;">)</span> <span style="color: #c8c8fa;">;;</span><span style="color: #969896; font-style: italic;">note: column-oriented!</span>
+      eigenvectors <span style="color: #183691;">(</span>dge 3 3<span style="color: #183691;">)</span>
+      eigenvalues <span style="color: #183691;">(</span>ev! a <span style="color: #0086b3;">nil</span> eigenvectors<span style="color: #183691;">)</span><span style="color: #795da3;">]</span>
+  <span style="color: #795da3;">[</span><span style="color: #183691;">(</span>col eigenvalues 0<span style="color: #183691;">)</span> eigenvectors<span style="color: #795da3;">]</span><span style="color: #a71d5d;">)</span>
 </pre>
 </div>
 
 <pre class="example">
 '(#RealBlockVector(double  n:3  offset: 0  stride:1)
-(  1.00  10.00   1.00 )
- #RealGEMatrix(double  mxn:3x3  order:column  offset:0  ld:3)
-
- -0.75   0.67  -0.03
-  0.60   0.67  -0.42
-  0.30   0.33   0.91
+(   1.00   10.00    1.00 )
+ #RealGEMatrix(double  mxn:3x3  layout:column  offset:0)
+   ▥       ↓       ↓       ↓       ┓
+   →      -0.75    0.67   -0.03
+   →       0.60    0.67   -0.42
+   →       0.30    0.33    0.91
+   ┗                               ┛
 )
 
 </pre>
@@ -281,23 +282,23 @@ an inverse of the whole matrix, we can compute it from \(LU\) factors.
 Relevant functions can be found in the <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html"><code>uncomplicate.neanderthal.linalg</code></a> namespace.
 Function <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#var-trf.21"><code>trf!</code></a> does the LU
 ("tr" is for <i>triangular</i> and "f" for <i>factorization</i>) and <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#var-tri.21"><code>tri!</code></a> the inverse given the previously LU-processed
-input. There is also a convenience function <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#var-inv.21"><code>inv!</code></a> that will call <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#var-trf.21"><code>trf!</code></a> and <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#var-tri"><code>tri!</code></a> properly, but use it
-only when you absolutely need an inverse, and avoid it when LU (or QR etc.) factors are enough.
+input (<code>trf</code>). Use it only when you absolutely need an inverse, and avoid it when LU (or QR etc.) factors are enough.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #7388d6;">[</span>a <span style="color: #909183;">(</span>dge 2 2 <span style="color: #709870;">[</span>7 3 -10 -4<span style="color: #709870;">]</span><span style="color: #909183;">)</span>
-      c <span style="color: #909183;">(</span>dge 2 2 <span style="color: #709870;">[</span>2 1 5 3<span style="color: #709870;">]</span><span style="color: #909183;">)</span>
-      inv-c <span style="color: #909183;">(</span>inv! <span style="color: #709870;">(</span>copy c<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">]</span><span style="color: #204A87;">;; </span><span style="color: #204A87;">we can not afford to destroy c!</span>
-<span style="color: #7388d6;">(</span>mm inv-c <span style="color: #909183;">(</span>mm a c<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<pre class="src src-clojure"><span style="color: #a71d5d;">(</span><span style="color: #a71d5d;">let</span> <span style="color: #795da3;">[</span>a <span style="color: #183691;">(</span>dge 2 2 <span style="color: #183691;">[</span>7 3 -10 -4<span style="color: #183691;">]</span><span style="color: #183691;">)</span>
+      c <span style="color: #183691;">(</span>dge 2 2 <span style="color: #183691;">[</span>2 1 5 3<span style="color: #183691;">]</span><span style="color: #183691;">)</span>
+      inv-c <span style="color: #183691;">(</span>tri! <span style="color: #183691;">(</span>trf c<span style="color: #183691;">)</span><span style="color: #183691;">)</span><span style="color: #795da3;">]</span><span style="color: #c8c8fa;">;; </span><span style="color: #969896; font-style: italic;">we can not afford to destroy c!</span>
+<span style="color: #795da3;">(</span>mm inv-c <span style="color: #183691;">(</span>mm a c<span style="color: #183691;">)</span><span style="color: #795da3;">)</span><span style="color: #a71d5d;">)</span>
 </pre>
 </div>
 
 <pre class="example">
-#RealGEMatrix[double, mxn:2x2, order:column, offset:0, ld:2]
-
-  2.00   0.00
-  0.00   1.00
+#RealGEMatrix[double, mxn:2x2, layout:column, offset:0]
+   ▥       ↓       ↓       ┓
+   →       2.00    0.00
+   →       0.00    1.00
+   ┗                       ┛
 
 </pre>
 
@@ -334,12 +335,12 @@ Demonstration in Clojure:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #7388d6;">[</span>a <span style="color: #909183;">(</span>dge 2 2 <span style="color: #709870;">[</span>-4 3 -6 5<span style="color: #709870;">]</span><span style="color: #909183;">)</span>
-            evec <span style="color: #909183;">(</span>dge 2 2<span style="color: #909183;">)</span>
-            eval <span style="color: #909183;">(</span>ev! <span style="color: #709870;">(</span>copy a<span style="color: #709870;">)</span> <span style="color: #F5666D;">nil</span> evec<span style="color: #909183;">)</span>
-            inv-evec <span style="color: #909183;">(</span>inv! <span style="color: #709870;">(</span>copy evec<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
-        <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">diag</span> <span style="color: #909183;">(</span>col eval 0<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
-        <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">d</span> <span style="color: #909183;">(</span>mm inv-evec <span style="color: #709870;">(</span>mm a evec<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<pre class="src src-clojure"><span style="color: #a71d5d;">(</span><span style="color: #a71d5d;">let</span> <span style="color: #795da3;">[</span>a <span style="color: #183691;">(</span>dge 2 2 <span style="color: #183691;">[</span>-4 3 -6 5<span style="color: #183691;">]</span><span style="color: #183691;">)</span>
+            evec <span style="color: #183691;">(</span>dge 2 2<span style="color: #183691;">)</span>
+            eval <span style="color: #183691;">(</span>ev! <span style="color: #183691;">(</span>copy a<span style="color: #183691;">)</span> <span style="color: #0086b3;">nil</span> evec<span style="color: #183691;">)</span>
+            inv-evec <span style="color: #183691;">(</span>tri! <span style="color: #183691;">(</span>trf evec<span style="color: #183691;">)</span><span style="color: #183691;">)</span><span style="color: #795da3;">]</span>
+        <span style="color: #795da3;">(</span><span style="color: #a71d5d;">def</span> <span style="color: #ed6a43;">diag</span> <span style="color: #183691;">(</span>col eval 0<span style="color: #183691;">)</span><span style="color: #795da3;">)</span>
+        <span style="color: #795da3;">(</span><span style="color: #a71d5d;">def</span> <span style="color: #ed6a43;">d</span> <span style="color: #183691;">(</span>mm inv-evec <span style="color: #183691;">(</span>mm a evec<span style="color: #183691;">)</span><span style="color: #183691;">)</span><span style="color: #795da3;">)</span><span style="color: #a71d5d;">)</span>
 </pre>
 </div>
 
@@ -354,7 +355,7 @@ I have computed the eigenvalues and have found the diagonal of \(D\):
 
 <pre class="example">
 #RealBlockVector[double, n:2, offset: 0, stride:1]
-[ -1.00   2.00 ]
+[  -1.00    2.00 ]
 
 </pre>
 
@@ -368,10 +369,11 @@ whether I should believe what the textbooks tells me. Indeed, the textbook is ri
 </div>
 
 <pre class="example">
-#RealGEMatrix[double, mxn:2x2, order:column, offset:0, ld:2]
-
- -1.00   0.00
-  0.00   2.00
+#RealGEMatrix[double, mxn:2x2, layout:column, offset:0]
+   ▥       ↓       ↓       ┓
+   →      -1.00    0.00
+   →       0.00    2.00
+   ┗                       ┛
 
 </pre>
 
@@ -388,25 +390,26 @@ so it supports vectors, matrices and many more structures).
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span><span style="color: #2F8B58; font-weight: bold;">uncomplicate.fluokitten.core</span> <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>fmap!<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
-<span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span><span style="color: #2F8B58; font-weight: bold;">uncomplicate.neanderthal.math</span> <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>pow<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+<pre class="src src-clojure"><span style="color: #a71d5d;">(</span>require '<span style="color: #795da3;">[</span><span style="color: #795da3;">uncomplicate.fluokitten.core</span> <span style="color: #a71d5d;">:refer</span> <span style="color: #183691;">[</span>fmap!<span style="color: #183691;">]</span><span style="color: #795da3;">]</span><span style="color: #a71d5d;">)</span>
+<span style="color: #a71d5d;">(</span>require '<span style="color: #795da3;">[</span><span style="color: #795da3;">uncomplicate.neanderthal.math</span> <span style="color: #a71d5d;">:refer</span> <span style="color: #183691;">[</span>pow<span style="color: #183691;">]</span><span style="color: #795da3;">]</span><span style="color: #a71d5d;">)</span>
 </pre>
 </div>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">d9</span> <span style="color: #7388d6;">(</span>copy d<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
-<span style="color: #707183;">(</span>fmap! <span style="color: #7388d6;">(</span>pow 9<span style="color: #7388d6;">)</span> <span style="color: #7388d6;">(</span>dia d9<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<pre class="src src-clojure"><span style="color: #a71d5d;">(</span><span style="color: #a71d5d;">def</span> <span style="color: #ed6a43;">d9</span> <span style="color: #795da3;">(</span>copy d<span style="color: #795da3;">)</span><span style="color: #a71d5d;">)</span>
+<span style="color: #a71d5d;">(</span>fmap! <span style="color: #795da3;">(</span>pow 9<span style="color: #795da3;">)</span> <span style="color: #795da3;">(</span>dia d9<span style="color: #795da3;">)</span><span style="color: #a71d5d;">)</span>
 d9
 </pre>
 </div>
 
 <pre class="example">
-#'old/d9#RealBlockVector[double, n:2, offset: 0, stride:3]
-[ -1.00 512.00 ]
-#RealGEMatrix[double, mxn:2x2, order:column, offset:0, ld:2]
-
- -1.00   0.00
-  0.00 512.00
+#'user2/d9#RealBlockVector[double, n:2, offset: 0, stride:3]
+[  -1.00  512.00 ]
+#RealGEMatrix[double, mxn:2x2, layout:column, offset:0]
+   ▥       ↓       ↓       ┓
+   →      -1.00    0.00
+   →       0.00  512.00
+   ┗                       ┛
 
 </pre>
 

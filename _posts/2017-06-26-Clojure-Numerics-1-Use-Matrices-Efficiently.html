@@ -43,15 +43,15 @@ The namespaces we'll use:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span><span style="color: #2F8B58; font-weight: bold;">uncomplicate.neanderthal</span>
-           <span style="color: #909183;">[</span>native <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>dv dge fge dtr native-float<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
-           <span style="color: #909183;">[</span>cuda <span style="color: #F5666D;">:as</span> cuda<span style="color: #909183;">]</span>
-           <span style="color: #909183;">[</span>opencl <span style="color: #F5666D;">:as</span> ocl<span style="color: #909183;">]</span>
-           <span style="color: #909183;">[</span>core <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>copy copy! row submatrix scal! transfer! transfer mrows ncols nrm2 mm cols <span style="color: #ee82ee; background-color: #333333;">view-tr</span><span style="color: #709870; background-color: #333333;">]</span><span style="color: #909183; background-color: #333333;">]</span>
-           <span style="color: #909183;">[</span>real <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>entry entry!<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
-           <span style="color: #909183;">[</span>linalg <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>trf tri det<span style="color: #709870;">]</span><span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
-         '<span style="color: #7388d6;">[</span><span style="color: #2F8B58; font-weight: bold;">uncomplicate.commons.core</span> <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>with-release<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
-         '<span style="color: #7388d6;">[</span><span style="color: #2F8B58; font-weight: bold;">uncomplicate.clojurecl.core</span> <span style="color: #F5666D;">:as</span> clojurecl<span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+<pre class="src src-clojure"><span style="color: #a71d5d;">(</span>require '<span style="color: #795da3;">[</span><span style="color: #795da3;">uncomplicate.neanderthal</span>
+           <span style="color: #183691;">[</span>native <span style="color: #a71d5d;">:refer</span> <span style="color: #183691;">[</span>dv dge fge dtr native-float<span style="color: #183691;">]</span><span style="color: #183691;">]</span>
+           <span style="color: #183691;">[</span>cuda <span style="color: #a71d5d;">:as</span> cuda<span style="color: #183691;">]</span>
+           <span style="color: #183691;">[</span>opencl <span style="color: #a71d5d;">:as</span> ocl<span style="color: #183691;">]</span>
+           <span style="color: #183691;">[</span>core <span style="color: #a71d5d;">:refer</span> <span style="color: #183691;">[</span>copy copy! row submatrix scal! transfer! transfer mrows ncols nrm2 mm cols <span style="color: #333333; background-color: #f5f5f5;">view-tr</span><span style="color: #183691; background-color: #f5f5f5;">]</span><span style="color: #183691; background-color: #f5f5f5;">]</span>
+           <span style="color: #183691;">[</span>real <span style="color: #a71d5d;">:refer</span> <span style="color: #183691;">[</span>entry entry!<span style="color: #183691;">]</span><span style="color: #183691;">]</span>
+           <span style="color: #183691;">[</span>linalg <span style="color: #a71d5d;">:refer</span> <span style="color: #183691;">[</span>trf tri det<span style="color: #183691;">]</span><span style="color: #183691;">]</span><span style="color: #795da3;">]</span>
+         '<span style="color: #795da3;">[</span><span style="color: #795da3;">uncomplicate.commons.core</span> <span style="color: #a71d5d;">:refer</span> <span style="color: #183691;">[</span>with-release<span style="color: #183691;">]</span><span style="color: #795da3;">]</span>
+         '<span style="color: #795da3;">[</span><span style="color: #795da3;">uncomplicate.clojurecl.core</span> <span style="color: #a71d5d;">:as</span> clojurecl<span style="color: #795da3;">]</span><span style="color: #a71d5d;">)</span>
 </pre>
 </div>
 
@@ -131,16 +131,17 @@ for functions that create GPU CUDA matrices (<a href="http://neanderthal.uncompl
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span>dge 3 2 <span style="color: #7388d6;">[</span>1 2 3 4 5 6<span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+<pre class="src src-clojure"><span style="color: #a71d5d;">(</span>dge 3 2 <span style="color: #795da3;">[</span>1 2 3 4 5 6<span style="color: #795da3;">]</span><span style="color: #a71d5d;">)</span>
 </pre>
 </div>
 
 <pre class="example">
-#RealGEMatrix[double, mxn:3x2, order:column, offset:0, ld:3]
-
-   1.00    4.00
-   2.00    5.00
-   3.00    6.00
+#RealGEMatrix[double, mxn:3x2, layout:column, offset:0]
+   ▥       ↓       ↓       ┓
+   →       1.00    4.00
+   →       2.00    5.00
+   →       3.00    6.00
+   ┗                       ┛
 
 </pre>
 
@@ -154,16 +155,17 @@ The other option is row orientation:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span>dge 3 2 <span style="color: #7388d6;">[</span>1 2 3 4 5 6<span style="color: #7388d6;">]</span> <span style="color: #7388d6;">{</span><span style="color: #F5666D;">:order</span> <span style="color: #F5666D;">:row</span><span style="color: #7388d6;">}</span><span style="color: #707183;">)</span>
+<pre class="src src-clojure"><span style="color: #a71d5d;">(</span>dge 3 2 <span style="color: #795da3;">[</span>1 2 3 4 5 6<span style="color: #795da3;">]</span> <span style="color: #795da3;">{</span><span style="color: #a71d5d;">:order</span> <span style="color: #a71d5d;">:row</span><span style="color: #795da3;">}</span><span style="color: #a71d5d;">)</span>
 </pre>
 </div>
 
 <pre class="example">
-#RealGEMatrix[double, mxn:3x2, order:row, offset:0, ld:2]
-
-   1.00    2.00
-   3.00    4.00
-   5.00    6.00
+#RealGEMatrix[double, mxn:3x2, layout:column, offset:0]
+   ▥       ↓       ↓       ┓
+   →       1.00    4.00
+   →       2.00    5.00
+   →       3.00    6.00
+   ┗                       ┛
 
 </pre>
 
@@ -187,9 +189,9 @@ storage that is backed by Clojure's persistent vectors-in-vectors. Something lik
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">[</span><span style="color: #7388d6;">[</span>1 2<span style="color: #7388d6;">]</span>
- <span style="color: #7388d6;">[</span>3 4<span style="color: #7388d6;">]</span>
- <span style="color: #7388d6;">[</span>5 6<span style="color: #7388d6;">]</span><span style="color: #707183;">]</span>
+<pre class="src src-clojure"><span style="color: #a71d5d;">[</span><span style="color: #795da3;">[</span>1 2<span style="color: #795da3;">]</span>
+ <span style="color: #795da3;">[</span>3 4<span style="color: #795da3;">]</span>
+ <span style="color: #795da3;">[</span>5 6<span style="color: #795da3;">]</span><span style="color: #a71d5d;">]</span>
 </pre>
 </div>
 
@@ -264,7 +266,7 @@ The data structure may access the whole buffer, on only a part. Let's look at a 
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span>row <span style="color: #7388d6;">(</span>dge 2 3 <span style="color: #909183;">(</span>range 6<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span> 1<span style="color: #707183;">)</span>
+<pre class="src src-clojure"><span style="color: #a71d5d;">(</span>row <span style="color: #795da3;">(</span>dge 2 3 <span style="color: #183691;">(</span>range 6<span style="color: #183691;">)</span><span style="color: #795da3;">)</span> 1<span style="color: #a71d5d;">)</span>
 </pre>
 </div>
 
@@ -287,18 +289,19 @@ data, the original structure also changes!
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #7388d6;">[</span>a <span style="color: #909183;">(</span>dge 2 3 <span style="color: #709870;">(</span>range 6<span style="color: #709870;">)</span><span style="color: #909183;">)</span>
-      b <span style="color: #909183;">(</span>submatrix a 0 1 1 2<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
-  <span style="color: #7388d6;">(</span>scal! 100 b<span style="color: #7388d6;">)</span>
-  a<span style="color: #707183;">)</span>
+<pre class="src src-clojure"><span style="color: #a71d5d;">(</span><span style="color: #a71d5d;">let</span> <span style="color: #795da3;">[</span>a <span style="color: #183691;">(</span>dge 2 3 <span style="color: #183691;">(</span>range 6<span style="color: #183691;">)</span><span style="color: #183691;">)</span>
+      b <span style="color: #183691;">(</span>submatrix a 0 1 1 2<span style="color: #183691;">)</span><span style="color: #795da3;">]</span>
+  <span style="color: #795da3;">(</span>scal! 100 b<span style="color: #795da3;">)</span>
+  a<span style="color: #a71d5d;">)</span>
 </pre>
 </div>
 
 <pre class="example">
-#RealGEMatrix[double, mxn:2x3, order:column, offset:0, ld:2]
-
-   0.00  200.00  400.00
-   1.00    3.00    5.00
+#RealGEMatrix[double, mxn:2x3, layout:column, offset:0]
+   ▥       ↓       ↓       ↓       ┓
+   →       0.00  200.00  400.00
+   →       1.00    3.00    5.00
+   ┗                               ┛
 
 </pre>
 
@@ -332,20 +335,21 @@ Here's a quick demonstration of the copy operation:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #7388d6;">[</span>a <span style="color: #909183;">(</span>dge 3 2 <span style="color: #709870;">(</span>range 6<span style="color: #709870;">)</span><span style="color: #909183;">)</span>
-      b <span style="color: #909183;">(</span>dge 3 2<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
-  <span style="color: #7388d6;">(</span>copy! a b<span style="color: #7388d6;">)</span>
-  <span style="color: #7388d6;">(</span>entry! a 1 1 800<span style="color: #7388d6;">)</span>
-  <span style="color: #7388d6;">(</span>copy b<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<pre class="src src-clojure"><span style="color: #a71d5d;">(</span><span style="color: #a71d5d;">let</span> <span style="color: #795da3;">[</span>a <span style="color: #183691;">(</span>dge 3 2 <span style="color: #183691;">(</span>range 6<span style="color: #183691;">)</span><span style="color: #183691;">)</span>
+      b <span style="color: #183691;">(</span>dge 3 2<span style="color: #183691;">)</span><span style="color: #795da3;">]</span>
+  <span style="color: #795da3;">(</span>copy! a b<span style="color: #795da3;">)</span>
+  <span style="color: #795da3;">(</span>entry! a 1 1 800<span style="color: #795da3;">)</span>
+  <span style="color: #795da3;">(</span>copy b<span style="color: #795da3;">)</span><span style="color: #a71d5d;">)</span>
 </pre>
 </div>
 
 <pre class="example">
-#RealGEMatrix[double, mxn:3x2, order:column, offset:0, ld:3]
-
-   0.00    3.00
-   1.00    4.00
-   2.00    5.00
+#RealGEMatrix[double, mxn:3x2, layout:column, offset:0]
+   ▥       ↓       ↓       ┓
+   →       0.00    3.00
+   →       1.00    4.00
+   →       2.00    5.00
+   ┗                       ┛
 
 </pre>
 
@@ -365,17 +369,18 @@ such as <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neandert
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #7388d6;">[</span>a <span style="color: #909183;">(</span>dge 3 2<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
-  <span style="color: #7388d6;">(</span>transfer! <span style="color: #909183;">(</span>list 1 2 3 4 5 6<span style="color: #909183;">)</span> a<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<pre class="src src-clojure"><span style="color: #a71d5d;">(</span><span style="color: #a71d5d;">let</span> <span style="color: #795da3;">[</span>a <span style="color: #183691;">(</span>dge 3 2<span style="color: #183691;">)</span><span style="color: #795da3;">]</span>
+  <span style="color: #795da3;">(</span>transfer! <span style="color: #183691;">(</span>list 1 2 3 4 5 6<span style="color: #183691;">)</span> a<span style="color: #795da3;">)</span><span style="color: #a71d5d;">)</span>
 </pre>
 </div>
 
 <pre class="example">
-#RealGEMatrix[double, mxn:3x2, order:column, offset:0, ld:3]
-
-   1.00    4.00
-   2.00    5.00
-   3.00    6.00
+#RealGEMatrix[double, mxn:3x2, layout:column, offset:0]
+   ▥       ↓       ↓       ┓
+   →       1.00    4.00
+   →       2.00    5.00
+   →       3.00    6.00
+   ┗                       ┛
 
 </pre>
 
@@ -384,8 +389,8 @@ Or, the other way, from a native matrix to a Java array:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #7388d6;">[</span>a <span style="color: #909183;">(</span>dge 3 2 <span style="color: #709870;">(</span>range 6<span style="color: #709870;">)</span> <span style="color: #709870;">{</span><span style="color: #F5666D;">:order</span> <span style="color: #F5666D;">:row</span><span style="color: #709870;">}</span><span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
-  <span style="color: #7388d6;">(</span>seq <span style="color: #909183;">(</span>transfer! a <span style="color: #709870;">(</span>double-array <span style="color: #907373;">(</span>* <span style="color: #6276ba;">(</span>mrows a<span style="color: #6276ba;">)</span> <span style="color: #6276ba;">(</span>ncols a<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<pre class="src src-clojure"><span style="color: #a71d5d;">(</span><span style="color: #a71d5d;">let</span> <span style="color: #795da3;">[</span>a <span style="color: #183691;">(</span>dge 3 2 <span style="color: #183691;">(</span>range 6<span style="color: #183691;">)</span> <span style="color: #183691;">{</span><span style="color: #a71d5d;">:order</span> <span style="color: #a71d5d;">:row</span><span style="color: #183691;">}</span><span style="color: #183691;">)</span><span style="color: #795da3;">]</span>
+  <span style="color: #795da3;">(</span>seq <span style="color: #183691;">(</span>transfer! a <span style="color: #183691;">(</span>double-array <span style="color: #795da3;">(</span>* <span style="color: #0086b3;">(</span>mrows a<span style="color: #0086b3;">)</span> <span style="color: #0086b3;">(</span>ncols a<span style="color: #0086b3;">)</span><span style="color: #795da3;">)</span><span style="color: #183691;">)</span><span style="color: #183691;">)</span><span style="color: #795da3;">)</span><span style="color: #a71d5d;">)</span>
 </pre>
 </div>
 
@@ -427,22 +432,23 @@ Let's do something exotic and transfer a matrix from an AMD GPU to an Nvidia GPU
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #2F8B58; font-weight: bold;">clojurecl</span><span style="color: #2E3436; background-color: #EDEDED;">/</span>with-default
-  <span style="color: #7388d6;">(</span><span style="color: #2F8B58; font-weight: bold;">ocl</span><span style="color: #2E3436; background-color: #EDEDED;">/</span>with-default-engine
-    <span style="color: #909183;">(</span><span style="color: #2F8B58; font-weight: bold;">cuda</span><span style="color: #2E3436; background-color: #EDEDED;">/</span>with-default-engine
-      <span style="color: #709870;">(</span>with-release <span style="color: #907373;">[</span>amd <span style="color: #6276ba;">(</span><span style="color: #2F8B58; font-weight: bold;">ocl</span><span style="color: #2E3436; background-color: #EDEDED;">/</span>clge 2 3 <span style="color: #858580;">(</span>range 6<span style="color: #858580;">)</span><span style="color: #6276ba;">)</span>
-                     nvidia <span style="color: #6276ba;">(</span><span style="color: #2F8B58; font-weight: bold;">cuda</span><span style="color: #2E3436; background-color: #EDEDED;">/</span>cuge 2 3<span style="color: #6276ba;">)</span><span style="color: #907373;">]</span>
-        <span style="color: #907373;">[</span><span style="color: #6276ba;">(</span>scal! <span style="color: #858580;">(</span>nrm2 amd<span style="color: #858580;">)</span> amd<span style="color: #6276ba;">)</span>
-         <span style="color: #6276ba;">(</span>transfer! amd nvidia<span style="color: #6276ba;">)</span>
-         <span style="color: #6276ba;">(</span>transfer native-float nvidia<span style="color: #6276ba;">)</span><span style="color: #907373;">]</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<pre class="src src-clojure"><span style="color: #a71d5d;">(</span><span style="color: #795da3;">clojurecl</span><span style="color: #333333; background-color: #ffffff;">/</span>with-default
+  <span style="color: #795da3;">(</span><span style="color: #795da3;">ocl</span><span style="color: #333333; background-color: #ffffff;">/</span>with-default-engine
+    <span style="color: #183691;">(</span><span style="color: #795da3;">cuda</span><span style="color: #333333; background-color: #ffffff;">/</span>with-default-engine
+      <span style="color: #183691;">(</span>with-release <span style="color: #795da3;">[</span>amd <span style="color: #0086b3;">(</span><span style="color: #795da3;">ocl</span><span style="color: #333333; background-color: #ffffff;">/</span>clge 2 3 <span style="color: #ed6a43;">(</span>range 6<span style="color: #ed6a43;">)</span><span style="color: #0086b3;">)</span>
+                     nvidia <span style="color: #0086b3;">(</span><span style="color: #795da3;">cuda</span><span style="color: #333333; background-color: #ffffff;">/</span>cuge 2 3<span style="color: #0086b3;">)</span><span style="color: #795da3;">]</span>
+        <span style="color: #795da3;">[</span><span style="color: #0086b3;">(</span>scal! <span style="color: #ed6a43;">(</span>nrm2 amd<span style="color: #ed6a43;">)</span> amd<span style="color: #0086b3;">)</span>
+         <span style="color: #0086b3;">(</span>transfer! amd nvidia<span style="color: #0086b3;">)</span>
+         <span style="color: #0086b3;">(</span>transfer native-float nvidia<span style="color: #0086b3;">)</span><span style="color: #795da3;">]</span><span style="color: #183691;">)</span><span style="color: #183691;">)</span><span style="color: #795da3;">)</span><span style="color: #a71d5d;">)</span>
 </pre>
 </div>
 
 <pre class="example">
-'(#CLGEMatrix(float  mxn:2x3  order:column  offset:0  ld:2) #CUGEMatrix(float  mxn:2x3  order:column  offset:0  ld:2) #RealGEMatrix(float  mxn:2x3  order:column  offset:0  ld:2)
-
-   0.00   14.83   29.66
-   7.42   22.25   37.08
+'(#CLGEMatrix(float  mxn:2x3  layout:column  offset:0) #CUGEMatrix(float  mxn:2x3  layout:column  offset:0) #RealGEMatrix(float  mxn:2x3  layout:column  offset:0)
+   ▥       ↓       ↓       ↓       ┓
+   →       0.00   14.83   29.66
+   →       7.42   22.25   37.08
+   ┗                               ┛
 )
 
 </pre>
@@ -570,18 +576,19 @@ and has ones on the diagonal. Then I multiply it with a dense matrix.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span>with-release <span style="color: #7388d6;">[</span>a <span style="color: #909183;">(</span>dtr 3 <span style="color: #709870;">(</span>range 1 7<span style="color: #709870;">)</span> <span style="color: #709870;">{</span><span style="color: #F5666D;">:order</span> <span style="color: #F5666D;">:row</span> <span style="color: #F5666D;">:diag</span> <span style="color: #F5666D;">:unit</span> <span style="color: #F5666D;">:uplo</span> <span style="color: #F5666D;">:lower</span><span style="color: #709870;">}</span><span style="color: #909183;">)</span>
-               b <span style="color: #909183;">(</span>dge 3 4 <span style="color: #709870;">(</span>range 1 13<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
-  <span style="color: #7388d6;">(</span>mm a b<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<pre class="src src-clojure"><span style="color: #a71d5d;">(</span>with-release <span style="color: #795da3;">[</span>a <span style="color: #183691;">(</span>dtr 3 <span style="color: #183691;">(</span>range 1 7<span style="color: #183691;">)</span> <span style="color: #183691;">{</span><span style="color: #a71d5d;">:order</span> <span style="color: #a71d5d;">:row</span> <span style="color: #a71d5d;">:diag</span> <span style="color: #a71d5d;">:unit</span> <span style="color: #a71d5d;">:uplo</span> <span style="color: #a71d5d;">:lower</span><span style="color: #183691;">}</span><span style="color: #183691;">)</span>
+               b <span style="color: #183691;">(</span>dge 3 4 <span style="color: #183691;">(</span>range 1 13<span style="color: #183691;">)</span><span style="color: #183691;">)</span><span style="color: #795da3;">]</span>
+  <span style="color: #795da3;">(</span>mm a b<span style="color: #795da3;">)</span><span style="color: #a71d5d;">)</span>
 </pre>
 </div>
 
 <pre class="example">
-#RealGEMatrix[double, mxn:3x4, order:column, offset:0, ld:3]
-
-   1.00    4.00    7.00   10.00
-   2.00    5.00    8.00   11.00
-   3.00    6.00    9.00   12.00
+#RealGEMatrix[double, mxn:3x4, layout:column, offset:0]
+   ▥       ↓       ↓       ↓       ↓       ┓
+   →       1.00    4.00    7.00   10.00
+   →       3.00    9.00   15.00   21.00
+   →      11.00   29.00   47.00   65.00
+   ┗                                       ┛
 
 </pre>
 
@@ -595,16 +602,17 @@ Let's print out a triangular matrix:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span>dtr 3 <span style="color: #7388d6;">(</span>range 1 7<span style="color: #7388d6;">)</span> <span style="color: #7388d6;">{</span><span style="color: #F5666D;">:order</span> <span style="color: #F5666D;">:row</span> <span style="color: #F5666D;">:diag</span> <span style="color: #F5666D;">:unit</span> <span style="color: #F5666D;">:uplo</span> <span style="color: #F5666D;">:lower</span><span style="color: #7388d6;">}</span><span style="color: #707183;">)</span>
+<pre class="src src-clojure"><span style="color: #a71d5d;">(</span>dtr 3 <span style="color: #795da3;">(</span>range 1 7<span style="color: #795da3;">)</span> <span style="color: #795da3;">{</span><span style="color: #a71d5d;">:order</span> <span style="color: #a71d5d;">:row</span> <span style="color: #a71d5d;">:diag</span> <span style="color: #a71d5d;">:unit</span> <span style="color: #a71d5d;">:uplo</span> <span style="color: #a71d5d;">:lower</span><span style="color: #795da3;">}</span><span style="color: #a71d5d;">)</span>
 </pre>
 </div>
 
 <pre class="example">
-#RealTRMatrix[double, mxn:3x3, order:row, uplo:lower, diag:unit, offset:0, ld:3]
-
-   1.00    0.00    0.00
-   1.00    1.00    0.00
-   2.00    3.00    1.00
+#RealUploMatrix[double, type:tr, mxn:3x3, layout:column, offset:0]
+   ▥       ↓       ↓       ↓       ┓
+   →     ·1·       *       *
+   →       1.00  ·1·       *
+   →       2.00    3.00  ·1·
+   ┗                               ┛
 
 </pre>
 
@@ -630,12 +638,12 @@ other tasks. In Clojure, we can use the <a href="http://neanderthal.uncomplicate
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">lu</span> <span style="color: #7388d6;">(</span>trf <span style="color: #909183;">(</span>dge 3 3 <span style="color: #709870;">[</span>1 0 -1 3 -2 3 4 1 1<span style="color: #709870;">]</span> <span style="color: #709870;">{</span><span style="color: #F5666D;">:order</span> <span style="color: #F5666D;">:row</span><span style="color: #709870;">}</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<pre class="src src-clojure"><span style="color: #a71d5d;">(</span><span style="color: #a71d5d;">def</span> <span style="color: #ed6a43;">lu</span> <span style="color: #795da3;">(</span>trf <span style="color: #183691;">(</span>dge 3 3 <span style="color: #183691;">[</span>1 0 -1 3 -2 3 4 1 1<span style="color: #183691;">]</span> <span style="color: #183691;">{</span><span style="color: #a71d5d;">:order</span> <span style="color: #a71d5d;">:row</span><span style="color: #183691;">}</span><span style="color: #183691;">)</span><span style="color: #795da3;">)</span><span style="color: #a71d5d;">)</span>
 </pre>
 </div>
 
 <pre class="example">
-#'user/lu
+#'user3/lu
 
 </pre>
 
@@ -645,17 +653,14 @@ other tasks. In Clojure, we can use the <a href="http://neanderthal.uncomplicate
 </div>
 
 <pre class="example">
-#uncomplicate.neanderthal.internal.common.LUFactorization{:lu #RealGEMatrix[double, mxn:3x3, order:row, offset:0, ld:3]
+#uncomplicate.neanderthal.internal.common.LUFactorization{:lu #RealGEMatrix[double, mxn:3x3, layout:column, offset:0]
+   ▥       ↓       ↓       ↓       ┓
+   →       1.00    3.00    4.00
+   →      -1.00    6.00    5.00
+   →       0.00   -0.33    2.67
+   ┗                               ┛
+, :ipiv #IntegerBlockVector[int, n:3, offset: 0, stride:1](1 3 3), :master true, :fresh #atom[true 0x2ab70e40]}
 
-   4.00    1.00    1.00
-   0.75   -2.75    2.25
-   0.25    0.09   -1.45
-, :a #RealGEMatrix[double, mxn:3x3, order:row, offset:0, ld:3]
-
-   1.00    0.00   -1.00
-   3.00   -2.00    3.00
-   4.00    1.00    1.00
-, :ipiv #IntegerBlockVector[int, n:3, offset: 0, stride:1](3 2 3), :master true, :fresh #atom[true 0x64adc80b]}
 </pre>
 
 <p>
@@ -667,16 +672,17 @@ L (lower) factor is:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span>view-tr <span style="color: #7388d6;">(</span><span style="color: #F5666D;">:lu</span> lu<span style="color: #7388d6;">)</span> <span style="color: #7388d6;">{</span><span style="color: #F5666D;">:uplo</span> <span style="color: #F5666D;">:lower</span> <span style="color: #F5666D;">:diag</span> <span style="color: #F5666D;">:unit</span><span style="color: #7388d6;">}</span><span style="color: #707183;">)</span>
+<pre class="src src-clojure"><span style="color: #a71d5d;">(</span>view-tr <span style="color: #795da3;">(</span><span style="color: #a71d5d;">:lu</span> lu<span style="color: #795da3;">)</span> <span style="color: #795da3;">{</span><span style="color: #a71d5d;">:uplo</span> <span style="color: #a71d5d;">:lower</span> <span style="color: #a71d5d;">:diag</span> <span style="color: #a71d5d;">:unit</span><span style="color: #795da3;">}</span><span style="color: #a71d5d;">)</span>
 </pre>
 </div>
 
 <pre class="example">
-#RealTRMatrix[double, mxn:3x3, order:row, uplo:lower, diag:unit, offset:0, ld:3]
-
-   1.00    0.00    0.00
-   0.75    1.00    0.00
-   0.25    0.09    1.00
+#RealUploMatrix[double, type:tr, mxn:3x3, layout:column, offset:0]
+   ▥       ↓       ↓       ↓       ┓
+   →     ·1·       *       *
+   →      -1.00  ·1·       *
+   →       0.00   -0.33  ·1·
+   ┗                               ┛
 
 </pre>
 
@@ -685,16 +691,17 @@ U (upper) factor:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span>view-tr <span style="color: #7388d6;">(</span><span style="color: #F5666D;">:lu</span> lu<span style="color: #7388d6;">)</span> <span style="color: #7388d6;">{</span><span style="color: #F5666D;">:uplo</span> <span style="color: #F5666D;">:upper</span><span style="color: #7388d6;">}</span><span style="color: #707183;">)</span>
+<pre class="src src-clojure"><span style="color: #a71d5d;">(</span>view-tr <span style="color: #795da3;">(</span><span style="color: #a71d5d;">:lu</span> lu<span style="color: #795da3;">)</span> <span style="color: #795da3;">{</span><span style="color: #a71d5d;">:uplo</span> <span style="color: #a71d5d;">:upper</span><span style="color: #795da3;">}</span><span style="color: #a71d5d;">)</span>
 </pre>
 </div>
 
 <pre class="example">
-#RealTRMatrix[double, mxn:3x3, order:row, uplo:upper, diag:non-unit, offset:0, ld:3]
-
-   4.00    1.00    1.00
-   0.00   -2.75    2.25
-   0.00    0.00   -1.45
+#RealUploMatrix[double, type:tr, mxn:3x3, layout:column, offset:0]
+   ▥       ↓       ↓       ↓       ┓
+   →       1.00    3.00    4.00
+   →       *       6.00    5.00
+   →       *       *       2.67
+   ┗                               ┛
 
 </pre>
 
@@ -705,7 +712,7 @@ greatly discounted computation price:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span>det lu<span style="color: #707183;">)</span>
+<pre class="src src-clojure"><span style="color: #a71d5d;">(</span>det lu<span style="color: #a71d5d;">)</span>
 </pre>
 </div>
 
@@ -715,16 +722,17 @@ greatly discounted computation price:
 </pre>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span>mm  <span style="color: #7388d6;">(</span>tri lu<span style="color: #7388d6;">)</span> <span style="color: #7388d6;">(</span>dge 3 3 <span style="color: #909183;">[</span>1 0 -1 3 -2 3 4 1 1<span style="color: #909183;">]</span> <span style="color: #909183;">{</span><span style="color: #F5666D;">:order</span> <span style="color: #F5666D;">:row</span><span style="color: #909183;">}</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<pre class="src src-clojure"><span style="color: #a71d5d;">(</span>mm  <span style="color: #795da3;">(</span>tri lu<span style="color: #795da3;">)</span> <span style="color: #795da3;">(</span>dge 3 3 <span style="color: #183691;">[</span>1 0 -1 3 -2 3 4 1 1<span style="color: #183691;">]</span> <span style="color: #183691;">{</span><span style="color: #a71d5d;">:order</span> <span style="color: #a71d5d;">:row</span><span style="color: #183691;">}</span><span style="color: #795da3;">)</span><span style="color: #a71d5d;">)</span>
 </pre>
 </div>
 
 <pre class="example">
-#RealGEMatrix[double, mxn:3x3, order:column, offset:0, ld:3]
-
-   1.00    0.00    0.00
-   0.00    1.00    0.00
-   0.00    0.00    1.00
+#RealGEMatrix[double, mxn:3x3, layout:column, offset:0]
+   ▥       ↓       ↓       ↓       ┓
+   →       1.00    0.00    0.00
+   →       0.00    1.00    0.00
+   →       0.00    0.00    1.00
+   ┗                               ┛
 
 </pre>
 

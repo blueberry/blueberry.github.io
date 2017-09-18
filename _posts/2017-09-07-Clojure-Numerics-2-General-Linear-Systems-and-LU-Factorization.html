@@ -11,7 +11,7 @@ tags:
 author: dragan
 layout: post
 title: Clojure Numerics, Part 2 - General Linear Systems and LU Factorization
-excerpt: Solving systems of linear equations is a staple task of linear algebra. It can be applied as a part of many machine learning tasks, although it is not always obvious to spot the opportunity. Here, we explore the computational basics, and see how triangular systems are together with a way of transforming general systems to triangular systems are the foundation that we need to internalize well. Neanderthal has many functions that cover us well in this quest.
+excerpt: Solving systems of linear equations is a staple food of linear algebra. It can be applied as a part of many machine learning tasks, although it is not always obvious to spot the opportunity. Here, we explore how triangular systems are the foundation that we need to internalize well. We concentrate on computational details, and transformations of general systems to triangular systems . Neanderthal offers many functions to help us in this quest.
 categories:
 - Neanderthal
 - Clojure
@@ -42,7 +42,7 @@ The namespaces we'll use:
            <span style="color: #183691;">[</span>native <span style="color: #a71d5d;">:refer</span> <span style="color: #183691;">[</span>dv dge fge dtr<span style="color: #183691;">]</span><span style="color: #183691;">]</span>
            <span style="color: #183691;">[</span>core <span style="color: #a71d5d;">:refer</span> <span style="color: #183691;">[</span>col nrm1 copy nrm1 view-tr<span style="color: #183691;">]</span><span style="color: #183691;">]</span>
            <span style="color: #183691;">[</span>linalg <span style="color: #a71d5d;">:refer</span> <span style="color: #183691;">[</span>sv! sv trf tri tri! trs trs! det con<span style="color: #183691;">]</span><span style="color: #183691;">]</span>
-           <span style="color: #183691;">[</span>aux <span style="color: #a71d5d;">:refer</span> <span style="color: #183691;">[</span>laswp!<span style="color: #183691;">]</span><span style="color: #183691;">]</span><span style="color: #795da3;">]</span>
+           <span style="color: #183691;">[</span>aux <span style="color: #a71d5d;">:refer</span> <span style="color: #183691;">[</span>permute-rows!<span style="color: #183691;">]</span><span style="color: #183691;">]</span><span style="color: #795da3;">]</span>
          '<span style="color: #795da3;">[</span><span style="color: #795da3;">uncomplicate.commons.core</span> <span style="color: #a71d5d;">:refer</span> <span style="color: #183691;">[</span>with-release<span style="color: #183691;">]</span><span style="color: #795da3;">]</span>
          '<span style="color: #795da3;">[</span><span style="color: #795da3;">uncomplicate.clojurecl.core</span> <span style="color: #a71d5d;">:as</span> clojurecl<span style="color: #795da3;">]</span><span style="color: #a71d5d;">)</span>
 </pre>
@@ -84,21 +84,21 @@ Let's repeat this simple example from an earlier blog post, <a href="./Clojure-L
 <pre class="example">
 '(#RealGEMatrix(double  mxn:3x3  layout:column  offset:0)
    ▥       ↓       ↓       ↓       ┓
-   →        1.0     1.0     3.0
-   →        0.0    -1.0     1.0
-   →        1.0    -0.0     1.0
+   →       1.00    1.00    3.00
+   →       0.00   -1.00    1.00
+   →       1.00   -0.00    1.00
    ┗                               ┛
  #RealGEMatrix(double  mxn:3x1  layout:column  offset:0)
    ▥       ↓       ┓
-   →       11.0
-   →       -2.0
-   →        9.0
+   →      11.00
+   →      -2.00
+   →       9.00
    ┗               ┛
  #RealGEMatrix(double  mxn:3x1  layout:column  offset:0)
    ▥       ↓       ┓
-   →       17.0
-   →        0.0
-   →       -2.0
+   →      17.00
+   →      -0.00
+   →      -2.00
    ┗               ┛
 )
 </pre>
@@ -157,21 +157,21 @@ instead the default (and the most versatile) general dense matrix <a href="http:
 <pre class="example">
 '(#RealUploMatrix(double  type:tr  mxn:3x3  layout:column  offset:0)
    ▥       ↓       ↓       ↓       ┓
-   →        2.0    *       *
-   →        1.0     5.0    *
-   →        3.0     2.0     1.0
+   →       2.00    *       *
+   →       1.00    5.00    *
+   →       3.00    2.00    1.00
    ┗                               ┛
  #RealGEMatrix(double  mxn:3x1  layout:column  offset:0)
    ▥       ↓       ┓
-   →        6.0
-   →        3.0
-   →        4.0
+   →       6.00
+   →       3.00
+   →       4.00
    ┗               ┛
  #RealGEMatrix(double  mxn:3x1  layout:column  offset:0)
    ▥       ↓       ┓
-   →        3.0
-   →        0.0
-   →       -5.0
+   →       3.00
+   →       0.00
+   →      -5.00
    ┗               ┛
 )
 </pre>
@@ -221,21 +221,21 @@ In this case:
 <pre class="example">
 '(#RealUploMatrix(double  type:tr  mxn:3x3  layout:column  offset:0)
    ▥       ↓       ↓       ↓       ┓
-   →        2.0    *       *
-   →        1.0     5.0    *
-   →        3.0     2.0     1.0
+   →       2.00    *       *
+   →       1.00    5.00    *
+   →       3.00    2.00    1.00
    ┗                               ┛
  #RealGEMatrix(double  mxn:3x4  layout:column  offset:0)
    ▥       ↓       ↓       ↓       ↓       ┓
-   →        6.0     7.0    -3.0     0.0
-   →        3.0     8.0    -1.0     9.0
-   →        4.0     5.0     2.0    -1.0
+   →       6.00    7.00   -3.00    0.00
+   →       3.00    8.00   -1.00    9.00
+   →       4.00    5.00    2.00   -1.00
    ┗                                       ┛
  #RealGEMatrix(double  mxn:3x4  layout:column  offset:0)
    ▥       ↓       ↓       ↓       ↓       ┓
-   →        3.0     3.5    -1.5     0.0
-   →        0.0     0.9     0.1     1.8
-   →       -5.0    -7.3     6.3    -4.6
+   →       3.00    3.50   -1.50    0.00
+   →       0.00    0.90    0.10    1.80
+   →      -5.00   -7.30    6.30   -4.60
    ┗                                       ┛
 )
 </pre>
@@ -352,21 +352,21 @@ pure cousin <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.nean
 <pre class="example">
 '(#RealGEMatrix(double  mxn:3x3  layout:column  offset:0)
    ▥       ↓       ↓       ↓       ┓
-   →        1.0     1.0     3.0
-   →        0.0    -1.0     1.0
-   →        1.0    -0.0     1.0
+   →       1.00    1.00    3.00
+   →       0.00   -1.00    1.00
+   →       1.00   -0.00    1.00
    ┗                               ┛
  #RealUploMatrix(double  type:tr  mxn:3x3  layout:column  offset:0)
    ▥       ↓       ↓       ↓       ┓
    →     ·1·       *       *
-   →        0.0  ·1·       *
-   →        1.0    -0.0  ·1·
+   →       0.00  ·1·       *
+   →       1.00   -0.00  ·1·
    ┗                               ┛
  #RealUploMatrix(double  type:tr  mxn:3x3  layout:column  offset:0)
    ▥       ↓       ↓       ↓       ┓
-   →        1.0     1.0     3.0
-   →       *       -1.0     1.0
-   →       *       *        1.0
+   →       1.00    1.00    3.00
+   →       *      -1.00    1.00
+   →       *       *       1.00
    ┗                               ┛
 )
 </pre>
@@ -418,15 +418,15 @@ Let's do that:
 <pre class="example">
 '(0.017857142857142856 1.0 #RealGEMatrix(double  mxn:3x5  layout:column  offset:0)
    ▥       ↓       ↓       ↓       ↓       ↓       ┓
-   →       17.0    17.0    23.0   -24.0    13.0
-   →        0.0    -5.0   -10.0     6.0   -10.0
-   →       -2.0    -2.0    -2.0     5.0    -1.0
+   →      17.00   17.00   23.00  -24.00   13.00
+   →      -0.00   -5.00  -10.00    6.00  -10.00
+   →      -2.00   -2.00   -2.00    5.00   -1.00
    ┗                                               ┛
  #RealGEMatrix(double  mxn:3x3  layout:column  offset:0)
    ▥       ↓       ↓       ↓       ┓
-   →        5.0     1.0    -4.0
-   →       -1.0    -1.0     1.0
-   →       -1.0     0.0     1.0
+   →       5.00    1.00   -4.00
+   →      -1.00   -1.00    1.00
+   →      -1.00    0.00    1.00
    ┗                               ┛
 )
 </pre>
@@ -479,7 +479,7 @@ Fortunately for you, Neanderthal's functions take this into account, and manage 
 You only have to be aware of the existence of pivoting, because the LU matrix that the procedure returns
 has its rows interchanged! You'll also get access to pivot index (:ipiv key). All other procedures
 accept the <i>pivoted</i> LU. You do not need to convert anything, and in the case that you'd like to
-look at L and U, you can use <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.aux.html#var-laswp.21">laswp!</a> to recover the desired matrix.
+look at L and U, you can use <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.aux.html#var-permute-rows.21">permute-rows!</a> or <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.aux.html#var-swap-rows.21">swap-rows!</a>to recover the desired matrix.
 </p>
 
 <p>

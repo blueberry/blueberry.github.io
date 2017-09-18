@@ -83,11 +83,11 @@ Let's start with the example, but first require the namespaces that we're going 
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span><span style="color: #2F8B58; font-weight: bold;">uncomplicate.neanderthal</span>
-           <span style="color: #909183;">[</span>native <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>dv dge<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
-           <span style="color: #909183;">[</span>core <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>mv mm col axpy copy<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
-           <span style="color: #909183;">[</span>linalg <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>ev! sv! inv!<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
-           <span style="color: #909183;">[</span>math <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>cos sin pi<span style="color: #709870;">]</span><span style="color: #909183;">]</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+<pre class="src src-clojure"><span style="color: #a71d5d;">(</span>require '<span style="color: #795da3;">[</span><span style="color: #795da3;">uncomplicate.neanderthal</span>
+           <span style="color: #183691;">[</span>native <span style="color: #a71d5d;">:refer</span> <span style="color: #183691;">[</span>dv dge<span style="color: #183691;">]</span><span style="color: #183691;">]</span>
+           <span style="color: #183691;">[</span>core <span style="color: #a71d5d;">:refer</span> <span style="color: #183691;">[</span>mv mm col axpy copy<span style="color: #183691;">]</span><span style="color: #183691;">]</span>
+           <span style="color: #183691;">[</span>linalg <span style="color: #a71d5d;">:refer</span> <span style="color: #183691;">[</span>ev! sv! trf tri<span style="color: #183691;">]</span><span style="color: #183691;">]</span>
+           <span style="color: #183691;">[</span>math <span style="color: #a71d5d;">:refer</span> <span style="color: #183691;">[</span>cos sin pi<span style="color: #183691;">]</span><span style="color: #183691;">]</span><span style="color: #795da3;">]</span><span style="color: #a71d5d;">)</span>
 </pre>
 </div>
 
@@ -103,21 +103,22 @@ and then form a matrix whose columns are those images. Easy!
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #7388d6;">[</span>t! <span style="color: #909183;">(</span><span style="color: #A52A2A; font-weight: bold;">fn</span> <span style="color: #709870;">[</span>v<span style="color: #709870;">]</span>
-           <span style="color: #709870;">(</span>v 0 <span style="color: #907373;">(</span>+ <span style="color: #6276ba;">(</span>* 2 <span style="color: #858580;">(</span>v 0<span style="color: #858580;">)</span><span style="color: #6276ba;">)</span> <span style="color: #6276ba;">(</span>v 1<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span><span style="color: #709870;">)</span>
-           <span style="color: #709870;">(</span>v 1 <span style="color: #907373;">(</span>* 3 <span style="color: #6276ba;">(</span>v 1<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span>
-      a <span style="color: #909183;">(</span>dge 2 2 <span style="color: #709870;">[</span>1 0 0 1<span style="color: #709870;">]</span><span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
-  <span style="color: #7388d6;">(</span>t! <span style="color: #909183;">(</span>col a 0<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
-  <span style="color: #7388d6;">(</span>t! <span style="color: #909183;">(</span>col a 1<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
-  a<span style="color: #707183;">)</span>
+<pre class="src src-clojure"><span style="color: #a71d5d;">(</span><span style="color: #a71d5d;">let</span> <span style="color: #795da3;">[</span>t! <span style="color: #183691;">(</span><span style="color: #a71d5d;">fn</span> <span style="color: #183691;">[</span>v<span style="color: #183691;">]</span>
+           <span style="color: #183691;">(</span>v 0 <span style="color: #795da3;">(</span>+ <span style="color: #0086b3;">(</span>* 2 <span style="color: #ed6a43;">(</span>v 0<span style="color: #ed6a43;">)</span><span style="color: #0086b3;">)</span> <span style="color: #0086b3;">(</span>v 1<span style="color: #0086b3;">)</span><span style="color: #795da3;">)</span><span style="color: #183691;">)</span>
+           <span style="color: #183691;">(</span>v 1 <span style="color: #795da3;">(</span>* 3 <span style="color: #0086b3;">(</span>v 1<span style="color: #0086b3;">)</span><span style="color: #795da3;">)</span><span style="color: #183691;">)</span><span style="color: #183691;">)</span>
+      a <span style="color: #183691;">(</span>dge 2 2 <span style="color: #183691;">[</span>1 0 0 1<span style="color: #183691;">]</span><span style="color: #183691;">)</span><span style="color: #795da3;">]</span>
+  <span style="color: #795da3;">(</span>t! <span style="color: #183691;">(</span>col a 0<span style="color: #183691;">)</span><span style="color: #795da3;">)</span>
+  <span style="color: #795da3;">(</span>t! <span style="color: #183691;">(</span>col a 1<span style="color: #183691;">)</span><span style="color: #795da3;">)</span>
+  a<span style="color: #a71d5d;">)</span>
 </pre>
 </div>
 
 <pre class="example">
-#RealGEMatrix[double, mxn:2x2, order:column, offset:0, ld:2]
-
-  2.00   1.00
-  0.00   3.00
+#RealGEMatrix[double, mxn:2x2, layout:column, offset:0]
+   ▥       ↓       ↓       ┓
+   →       2.00    1.00
+   →       0.00    3.00
+   ┗                       ┛
 
 </pre>
 
@@ -190,23 +191,24 @@ the rotation through an angle \(\pi/2\) about the point \(P(5,4)\).
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #7388d6;">[</span>t1 <span style="color: #909183;">(</span><span style="color: #A52A2A; font-weight: bold;">fn</span> <span style="color: #709870;">[</span>p<span style="color: #709870;">]</span> <span style="color: #709870;">(</span>dge 3 3 <span style="color: #907373;">[</span>1 0 0 0 1 0 <span style="color: #6276ba;">(</span>- <span style="color: #858580;">(</span>p 0<span style="color: #858580;">)</span><span style="color: #6276ba;">)</span> <span style="color: #6276ba;">(</span>- <span style="color: #858580;">(</span>p 1<span style="color: #858580;">)</span><span style="color: #6276ba;">)</span> 1<span style="color: #907373;">]</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span>
-      r <span style="color: #909183;">(</span><span style="color: #A52A2A; font-weight: bold;">fn</span> <span style="color: #709870;">[</span>theta<span style="color: #709870;">]</span>
-          <span style="color: #709870;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #907373;">[</span>c <span style="color: #6276ba;">(</span>cos theta<span style="color: #6276ba;">)</span>
-                s <span style="color: #6276ba;">(</span>sin theta<span style="color: #6276ba;">)</span><span style="color: #907373;">]</span>
-            <span style="color: #907373;">(</span>dge 3 3 <span style="color: #6276ba;">[</span>c s 0 <span style="color: #858580;">(</span>- s<span style="color: #858580;">)</span> c 0 0 0 1<span style="color: #6276ba;">]</span><span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span>
-      t2 <span style="color: #909183;">(</span><span style="color: #A52A2A; font-weight: bold;">fn</span> <span style="color: #709870;">[</span>p<span style="color: #709870;">]</span> <span style="color: #709870;">(</span>dge 3 3 <span style="color: #907373;">[</span>1 0 0 0 1 0 <span style="color: #6276ba;">(</span>p 0<span style="color: #6276ba;">)</span> <span style="color: #6276ba;">(</span>p 1<span style="color: #6276ba;">)</span> 1<span style="color: #907373;">]</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span>
-      t2rt1 <span style="color: #909183;">(</span><span style="color: #A52A2A; font-weight: bold;">fn</span> <span style="color: #709870;">[</span>p theta<span style="color: #709870;">]</span> <span style="color: #709870;">(</span>mm <span style="color: #907373;">(</span>t2 p<span style="color: #907373;">)</span> <span style="color: #907373;">(</span>r theta<span style="color: #907373;">)</span> <span style="color: #907373;">(</span>t1 p<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
-  <span style="color: #7388d6;">(</span>t2rt1 <span style="color: #909183;">(</span>dv 5 4<span style="color: #909183;">)</span> <span style="color: #909183;">(</span>/ pi 2<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<pre class="src src-clojure"><span style="color: #a71d5d;">(</span><span style="color: #a71d5d;">let</span> <span style="color: #795da3;">[</span>t1 <span style="color: #183691;">(</span><span style="color: #a71d5d;">fn</span> <span style="color: #183691;">[</span>p<span style="color: #183691;">]</span> <span style="color: #183691;">(</span>dge 3 3 <span style="color: #795da3;">[</span>1 0 0 0 1 0 <span style="color: #0086b3;">(</span>- <span style="color: #ed6a43;">(</span>p 0<span style="color: #ed6a43;">)</span><span style="color: #0086b3;">)</span> <span style="color: #0086b3;">(</span>- <span style="color: #ed6a43;">(</span>p 1<span style="color: #ed6a43;">)</span><span style="color: #0086b3;">)</span> 1<span style="color: #795da3;">]</span><span style="color: #183691;">)</span><span style="color: #183691;">)</span>
+      r <span style="color: #183691;">(</span><span style="color: #a71d5d;">fn</span> <span style="color: #183691;">[</span>theta<span style="color: #183691;">]</span>
+          <span style="color: #183691;">(</span><span style="color: #a71d5d;">let</span> <span style="color: #795da3;">[</span>c <span style="color: #0086b3;">(</span>cos theta<span style="color: #0086b3;">)</span>
+                s <span style="color: #0086b3;">(</span>sin theta<span style="color: #0086b3;">)</span><span style="color: #795da3;">]</span>
+            <span style="color: #795da3;">(</span>dge 3 3 <span style="color: #0086b3;">[</span>c s 0 <span style="color: #ed6a43;">(</span>- s<span style="color: #ed6a43;">)</span> c 0 0 0 1<span style="color: #0086b3;">]</span><span style="color: #795da3;">)</span><span style="color: #183691;">)</span><span style="color: #183691;">)</span>
+      t2 <span style="color: #183691;">(</span><span style="color: #a71d5d;">fn</span> <span style="color: #183691;">[</span>p<span style="color: #183691;">]</span> <span style="color: #183691;">(</span>dge 3 3 <span style="color: #795da3;">[</span>1 0 0 0 1 0 <span style="color: #0086b3;">(</span>p 0<span style="color: #0086b3;">)</span> <span style="color: #0086b3;">(</span>p 1<span style="color: #0086b3;">)</span> 1<span style="color: #795da3;">]</span><span style="color: #183691;">)</span><span style="color: #183691;">)</span>
+      t2rt1 <span style="color: #183691;">(</span><span style="color: #a71d5d;">fn</span> <span style="color: #183691;">[</span>p theta<span style="color: #183691;">]</span> <span style="color: #183691;">(</span>mm <span style="color: #795da3;">(</span>t2 p<span style="color: #795da3;">)</span> <span style="color: #795da3;">(</span>r theta<span style="color: #795da3;">)</span> <span style="color: #795da3;">(</span>t1 p<span style="color: #795da3;">)</span><span style="color: #183691;">)</span><span style="color: #183691;">)</span><span style="color: #795da3;">]</span>
+  <span style="color: #795da3;">(</span>t2rt1 <span style="color: #183691;">(</span>dv 5 4<span style="color: #183691;">)</span> <span style="color: #183691;">(</span>/ pi 2<span style="color: #183691;">)</span><span style="color: #795da3;">)</span><span style="color: #a71d5d;">)</span>
 </pre>
 </div>
 
 <pre class="example">
-#RealGEMatrix[double, mxn:3x3, order:column, offset:0, ld:3]
-
-  0.00  -1.00   9.00
-  1.00   0.00  -1.00
-  0.00   0.00   1.00
+#RealGEMatrix[double, mxn:3x3, layout:column, offset:0]
+   ▥       ↓       ↓       ↓       ┓
+   →       0.00   -1.00    9.00
+   →       1.00    0.00   -1.00
+   →       0.00    0.00    1.00
+   ┗                               ┛
 
 </pre>
 </div>
@@ -246,20 +248,21 @@ See <a href="./Clojure-Linear-Algebra-Refresher-Eigenvalues-Eigenvectors">Clojur
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #7388d6;">[</span>a <span style="color: #909183;">(</span>dge 3 3 <span style="color: #709870;">[</span>1 0 1 2 -1 1 3 1 4<span style="color: #709870;">]</span><span style="color: #909183;">)</span>
-            eigenvectors <span style="color: #909183;">(</span>dge 3 3<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
-        <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">lambdas</span> <span style="color: #909183;">(</span>ev! a <span style="color: #F5666D;">nil</span> eigenvectors<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
-        <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">eigen</span> eigenvectors<span style="color: #7388d6;">)</span>
-        eigenvectors<span style="color: #707183;">)</span>
+<pre class="src src-clojure"><span style="color: #a71d5d;">(</span><span style="color: #a71d5d;">let</span> <span style="color: #795da3;">[</span>a <span style="color: #183691;">(</span>dge 3 3 <span style="color: #183691;">[</span>1 0 1 2 -1 1 3 1 4<span style="color: #183691;">]</span><span style="color: #183691;">)</span>
+            eigenvectors <span style="color: #183691;">(</span>dge 3 3<span style="color: #183691;">)</span><span style="color: #795da3;">]</span>
+        <span style="color: #795da3;">(</span><span style="color: #a71d5d;">def</span> <span style="color: #ed6a43;">lambdas</span> <span style="color: #183691;">(</span>ev! a <span style="color: #0086b3;">nil</span> eigenvectors<span style="color: #183691;">)</span><span style="color: #795da3;">)</span>
+        <span style="color: #795da3;">(</span><span style="color: #a71d5d;">def</span> <span style="color: #ed6a43;">eigen</span> eigenvectors<span style="color: #795da3;">)</span>
+        eigenvectors<span style="color: #a71d5d;">)</span>
 </pre>
 </div>
 
 <pre class="example">
-#RealGEMatrix[double, mxn:3x3, order:column, offset:0, ld:3]
-
- -0.64  -0.96   0.71
- -0.13   0.19  -0.71
- -0.76   0.19   0.00
+#RealGEMatrix[double, mxn:3x3, layout:column, offset:0]
+   ▥       ↓       ↓       ↓       ┓
+   →      -0.64   -0.96    0.71
+   →      -0.13    0.19   -0.71
+   →      -0.76    0.19    0.00
+   ┗                               ┛
 
 </pre>
 
@@ -273,11 +276,12 @@ Let's see whether any of these eigenvectors is our solution.
 </div>
 
 <pre class="example">
-#RealGEMatrix[double, mxn:3x2, order:column, offset:0, ld:3]
-
-  5.00   0.00
- -0.00   0.00
- -1.00   0.00
+#RealGEMatrix[double, mxn:3x2, layout:column, offset:0]
+   ▥       ↓       ↓       ┓
+   →       5.00    0.00
+   →      -0.00    0.00
+   →      -1.00    0.00
+   ┗                       ┛
 
 </pre>
 
@@ -287,7 +291,7 @@ one-dimensional subspace of \(R^n\) that is the kernel we were looking for.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span>seq <span style="color: #7388d6;">(</span>col eigen 1<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<pre class="src src-clojure"><span style="color: #a71d5d;">(</span>seq <span style="color: #795da3;">(</span>col eigen 1<span style="color: #795da3;">)</span><span style="color: #a71d5d;">)</span>
 </pre>
 </div>
 
@@ -343,17 +347,17 @@ the <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #7388d6;">[</span>a <span style="color: #909183;">(</span>dge 3 3 <span style="color: #709870;">[</span>1 0 1 1 -1 1 3 1 4<span style="color: #709870;">]</span><span style="color: #909183;">)</span>
-      b <span style="color: #909183;">(</span>dge 3 1 <span style="color: #709870;">[</span>11 -2 9<span style="color: #709870;">]</span><span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
-  <span style="color: #7388d6;">(</span>sv! a b<span style="color: #7388d6;">)</span>
-  <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">a-solution</span> <span style="color: #909183;">(</span>col b 0<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
-  a-solution<span style="color: #707183;">)</span>
+<pre class="src src-clojure"><span style="color: #a71d5d;">(</span><span style="color: #a71d5d;">let</span> <span style="color: #795da3;">[</span>a <span style="color: #183691;">(</span>dge 3 3 <span style="color: #183691;">[</span>1 0 1 1 -1 1 3 1 4<span style="color: #183691;">]</span><span style="color: #183691;">)</span>
+      b <span style="color: #183691;">(</span>dge 3 1 <span style="color: #183691;">[</span>11 -2 9<span style="color: #183691;">]</span><span style="color: #183691;">)</span><span style="color: #795da3;">]</span>
+  <span style="color: #795da3;">(</span>sv! a b<span style="color: #795da3;">)</span>
+  <span style="color: #795da3;">(</span><span style="color: #a71d5d;">def</span> <span style="color: #ed6a43;">a-solution</span> <span style="color: #183691;">(</span>col b 0<span style="color: #183691;">)</span><span style="color: #795da3;">)</span>
+  a-solution<span style="color: #a71d5d;">)</span>
 </pre>
 </div>
 
 <pre class="example">
 #RealBlockVector[double, n:3, offset: 0, stride:1]
-[ 17.00   0.00  -2.00 ]
+[  17.00   -0.00   -2.00 ]
 
 </pre>
 
@@ -363,16 +367,16 @@ all solution to this system:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #7388d6;">[</span>z <span style="color: #909183;">(</span>col eigen 1<span style="color: #909183;">)</span>
-      x1 a-solution<span style="color: #7388d6;">]</span>
-  <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">y</span> <span style="color: #909183;">[</span>r<span style="color: #909183;">]</span> <span style="color: #909183;">(</span>axpy r z x1<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
-<span style="color: #707183;">(</span>y 1.33<span style="color: #707183;">)</span>
+<pre class="src src-clojure"><span style="color: #a71d5d;">(</span><span style="color: #a71d5d;">let</span> <span style="color: #795da3;">[</span>z <span style="color: #183691;">(</span>col eigen 1<span style="color: #183691;">)</span>
+      x1 a-solution<span style="color: #795da3;">]</span>
+  <span style="color: #795da3;">(</span><span style="color: #a71d5d;">defn</span> <span style="color: #795da3;">y</span> <span style="color: #183691;">[</span>r<span style="color: #183691;">]</span> <span style="color: #183691;">(</span>axpy r z x1<span style="color: #183691;">)</span><span style="color: #795da3;">)</span><span style="color: #a71d5d;">)</span>
+<span style="color: #a71d5d;">(</span>y 1.33<span style="color: #a71d5d;">)</span>
 </pre>
 </div>
 
 <pre class="example">
-#'user/y#RealBlockVector[double, n:3, offset: 0, stride:1]
-[ 15.72   0.26  -1.74 ]
+#'user2/y#RealBlockVector[double, n:3, offset: 0, stride:1]
+[  15.72    0.26   -1.74 ]
 
 </pre>
 
@@ -386,19 +390,19 @@ in one sweep:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #7388d6;">[</span>a <span style="color: #909183;">(</span>dge 3 3 <span style="color: #709870;">[</span>1 0 1 1 -1 1 3 1 4<span style="color: #709870;">]</span><span style="color: #909183;">)</span>
-      b <span style="color: #909183;">(</span>dge 3 4 <span style="color: #709870;">[</span>11 -2 9 3 -2 1 4 5 -6 -1 0 1<span style="color: #709870;">]</span><span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
-  <span style="color: #7388d6;">(</span>sv! a b<span style="color: #7388d6;">)</span>
-  b<span style="color: #707183;">)</span>
+<pre class="src src-clojure"><span style="color: #a71d5d;">(</span><span style="color: #a71d5d;">let</span> <span style="color: #795da3;">[</span>a <span style="color: #183691;">(</span>dge 3 3 <span style="color: #183691;">[</span>1 0 1 1 -1 1 3 1 4<span style="color: #183691;">]</span><span style="color: #183691;">)</span>
+      b <span style="color: #183691;">(</span>dge 3 4 <span style="color: #183691;">[</span>11 -2 9 3 -2 1 4 5 -6 -1 0 1<span style="color: #183691;">]</span><span style="color: #183691;">)</span><span style="color: #795da3;">]</span>
+  <span style="color: #795da3;">(</span>sv! a b<span style="color: #795da3;">)</span><span style="color: #a71d5d;">)</span>
 </pre>
 </div>
 
 <pre class="example">
-#RealGEMatrix[double, mxn:3x4, order:column, offset:0, ld:3]
-
- 17.00   9.00  49.00  -9.00
-  0.00   0.00 -15.00   2.00
- -2.00  -2.00 -10.00   2.00
+#RealGEMatrix[double, mxn:3x4, layout:column, offset:0]
+   ▥       ↓       ↓       ↓       ↓       ┓
+   →      17.00    9.00   49.00   -9.00
+   →      -0.00   -0.00  -15.00    2.00
+   →      -2.00   -2.00  -10.00    2.00
+   ┗                                       ┛
 
 </pre>
 
@@ -481,16 +485,16 @@ are the columns of the first basis! (example 4, page 294, from the textbook):
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #7388d6;">[</span>b <span style="color: #909183;">(</span>dge 2 2 <span style="color: #709870;">[</span>1 2 3 -1<span style="color: #709870;">]</span><span style="color: #909183;">)</span>
-      b' <span style="color: #909183;">(</span>dge 2 2 <span style="color: #709870;">[</span>1 0 0 1<span style="color: #709870;">]</span><span style="color: #909183;">)</span>
-      p <span style="color: #909183;">(</span>copy b<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
-  <span style="color: #7388d6;">(</span>mv p <span style="color: #909183;">(</span>dv 3 4<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<pre class="src src-clojure"><span style="color: #a71d5d;">(</span><span style="color: #a71d5d;">let</span> <span style="color: #795da3;">[</span>b <span style="color: #183691;">(</span>dge 2 2 <span style="color: #183691;">[</span>1 2 3 -1<span style="color: #183691;">]</span><span style="color: #183691;">)</span>
+      b' <span style="color: #183691;">(</span>dge 2 2 <span style="color: #183691;">[</span>1 0 0 1<span style="color: #183691;">]</span><span style="color: #183691;">)</span>
+      p <span style="color: #183691;">(</span>copy b<span style="color: #183691;">)</span><span style="color: #795da3;">]</span>
+  <span style="color: #795da3;">(</span>mv p <span style="color: #183691;">(</span>dv 3 4<span style="color: #183691;">)</span><span style="color: #795da3;">)</span><span style="color: #a71d5d;">)</span>
 </pre>
 </div>
 
 <pre class="example">
 #RealBlockVector[double, n:2, offset: 0, stride:1]
-[ 15.00   2.00 ]
+[  15.00    2.00 ]
 
 </pre>
 
@@ -506,17 +510,17 @@ Here's example 5 (page 295) from the textbook worked out in Clojure code:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #7388d6;">[</span>p <span style="color: #909183;">(</span>dge 2 2 <span style="color: #709870;">[</span>1 2 3 -1<span style="color: #709870;">]</span><span style="color: #909183;">)</span>
-      p' <span style="color: #909183;">(</span>dge 2 2 <span style="color: #709870;">[</span>3 1 5 2<span style="color: #709870;">]</span><span style="color: #909183;">)</span>
-      p-1 <span style="color: #909183;">(</span>inv! <span style="color: #709870;">(</span>copy p<span style="color: #709870;">)</span><span style="color: #909183;">)</span>
-      p'-1 <span style="color: #909183;">(</span>inv! <span style="color: #709870;">(</span>copy p'<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
-  <span style="color: #7388d6;">(</span>mv <span style="color: #909183;">(</span>mm p'-1 p<span style="color: #909183;">)</span> <span style="color: #909183;">(</span>dv 2 1<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<pre class="src src-clojure"><span style="color: #a71d5d;">(</span><span style="color: #a71d5d;">let</span> <span style="color: #795da3;">[</span>p <span style="color: #183691;">(</span>dge 2 2 <span style="color: #183691;">[</span>1 2 3 -1<span style="color: #183691;">]</span><span style="color: #183691;">)</span>
+      p' <span style="color: #183691;">(</span>dge 2 2 <span style="color: #183691;">[</span>3 1 5 2<span style="color: #183691;">]</span><span style="color: #183691;">)</span>
+      p-1 <span style="color: #183691;">(</span>tri <span style="color: #183691;">(</span>trf p<span style="color: #183691;">)</span><span style="color: #183691;">)</span>
+      p'-1 <span style="color: #183691;">(</span>tri <span style="color: #183691;">(</span>trf p'<span style="color: #183691;">)</span><span style="color: #183691;">)</span><span style="color: #795da3;">]</span>
+  <span style="color: #795da3;">(</span>mv <span style="color: #183691;">(</span>mm p'-1 p<span style="color: #183691;">)</span> <span style="color: #183691;">(</span>dv 2 1<span style="color: #183691;">)</span><span style="color: #795da3;">)</span><span style="color: #a71d5d;">)</span>
 </pre>
 </div>
 
 <pre class="example">
 #RealBlockVector[double, n:2, offset: 0, stride:1]
-[ -5.00   4.00 ]
+[  -5.00    4.00 ]
 
 </pre>
 
