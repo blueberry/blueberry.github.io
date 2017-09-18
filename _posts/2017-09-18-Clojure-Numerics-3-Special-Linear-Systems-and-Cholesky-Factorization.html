@@ -1,0 +1,394 @@
+---
+date: 2017-09-18
+tags:
+- Cholesky Factorization
+- linear systems
+- Neanderthal
+- Clojure
+- linear algebra
+- dense
+- positive definite
+- symmetric
+author: dragan
+layout: post
+title: Clojure Numerics, Part 3 - Special Linear Systems and Cholesky Factorization
+excerpt: In the last article we have learned to solve general linear systems, assuming that the matrix of coefficients is square, dense, and unstructured. We have also seen how computing the solution is much faster and easier when we know that the matrix is triangular. These are pretty general assumptions, so we are able to solve any well-defined system. We now explore how additional knowledge about the system can be applied to make it faster. The properties that we are looking for are symmetry, definiteness, and bandedness.
+categories:
+- Neanderthal
+- Clojure
+- linear algebra
+---
+<p>
+In the <a href="./Clojure-Numerics-2-General-Linear-Systems-and-LU-Factorization">last article</a> we have learned to solve general linear systems, assuming that the matrix of coefficients
+is square, dense, and unstructured. We have also seen how computing the solution is much faster and easier
+when we know that the matrix is triangular. These are pretty general assumptions, so we are able to
+solve any well-defined system. We now explore how additional knowledge about the system can be applied to
+make it faster. The properties that we are looking for are symmetry, definiteness, and bandedness.
+</p>
+
+<p>
+Before I continue, a few reminders:
+</p>
+<ul class="org-ul">
+<li>Include <a href="http://neanderthal.uncomplicate.org">Neanderthal library</a> in your project to be able to use ready-made high-performance linear algebra functions.</li>
+<li>Read articles in the introductory <a href="./Clojure-Linear-Algebra-Refresher-Vector-Spaces">Clojure Linear Algebra Refresher</a> series.</li>
+<li>This is the third article in a more advanced series. The first two are <a href="./Clojure-Numerics-1-Use-Matrices-Efficiently">Clojure Numerics 1: Use Matrices Efficiently</a> and <a href="./Clojure-Numerics-2-General-Linear-Systems-and-LU-Factorization">General Linear Systems and LU Factorization</a>.</li>
+</ul>
+
+<p>
+The namespaces we'll use:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #a71d5d;">(</span>require '<span style="color: #795da3;">[</span><span style="color: #795da3;">uncomplicate.neanderthal</span>
+           <span style="color: #183691;">[</span>native <span style="color: #a71d5d;">:refer</span> <span style="color: #183691;">[</span>dge dsy dsb dsp<span style="color: #183691;">]</span><span style="color: #183691;">]</span>
+           <span style="color: #183691;">[</span>linalg <span style="color: #a71d5d;">:refer</span> <span style="color: #183691;">[</span>trf trs<span style="color: #183691;">]</span><span style="color: #183691;">]</span><span style="color: #795da3;">]</span><span style="color: #a71d5d;">)</span>
+</pre>
+</div>
+
+<div id="outline-container-org3051890" class="outline-2">
+<h2 id="org3051890">Symmetry</h2>
+<div class="outline-text-2" id="text-org3051890">
+<p>
+Recall from the <a href="./Clojure-Numerics-2-General-Linear-Systems-and-LU-Factorization">last article</a> that a general square system is solved by first doing LU factorization
+to destructure the system to two triangular forms (L and U), and then solve those two triangular systems
+(\(Ly=b\), then \(Ux=y\)). To fight with inherent instability of floating-point computations (as a non-perfect
+approximation of "ideal" real numbers), the algorithm does pivoting and row interchange. It is not
+a burden only because of the additional stuff (pivots) to carry around, but also because it
+requires additional memory reading and writing (we remember that this is more expensive that mere FLOPS).
+That's why we would like to use computational shortcuts that do less pivoting, or no pivoting at all.
+</p>
+
+<p>
+One such shortcut is that if \(A\) is symmetric and has an LU factorization, \(U\) is a row scaling of \(L^T\).
+More precisely, \(A=LDL^T\) where \(D\) is a diagonal matrix. Since the system is symmetrical, \(A=UDU^T\), too.
+From theoretical perspective, it might not make much difference, but in implementation it is important.
+If the symmetric matrix data is stored in the lower triangle, that triangle will be (re)reused for storing
+the factorization. Likewise for upper symmetric matrix. Those two are equal but are obviously not the
+same (<code>=</code> vs <code>identical?</code> in Clojure).
+</p>
+
+<p>
+It is simpler to do with Neanderthal than it looks from the previous description. Practically, there is nothing
+required of you, but to create a symmetric matrix. When you call the usual factorization and solver
+functions, this will be taken care of automatically.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #a71d5d;">(</span><span style="color: #a71d5d;">let</span> <span style="color: #795da3;">[</span>a <span style="color: #183691;">(</span>dsy 3 <span style="color: #183691;">[</span>3
+                5 3
+                -2 2 0<span style="color: #183691;">]</span>
+             <span style="color: #183691;">{</span><span style="color: #a71d5d;">:layout</span> <span style="color: #a71d5d;">:row</span> <span style="color: #a71d5d;">:uplo</span> <span style="color: #a71d5d;">:lower</span><span style="color: #183691;">}</span><span style="color: #183691;">)</span>
+      fact <span style="color: #183691;">(</span>trf a<span style="color: #183691;">)</span>
+      b <span style="color: #183691;">(</span>dge 3 2 <span style="color: #183691;">[</span>-1 4
+                  0.5 0
+                  2 -1<span style="color: #183691;">]</span>
+             <span style="color: #183691;">{</span><span style="color: #a71d5d;">:layout</span> <span style="color: #a71d5d;">:row</span><span style="color: #183691;">}</span><span style="color: #183691;">)</span><span style="color: #795da3;">]</span>
+  <span style="color: #795da3;">[</span>a fact <span style="color: #183691;">(</span>trs fact b<span style="color: #183691;">)</span><span style="color: #795da3;">]</span><span style="color: #a71d5d;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+'(#RealUploMatrix(double  type:sy  mxn:3x3  layout:row  offset:0)
+   ▤       ↓       ↓       ↓       ┓
+   →       3.00    *       *
+   →       5.00    3.00    *
+   →      -2.00    2.00    0.00
+   ┗                               ┛
+ #uncomplicate.neanderthal.internal.common.LUFactorization(:lu #RealUploMatrix(double  type:sy  mxn:3x3  layout:row  offset:0)
+   ▤       ↓       ↓       ↓       ┓
+   →       3.00    *       *
+   →       5.00    3.00    *
+   →       1.00   -1.00    4.00
+   ┗                               ┛
+  :ipiv #IntegerBlockVector(int  n:3  offset: 0  stride:1)(-2 -2 3)  :master true  :fresh #atom(true 0x6a306829)) #RealGEMatrix(double  mxn:3x2  layout:row  offset:0)
+   ▤       ↓       ↓       ┓
+   →      -0.53    0.50
+   →       0.47    0.00
+   →       0.88   -1.25
+   ┗                       ┛
+)
+</pre>
+
+<p>
+As you can see, it's all the same as for general dense matrices, with Neanderthal taking care to preserve
+the optimized symmetrical structure of <code>:lu</code>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org6a60829" class="outline-2">
+<h2 id="org6a60829">Positive definite systems and Cholesky factorization</h2>
+<div class="outline-text-2" id="text-org6a60829">
+<p>
+The previous shortcut is cute, but nothing to write home about. Fortunately, there is a <i>much</i> better
+optimization available for a special subset of symmetric matrices - those that are positive definite.
+</p>
+
+<p>
+A matrix \(A\in{R^{n\times{n}}}\) is <i>positive definite</i> if \(x^TAx>0\) for all nonzero \(x\in{R^n}\),
+positive <i>semidefinite</i> if \(x^TAx\geq{0}\), and positive <i>indefinite</i> if there are \(x_1,x_2\in{R^n}\)
+such that \((x_1^TAx_1)(x_2^TAx_2)<0\). Huh? So, is <i>my</i> system positive definite? How would I know that?
+</p>
+
+<p>
+Before I show you that, let me tell you that the reason why <i>symmetric positive definite</i> matrices
+are handy is that for them, there is a special factorization available - Cholesky factorization -
+which <i>preserves symmetry and definiteness</i>. Now, it turns out that discovering whether a
+matrix is positive definite is not easy. That's why I will not try to explain here how to do that,
+nor it would help you in practical work. The important (and fortunate) thing is that you don't
+have to care; Neanderthal will determine that automatically, and return the Cholesky factorization
+if possible. If not, it will return the \(LDL^T\) (or \(UDU^T\))!
+</p>
+
+<p>
+Let's see how to do this in Clojure:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #a71d5d;">(</span><span style="color: #a71d5d;">let</span> <span style="color: #795da3;">[</span>a <span style="color: #183691;">(</span>dsy 3 <span style="color: #183691;">[</span>1
+                1 2
+                1 2 3<span style="color: #183691;">]</span>
+             <span style="color: #183691;">{</span><span style="color: #a71d5d;">:layout</span> <span style="color: #a71d5d;">:row</span> <span style="color: #a71d5d;">:uplo</span> <span style="color: #a71d5d;">:lower</span><span style="color: #183691;">}</span><span style="color: #183691;">)</span>
+      fact <span style="color: #183691;">(</span>trf a<span style="color: #183691;">)</span>
+      b <span style="color: #183691;">(</span>dge 3 2 <span style="color: #183691;">[</span>-1 4
+                  0.5 0
+                  2 -1<span style="color: #183691;">]</span>
+             <span style="color: #183691;">{</span><span style="color: #a71d5d;">:layout</span> <span style="color: #a71d5d;">:row</span><span style="color: #183691;">}</span><span style="color: #183691;">)</span><span style="color: #795da3;">]</span>
+  <span style="color: #795da3;">[</span>a fact <span style="color: #183691;">(</span>trs fact b<span style="color: #183691;">)</span><span style="color: #795da3;">]</span><span style="color: #a71d5d;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+'(#RealUploMatrix(double  type:sy  mxn:3x3  layout:row  offset:0)
+   ▤       ↓       ↓       ↓       ┓
+   →       1.00    *       *
+   →       1.00    2.00    *
+   →       1.00    2.00    3.00
+   ┗                               ┛
+ #uncomplicate.neanderthal.internal.common.PivotlessLUFactorization(:lu #RealUploMatrix(double  type:sy  mxn:3x3  layout:row  offset:0)
+   ▤       ↓       ↓       ↓       ┓
+   →       1.00    *       *
+   →       1.00    1.00    *
+   →       1.00    1.00    1.00
+   ┗                               ┛
+  :master true  :fresh #atom(true 0x8cf263e)) #RealGEMatrix(double  mxn:3x2  layout:row  offset:0)
+   ▤       ↓       ↓       ┓
+   →      -2.50    8.00
+   →       0.00   -3.00
+   →       1.50   -1.00
+   ┗                       ┛
+)
+</pre>
+
+<p>
+Notice how the code is virtually the same as in the previous example. The only thing that is different
+is the <i>data</i>. In this example, Neanderthal could do the Cholesky factorization, instead of more expensive
+LU with symmetric pivoting. Later it adapted the solver to use the available factorization for solving
+the linear equation, but everything went automatically.
+</p>
+
+<p>
+In fact, Cholesky factorization is a variant of LU, just like \(LDL^T\) is. The difference is that
+L and U in Cholesky are \(G\) and \(G^T\). Notice: L is G, U is a transpose of G, and there is no
+need for the D in the middle. Also, no pivoting is necessary, which makes Cholesky quite nice;
+compact and efficient.
+</p>
+
+<p>
+There are more subtle controls related to this in Neanderthal; look at the treasure trove of
+API documentation and tests. Writing these blog posts takes time and energy, and now I don't feel
+like taking too much time delving more into details related to this. :)
+</p>
+
+<p>
+Of course, <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#var-sv">sv</a> is also available, as well as destructive variants of the functions I've shown, and with them,
+too, you can rely on Neanderthal to select the appropriate algorithm automatically.
+I didn't show those here because that is used virtually in the same way as in the examples I've shown in
+previous articles. Let it be a nice easy exercise to try them on your own.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org090f04c" class="outline-2">
+<h2 id="org090f04c">Banded Systems</h2>
+<div class="outline-text-2" id="text-org090f04c">
+<p>
+Are there more optimizations? Sure! One of them is for <i>banded systems</i>. A matrix is <i>banded</i> when
+all of its zero elements are concentrated in a narrow (relative to the whole matrix) band around the
+diagonal. Of course, the implementation does not care how narrow: even completely dense matrix could be stored as
+banded in a sense that the band covers the whole matrix. However, for the implementation to
+have more performance instead of much less, the band should not be too obese. For example,
+if the matrix is in \(R^{100\times{100}}\) a band 5 diagonals wide is obviously exploitable, while the
+band 50 elements wide is probably not (but test that yourself for your use cases).
+</p>
+
+<p>
+Now, the cool thing is that the stuff I've shown you for the general, triangular, and symmetric
+matrices also work with banded matrices:
+</p>
+
+<ul class="org-ul">
+<li>The most desirable case is triangular banded matrix, since it does not need to be factorized at all</li>
+<li>Then, if the matrix is symmetric banded, Neanderthal offers Cholesky if possible, with the LU fallback.</li>
+<li>And, for general banded matrices, it does the banded LU.</li>
+</ul>
+
+<p>
+The best of all, it's all automatic (I'm only showing the symmetric case here):
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #a71d5d;">(</span><span style="color: #a71d5d;">let</span> <span style="color: #795da3;">[</span>a <span style="color: #183691;">(</span>dsb 9 3 <span style="color: #183691;">[</span>1.0 1.0 1.0 1.0
+                  2.0 2.0 2.0 1.0
+                  3.0 3.0 2.0 1.0
+                  4.0 3.0 2.0 1.0
+                  4.0 3.0 2.0 1.0
+                  4.0 3.0 2.0 1.0
+                  4.0 3.0 2.0
+                  4.0 3.0
+                  4.0<span style="color: #183691;">]</span><span style="color: #183691;">)</span>
+      fact <span style="color: #183691;">(</span>trf a<span style="color: #183691;">)</span>
+      b <span style="color: #183691;">(</span>dge 9 3 <span style="color: #183691;">[</span>4.0  0.0  1.0
+                  8.0  0.0  1.0
+                  12.0  0.0  0.0
+                  16.0  0.0  1.0
+                  16.0  0.0  0.0
+                  16.0  0.0 -1.0
+                  15.0  1.0  0.0
+                  13.0  1.0 -2.0
+                  10.0  2.0 -3.0<span style="color: #183691;">]</span>
+             <span style="color: #183691;">{</span><span style="color: #a71d5d;">:layout</span> <span style="color: #a71d5d;">:row</span><span style="color: #183691;">}</span><span style="color: #183691;">)</span><span style="color: #795da3;">]</span>
+  <span style="color: #795da3;">[</span>a fact <span style="color: #183691;">(</span>trs fact b<span style="color: #183691;">)</span><span style="color: #795da3;">]</span><span style="color: #a71d5d;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+'(#RealBandedMatrix(double  type:sb  mxn:9x9  layout:column  offset:0)
+   ▥       ↓       ↓       ↓       ↓       ↓       ─
+   ↘       1.00    2.00    3.00    4.00    4.00    ⋯
+   ↘       1.00    2.00    3.00    3.00    3.00
+   ↘       1.00    2.00    2.00    2.00    2.00
+   ↘       1.00    1.00    1.00    1.00    1.00
+   ┗                                               ┛
+ #uncomplicate.neanderthal.internal.common.PivotlessLUFactorization(:lu #RealBandedMatrix(double  type:sb  mxn:9x9  layout:column  offset:0)
+   ▥       ↓       ↓       ↓       ↓       ↓       ─
+   ↘       1.00    1.00    1.00    1.00    1.00    ⋯
+   ↘       1.00    1.00    1.00    1.00    1.00
+   ↘       1.00    1.00    1.00    1.00    1.00
+   ↘       1.00    1.00    1.00    1.00    1.00
+   ┗                                               ┛
+  :master true  :fresh #atom(true 0x39b524ea)) #RealGEMatrix(double  mxn:9x3  layout:column  offset:0)
+   ▥       ↓       ↓       ↓       ┓
+   →       1.00    1.00    1.00
+   →       1.00   -1.00    0.00
+   →       ⁙       ⁙       ⁙
+   →       1.00   -1.00    0.00
+   →       1.00    1.00   -1.00
+   ┗                               ┛
+)
+</pre>
+
+<p>
+I created a banded symmetric matrix <code>a</code>, with dimensions \(9\times 9\). The band width is the main diagonal and
+3 sub-diagonals. When it comes to storage, it means than instead of storing all 81 elements, only
+ \(9+8+7+6=30\) non-zero elements are stored (even though the band was not particularly thin).
+When Neanderthal prints the matrix, it prints the diagonals horizontally (to avoid printing a bunch
+ of zero entries). To avoid confusion, notice how Neanderthal prints the ↘ symbol for the printed rows
+ and ↓ for columns to indicate that (in the case of column-major matrices) diagonals are printed horizontally,
+ and columns vertically. Also note how this particular system has been positive definite,
+and we get a nice Cholesky, which preserves the band!
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgfcc7bca" class="outline-2">
+<h2 id="orgfcc7bca">Packed matrices</h2>
+<div class="outline-text-2" id="text-orgfcc7bca">
+<p>
+As a bonus, let me mention that Neanderthal supports packed dense storage, which can come handy when
+the memory is scarce. If we work with dense symmetric or triangular matrices that can not be compressed
+with band because they do not have many zero elements, we can still save half the space by only storing
+lower or upper half and not storing the upper/lower part that is not accessed.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #a71d5d;">(</span><span style="color: #a71d5d;">let</span> <span style="color: #795da3;">[</span>a <span style="color: #183691;">(</span>dsp 3 <span style="color: #183691;">[</span>1
+                1 2
+                1 2 3<span style="color: #183691;">]</span>
+             <span style="color: #183691;">{</span><span style="color: #a71d5d;">:layout</span> <span style="color: #a71d5d;">:row</span> <span style="color: #a71d5d;">:uplo</span> <span style="color: #a71d5d;">:lower</span><span style="color: #183691;">}</span><span style="color: #183691;">)</span>
+      fact <span style="color: #183691;">(</span>trf a<span style="color: #183691;">)</span>
+      b <span style="color: #183691;">(</span>dge 3 2 <span style="color: #183691;">[</span>-1 4
+                  0.5 0
+                  2 -1<span style="color: #183691;">]</span>
+             <span style="color: #183691;">{</span><span style="color: #a71d5d;">:layout</span> <span style="color: #a71d5d;">:row</span><span style="color: #183691;">}</span><span style="color: #183691;">)</span><span style="color: #795da3;">]</span>
+  <span style="color: #795da3;">[</span>a fact <span style="color: #183691;">(</span>trs fact b<span style="color: #183691;">)</span><span style="color: #795da3;">]</span><span style="color: #a71d5d;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+'(#RealPackedMatrix(double  type:sp  mxn:3x3  layout:row  offset:0)
+   ▤       ↓       ↓       ↓       ┓
+   →       1.00    .       .
+   →       1.00    2.00    .
+   →       1.00    2.00    3.00
+   ┗                               ┛
+ #uncomplicate.neanderthal.internal.common.PivotlessLUFactorization(:lu #RealPackedMatrix(double  type:sp  mxn:3x3  layout:row  offset:0)
+   ▤       ↓       ↓       ↓       ┓
+   →       1.00    .       .
+   →       1.00    1.00    .
+   →       1.00    1.00    1.00
+   ┗                               ┛
+  :master true  :fresh #atom(true 0x65376e65)) #RealGEMatrix(double  mxn:3x2  layout:row  offset:0)
+   ▤       ↓       ↓       ┓
+   →      -2.50    8.00
+   →       0.00   -3.00
+   →       1.50   -1.00
+   ┗                       ┛
+)
+</pre>
+
+<p>
+Hey, this example is virtually the same as when we used dense symmetric matrix! That's right -
+Neanderthal can sort these kind of things without bothering you! Now, how cool is that? I don't know,
+but it is certainly very useful&#x2026;
+</p>
+
+<p>
+Use packed storage with caution, though: it saves only half the space, while many important operations
+such as matrix multiplication are noticeably slower than when working with straight dense triangular
+ or symmetric matrices. Some operations can be faster, so YMMV, and experiment with the use cases
+that you are interested in.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org4cb210c" class="outline-2">
+<h2 id="org4cb210c">(Tri)diagonal storage</h2>
+<div class="outline-text-2" id="text-org4cb210c">
+<p>
+Everything described by now can be compacted and exploited even more. As an exercise, please look at
+diagonal (gd), tridiagonal (gt), diagonally dominant tridiagonal (dt), and symmetric tridiagonal (st)
+matrices, and try them out with linear solvers. Yes, they are also supported&#x2026;
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgd5247f4" class="outline-2">
+<h2 id="orgd5247f4">What to expect next</h2>
+<div class="outline-text-2" id="text-orgd5247f4">
+<p>
+We've taken a look at solving dense, banded and packed systems described with general rectangular matrices,
+symmetric matrices, and triangular matrices. Now we can quickly and easily solve almost any kind of
+linear system that has unique solution. Hey, but what if our system has less equations than there are
+unknowns, or if we have too many equations? Stay tuned, since I'll discuss these topics soon.
+Somewhere in the middle, I'll probably squeeze in a post where I'll explain the details of those
+storage and matrix types, and how to read these symbols when matrices are printed (although I think
+it is intuitive enough that you've probably already picked the most important details up).
+</p>
+
+<p>
+Until then, create a learning playground project, include Neanderthal, and have a happy hacking day!
+</p>
+</div>
+</div>
