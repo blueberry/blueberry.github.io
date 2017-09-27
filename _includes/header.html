@@ -2,6 +2,9 @@
 <header>
     <nav class="group">
 	<a href="{{site.baseurl}}/"><img class="badge" src="{{site.baseurl}}/assets/img/dragan.png" alt="CH"></a>
+        {% for entry in site.data.social %}
+        <a href="{{ entry.link }}"><span class="{{ entry.icon }}"></span></a>
+        {% endfor %}
 	{% for node in site.pages %}
 		{% unless node.nav_exclude %}
 		    {% if page.url == node.url %}
@@ -11,5 +14,6 @@
 		    {% endif %}
 	    {% endunless %}
   	{% endfor %}
-	</nav>
+    </nav>
+
 </header>
