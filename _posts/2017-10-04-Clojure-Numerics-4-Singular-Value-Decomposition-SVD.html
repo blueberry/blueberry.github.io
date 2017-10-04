@@ -1,0 +1,319 @@
+---
+date: 2017-10-04
+tags:
+- SVD
+- Singular Value Decomposition
+- null space
+- rank
+- Neanderthal
+- Clojure
+- linear algebra
+-
+author: dragan
+layout: post
+title: Clojure Numerics, Part 4 - Singular Value Decomposition (SVD)
+excerpt: Today's article is a short one. Not because Singular Value Decomposition (SVD) is not important, but because it is so ubiquitous that we'll touch it in other articles where appropriate. The goal of this article is to give an overview and point to Neanderthal's functions that work with it. When you see SVD in the literature you read, you'll know where to look for the implementation; that's the idea.
+categories:
+- Neanderthal
+- Clojure
+- linear algebra
+---
+<p>
+Today's article is a short one. Not because Singular Value Decomposition (SVD) is not important, but
+because it is so ubiquitous that we'll touch it in other articles where appropriate. The goal of this
+article is to give an overview and point to Neanderthal's functions that work with it. When you
+see SVD in the literature you read, you'll know where to look for the implementation; that's
+the idea.
+</p>
+
+<p>
+Before I continue, a few reminders:
+</p>
+<ul class="org-ul">
+<li>Include <a href="http://neanderthal.uncomplicate.org">Neanderthal library</a> in your project to be able to use ready-made high-performance linear algebra functions.</li>
+<li>Read articles in the introductory <a href="./Clojure-Linear-Algebra-Refresher-Vector-Spaces">Clojure Linear Algebra Refresher</a> series.</li>
+<li>This is the fourth article in a more advanced series. It is a good idea to read them all in sequence if this is your first contact with this kind of software.</li>
+</ul>
+
+<p>
+The namespaces we'll use:
+</p>
+
+<div class="org-src-container">
+<pre><code class="src src-clojure"><span style="color: #a71d5d;">(</span>require '<span style="color: #795da3;">[</span><span style="color: #795da3;">uncomplicate.neanderthal</span>
+           <span style="color: #183691;">[</span>native <span style="color: #a71d5d;">:refer</span> <span style="color: #183691;">[</span>dge dgb dgd<span style="color: #183691;">]</span><span style="color: #183691;">]</span>
+           <span style="color: #183691;">[</span>core <span style="color: #a71d5d;">:refer</span> <span style="color: #183691;">[</span>mm nrm2<span style="color: #183691;">]</span><span style="color: #183691;">]</span>
+           <span style="color: #183691;">[</span>linalg <span style="color: #a71d5d;">:refer</span> <span style="color: #183691;">[</span>svd svd!<span style="color: #183691;">]</span><span style="color: #183691;">]</span><span style="color: #795da3;">]</span><span style="color: #a71d5d;">)</span>
+</code></pre>
+</div>
+
+<div id="outline-container-orgfc871e8" class="outline-2">
+<h2 id="orgfc871e8">Motivation</h2>
+<div class="outline-text-2" id="text-orgfc871e8">
+<p>
+The main idea of many of the methods I've already mentioned and the one we've yet to cover in this tutorial
+is to decompose a matrix into a product of a few matrices with special properties, and then
+exploit these properties to get what we want. Not all decompositions, aka factorizations, are the same;
+some give more benefits than others. On the other hand, they may be more difficult to compute, or require
+yet another set of properties from the original matrix. Recall that for random matrices, we have to do
+LU decomposition with pivoting, but for the positive definite, pivoting is not needed, while for thex
+triangular, no decomposition is needed.
+</p>
+
+<p>
+As diagonal matrices are very convenient, and computationally efficient, it makes sense to
+have a method to decompose a matrix into some diagonal form. One such decomposition, a very powerful one,
+is the Singular Value Decomposition (SVD). It is relatively expensive to compute, but once we have it, it
+can be used to get answers for some difficult cases when other decompositions can not help us.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org6ad3bab" class="outline-2">
+<h2 id="org6ad3bab">The Definition of Singular Value Decomposition</h2>
+<div class="outline-text-2" id="text-org6ad3bab">
+<p>
+If \(A\) is a matrix in \(R^{m \times n}\), then there exist <i>orthogonal</i> matrices \(U\in{R^{m \times m}}\)
+and \(V\in{R^{n \times n}}\) and a diagonal matrix \(\Sigma\) such that \(U^TAV=\Sigma=diag(\sigma_1,\dots,\sigma_p) \in R^{m\times{n}},
+p=min(m,n)\), where \(\sigma_1\geq \sigma_2 \geq \dots \geq \sigma_p \geq 0\).
+</p>
+
+<p>
+Here, the columns of \(U\) are the <i>left singular vectors</i>.
+</p>
+\begin{equation}
+  U=
+  \begin{bmatrix}
+    u_1 & | \dots | & U_m\\
+  \end{bmatrix} \in R^{m \times m}
+\end{equation}
+
+<p>
+The columns of \(V\) are the <i>right singular vectors</i>.
+</p>
+\begin{equation}
+  V=
+  \begin{bmatrix}
+    v_1 & | \dots | & v_n\\
+  \end{bmatrix} \in R^{n \times n}
+\end{equation}
+
+<p>
+The elements of \(\Sigma\) are <i>the singular values</i> of \(A\).
+</p>
+
+<p>
+Here's a simple example in Clojure code:
+</p>
+<div class="org-src-container">
+<pre><code class="src src-clojure"><span style="color: #a71d5d;">(</span><span style="color: #a71d5d;">let</span> <span style="color: #795da3;">[</span>a <span style="color: #183691;">(</span>dge 4 3 <span style="color: #183691;">[</span>1 2 3 4 -1 -2 -1 -1 4 3 2 1<span style="color: #183691;">]</span><span style="color: #183691;">)</span><span style="color: #795da3;">]</span>
+  <span style="color: #795da3;">(</span>svd a <span style="color: #0086b3;">true</span> <span style="color: #0086b3;">true</span><span style="color: #795da3;">)</span><span style="color: #a71d5d;">)</span>
+</code></pre>
+</div>
+
+<pre class="example">
+#uncomplicate.neanderthal.internal.common.SVDecomposition{:sigma #RealDiagonalMatrix[double, type:gd mxn:3x3, offset:0]
+   ▧                               ┓
+   ↘       7.51    3.17    0.79
+   ┗                               ┛
+, :u #RealGEMatrix[double, mxn:4x3, layout:column, offset:0]
+   ▥       ↓       ↓       ↓       ┓
+   →      -0.49    0.66    0.51
+   →      -0.53    0.23   -0.81
+   →      -0.49   -0.23    0.25
+   →      -0.49   -0.68    0.13
+   ┗                               ┛
+, :vt #RealGEMatrix[double, mxn:3x3, layout:column, offset:0]
+   ▥       ↓       ↓       ↓       ┓
+   →      -0.66    0.34   -0.67
+   →      -0.73   -0.06    0.69
+   →       0.19    0.94    0.29
+   ┗                               ┛
+, :master true}
+</pre>
+
+<p>
+Let's check whether it is true that \(U^TAV=\Sigma\) in this example.
+</p>
+
+<div class="org-src-container">
+<pre><code class="src src-clojure"><span style="color: #a71d5d;">(</span><span style="color: #a71d5d;">let</span> <span style="color: #795da3;">[</span>a <span style="color: #183691;">(</span>dge 4 3 <span style="color: #183691;">[</span>1 2 3 4 -1 -2 -1 -1 4 3 2 1<span style="color: #183691;">]</span><span style="color: #183691;">)</span>
+      usv <span style="color: #183691;">(</span>svd a <span style="color: #0086b3;">true</span> <span style="color: #0086b3;">true</span><span style="color: #183691;">)</span>
+      u <span style="color: #183691;">(</span><span style="color: #a71d5d;">:u</span> usv<span style="color: #183691;">)</span>
+      vt <span style="color: #183691;">(</span><span style="color: #a71d5d;">:vt</span> usv<span style="color: #183691;">)</span>
+      sigma <span style="color: #183691;">(</span><span style="color: #a71d5d;">:sigma</span> usv<span style="color: #183691;">)</span><span style="color: #795da3;">]</span>
+  <span style="color: #795da3;">(</span>mm u sigma vt<span style="color: #795da3;">)</span><span style="color: #a71d5d;">)</span>
+</code></pre>
+</div>
+
+<pre class="example">
+#RealGEMatrix[double, mxn:4x3, layout:column, offset:0]
+   ▥       ↓       ↓       ↓       ┓
+   →       1.00   -1.00    4.00
+   →       2.00   -2.00    3.00
+   →       3.00   -1.00    2.00
+   →       4.00   -1.00    1.00
+   ┗                               ┛
+
+</pre>
+
+<p>
+Hurrah, it is equal to \(A\)! But, the original definition didn't say \(A=U\Sigma V^T\), it said \(U^TAV=\Sigma\)?
+It's just a matter of a bit of arithmetic. These equations are equivalent.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgcb4866d" class="outline-2">
+<h2 id="orgcb4866d">Properties of the SVD</h2>
+<div class="outline-text-2" id="text-orgcb4866d">
+</div>
+<div id="outline-container-orgecf4d17" class="outline-3">
+<h3 id="orgecf4d17">\(Av_i=\sigma_i u_i\) and \(A^Tu_i=\sigma_i v_i\)</h3>
+<div class="outline-text-3" id="text-orgecf4d17">
+<p>
+This is obvious from the definition, an it can be seen in the previous example, too.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org42a5379" class="outline-3">
+<h3 id="org42a5379">\({\lVert A\rVert}_2 = \sigma_1\) and \({\lVert \sqrt{\sigma_1^2 + \dots \sigma_p^2 }\rVert}_2 = \sigma_1\)</h3>
+<div class="outline-text-3" id="text-org42a5379">
+<p>
+If you're interested in the proof, look for it in a textbook. Here, we'll just see an example:
+</p>
+<div class="org-src-container">
+<pre><code class="src src-clojure"><span style="color: #a71d5d;">(</span><span style="color: #a71d5d;">let</span> <span style="color: #795da3;">[</span>a <span style="color: #183691;">(</span>dge 4 3 <span style="color: #183691;">[</span>1 2 3 4 -1 -2 -1 -1 4 3 2 1<span style="color: #183691;">]</span><span style="color: #183691;">)</span> <span style="color: #795da3;">]</span>
+  <span style="color: #795da3;">[</span><span style="color: #183691;">(</span>nrm2 <span style="color: #183691;">(</span><span style="color: #a71d5d;">:sigma</span> <span style="color: #795da3;">(</span>svd a<span style="color: #795da3;">)</span><span style="color: #183691;">)</span><span style="color: #183691;">)</span>
+   <span style="color: #183691;">(</span>nrm2 a<span style="color: #183691;">)</span><span style="color: #795da3;">]</span><span style="color: #a71d5d;">)</span>
+</code></pre>
+</div>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-right" />
+
+<col  class="org-right" />
+</colgroup>
+<tbody>
+<tr>
+<td class="org-right">8.185352771872449</td>
+<td class="org-right">8.18535277187245</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+
+<div id="outline-container-org84200f5" class="outline-3">
+<h3 id="org84200f5">Rank, range, and null space</h3>
+<div class="outline-text-3" id="text-org84200f5">
+<p>
+If \(A\) has \(r\) positive singular values, then \(rank(A) = r\), \(null(A) = span\{v_{r+1},\dots,v_n\}\),
+and \(ran(A) = span\{u_1,\dots,v_r\}\).
+</p>
+
+<p>
+And so on. There are more interesting properties like these. I hope that with the help of this guide, you can
+easily find out how to use them in Clojure when you learn them from the textbooks.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org9321141" class="outline-2">
+<h2 id="org9321141">Subspaces</h2>
+<div class="outline-text-2" id="text-org9321141">
+<p>
+Singular vectors and values are very useful in computations of subspaces (see <a href="./Clojure-Linear-Algebra-Refresher-Vector-Spaces">Clojure Linear Algebra Refresher</a>).
+</p>
+
+<p>
+A convenient property of \(U\) and \(V\) is that they are orthogonal, and orthogonal transformations do not
+deform space.
+</p>
+
+<p>
+If
+</p>
+\begin{equation}
+  U=
+  \begin{bmatrix}
+    U_r & | \tilde{U}_{m-r}\\
+  \end{bmatrix}
+,\text{and}
+  V=
+  \begin{bmatrix}
+    V_r & | \tilde{V}_{n-r}\\
+  \end{bmatrix}
+\end{equation}
+
+<p>
+Here are a few useful facts:
+</p>
+
+<ul class="org-ul">
+<li>\(V_r V_r^T\) = projection on \(null(A)^{\perp} = ran(A^T)\),</li>
+<li>\(\tilde{V}_r \tilde{V}_r^T\) = projection on $null(A),</li>
+<li>\(U_r U_r^T\) = projection on \(ran(A)\),</li>
+<li>\(\tilde{U}_r \tilde{U}_r^T\) = projection on ran(A)<sup>&perp;</sup> = null(A<sup>T</sup>),</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-org5abaad1" class="outline-2">
+<h2 id="org5abaad1">Sensitivity of Square Linear Systems</h2>
+<div class="outline-text-2" id="text-org5abaad1">
+<p>
+There's a very important way in which SVD can help us with Linear Systems.
+</p>
+
+<p>
+We start from \(Ax=b\), and then have \(x = A^{-1}b=(U \Sigma V^T)^{-1}b=\sum_{i=1}^n{\dfrac{u_i^t b}{\sigma_i}}\)
+</p>
+
+<p>
+Now, if \(\sigma_i\) is small enough, small change in \(A\) or \(b\) will cause large changes in \(X\), and
+the system becomes unstable.
+</p>
+
+<p>
+One of the properties of the SVD that we skipped in the last section is that the smallest singular value
+is the 2-norm distance of a to the set of rank-deficient, singular, matrices. Closer the matrix is to
+that set, the system it describes becomes sensitive to small changes (caused by imprecision in floating
+point operations).
+</p>
+
+<p>
+It boils down to this: if no other method can not show us reliably whether a system is ill-conditioned,
+SVD usually can. On the other hand, SVD is usually more computationally expensive than other factorizations,
+so we should consider that too and prefer lighter methods when possible.
+</p>
+
+<p>
+A precise measure of linear system sensitivity can be obtained by looking at the condition number.
+We've already dealt with that - we can get the condition number from triangular factorizations (see previous
+articles).
+</p>
+
+<p>
+A word or two about determinants should be said here. I've learned in school to find the determinant when
+I want to check whether a system is solvable. If \(det(A)=0\), the system is singular. But, if the determinant
+is <i>close</i> to zero? Is \(A\) near singular? Unfortunately, we cannot say. Determinant is poor tool for this,
+and in computational linear algebra, as I've shown you, we usually have much better tools for that.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orga9627b2" class="outline-2">
+<h2 id="orga9627b2">And next&#x2026;</h2>
+<div class="outline-text-2" id="text-orga9627b2">
+<p>
+Orthogonalization seems to be a quite powerful factorization method. We'll explore it in the next
+sessions.
+</p>
+</div>
+</div>
