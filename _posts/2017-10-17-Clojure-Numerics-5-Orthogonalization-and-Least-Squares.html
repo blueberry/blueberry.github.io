@@ -1,0 +1,459 @@
+---
+date: 2017-10-17
+tags:
+- QR factorization
+- Least Squares
+- overdetermined systems
+- minimal residual
+- orthogonalization
+- Neanderthal
+- Clojure
+- linear algebra
+- MKL
+-
+author: dragan
+layout: post
+title: Clojure Numerics, Part 5 - Orthogonalization and Least Squares
+excerpt: How to solve linear systems that have many solutions, or those that have no solutions at all? That's the theme for a thick math textbook, of course, but from the programmer's point of view, we are interested in the practical matters, so I'll stick to the main point. When I have less equations than there are unknowns, or I have too many equations, what can I do in Clojure to make those unknowns known? Which functions do I call?
+categories:
+- Neanderthal
+- Clojure
+- linear algebra
+---
+<p>
+How to solve linear systems that have many solutions, or those that have no solutions at all?
+That's the theme for a thick math textbook, of course, but from the programmer's point of view,
+we are interested in the practical matters, so I'll stick to the main point. When I have less
+equations than there are unknowns, or I have too many equations, what can I do in Clojure to
+make those unknowns known? What functions do I call?
+</p>
+
+<p>
+Before I continue, a few reminders:
+</p>
+<ul class="org-ul">
+<li>Include <a href="http://neanderthal.uncomplicate.org">Neanderthal library</a> in your project to be able to use ready-made high-performance linear algebra functions.</li>
+<li>Read articles in the introductory <a href="./Clojure-Linear-Algebra-Refresher-Vector-Spaces">Clojure Linear Algebra Refresher</a> series.</li>
+<li>This is the fifth article in a more advanced series. It is a good idea to read them all in sequence if this is your first contact with this kind of software.</li>
+</ul>
+
+<p>
+The namespaces we'll use:
+</p>
+
+<div class="org-src-container">
+<pre><code class="src src-clojure"><span style="color: #a71d5d;">(</span>require '<span style="color: #795da3;">[</span><span style="color: #795da3;">uncomplicate.neanderthal</span>
+           <span style="color: #183691;">[</span>native <span style="color: #a71d5d;">:refer</span> <span style="color: #183691;">[</span>dge dv<span style="color: #183691;">]</span><span style="color: #183691;">]</span>
+           <span style="color: #183691;">[</span>core <span style="color: #a71d5d;">:refer</span> <span style="color: #183691;">[</span>mm trans view-sy view-tr axpy nrm2 mm! copy submatrix<span style="color: #183691;">]</span><span style="color: #183691;">]</span>
+           <span style="color: #183691;">[</span>linalg <span style="color: #a71d5d;">:refer</span> <span style="color: #183691;">[</span>qrf org svd sv ls!<span style="color: #183691;">]</span><span style="color: #183691;">]</span><span style="color: #795da3;">]</span><span style="color: #a71d5d;">)</span>
+</code></pre>
+</div>
+
+<div id="outline-container-org8bf6e10" class="outline-2">
+<h2 id="org8bf6e10">Let's begin</h2>
+<div class="outline-text-2" id="text-org8bf6e10">
+<p>
+I wrote about solving linear systems, and I think it was clear that, while there are complications
+along the way when the specific numbers are a bit funky, it is otherwise a quite straightforward business.
+Many problems are not structured so well. What about the case when we have more equations than there are
+unknowns? Such systems are <i>overdetermined</i>; there are so many conditions that there probably isn't
+any solution to satisfy them all. In that case, we have to choose the solution that is somehow "least bad".
+What is "least bad" is also its own matter. On top of that, since I am a practical programmer who
+prefers Clojure, I also require an elegant programming API to find the solution. And, since I accept
+nothing less than the best from Neanderthal, I want it to be superfast&#x2026;
+</p>
+</div>
+</div>
+
+<div id="outline-container-org1286885" class="outline-2">
+<h2 id="org1286885">The Full-rank Least Squares</h2>
+<div class="outline-text-2" id="text-org1286885">
+<p>
+Let's consider the problem first. I have a system \(Ax=b\), where \(A\in{R^{m\times{n}}}\) is a <i>data matrix</i>
+holding coefficients, and \(b\in{R^m}\) is an <i>observation vector</i>, while \(m\geq{n}\). Such system is
+called <i>overdetermined</i>, and usually there is no exact solution to such system.
+</p>
+
+<p>
+Since we can't find the exact solution, we opt for the next best, the "nearest" solution. Recall form
+the <a href="./Clojure-Linear-Algebra-Refresher-Vector-Spaces">Clojure Linear Algebra Refresher</a> series that in linear algebra we use <i>norms</i> to measure distance.
+Therefore, the nearest something is something with the least norm \({\lVert Ax-b \rVert}_p\). But, which
+norm to choose? 1-norm? &infin;-norm? Different norms will give different answers. The matter is, fortunately,
+solved by the fact that minimization of 1-norm and &infin;-norm is too complicated, so our best buddy
+the Euclidean norm is the winner.
+</p>
+
+<p>
+Minimization of the Euclidean norm \(min {\lVert Ax-b \rVert}_2\) is called the <i>least squares</i> problem.
+It is convenient because this function is differentiable, <i>and</i> the 2-norm is preserved under <i>orthogonal
+transformations</i> (see <a href="./Clojure-Linear-Algebra-Refresher-Vector-Spaces">Clojure Linear Algebra Refresher</a> series for the basics, and the specific details follow here shortly).
+</p>
+
+<p>
+When \(A\) is full-rank (\(ran(A)=n\)), there is a <i>unique</i> linear squares solution, and it can
+be found by solving the symmetric positive definite system \(A^TAx_{LS}=A^Tb\). You remember one of the
+previous articles in this series? We talked about these.
+</p>
+
+<p>
+Let's try a random example in Clojure:
+</p>
+
+<p>
+First, I'll construct a (randomly chosen) matrix <code>a</code>, and make sure its rank is 2 (here, by doing SVD):
+</p>
+<div class="org-src-container">
+<pre><code class="src src-clojure"><span style="color: #a71d5d;">(</span><span style="color: #a71d5d;">def</span> <span style="color: #ed6a43;">a</span> <span style="color: #795da3;">(</span>dge 3 2 <span style="color: #183691;">[</span>1 2 3 -1 1 -1<span style="color: #183691;">]</span><span style="color: #795da3;">)</span><span style="color: #a71d5d;">)</span>
+</code></pre>
+</div>
+
+<div class="org-src-container">
+<pre><code class="src src-clojure"><span style="color: #a71d5d;">(</span>svd a<span style="color: #a71d5d;">)</span>
+</code></pre>
+</div>
+
+<pre class="example">
+#uncomplicate.neanderthal.internal.common.SVDecomposition{:sigma #RealDiagonalMatrix[double, type:gd mxn:2x2, offset:0]
+   ▧                       ┓
+   ↘       3.79    1.63
+   ┗                       ┛
+, :u nil, :vt nil, :master true}
+
+</pre>
+
+<p>
+There are 2 non-zero values there, so the rank is 2, which I wanted to check.
+</p>
+
+<p>
+Next, I'll construct \(A^TA\):
+</p>
+
+<div class="org-src-container">
+<pre><code class="src src-clojure"><span style="color: #a71d5d;">(</span><span style="color: #a71d5d;">def</span> <span style="color: #ed6a43;">ata</span> <span style="color: #795da3;">(</span>mm <span style="color: #183691;">(</span>trans a<span style="color: #183691;">)</span> a<span style="color: #795da3;">)</span><span style="color: #a71d5d;">)</span>
+</code></pre>
+</div>
+
+<div class="org-src-container">
+<pre><code class="src src-clojure">ata
+</code></pre>
+</div>
+
+<pre class="example">
+#RealGEMatrix[double, mxn:2x2, layout:column, offset:0]
+   ▥       ↓       ↓       ┓
+   →      14.00   -2.00
+   →      -2.00    3.00
+   ┗                       ┛
+
+</pre>
+
+<p>
+I created <code>ata</code> as a general matrix, so we can both look at it and see that it is symmetric, as
+promised by math theory. Now I'll make it symmetric (in the Clojure data structure sense).
+Of course, in a real project, I'd skip those intermediate steps.
+</p>
+
+<div class="org-src-container">
+<pre><code class="src src-clojure"><span style="color: #a71d5d;">(</span><span style="color: #a71d5d;">def</span> <span style="color: #ed6a43;">b</span> <span style="color: #795da3;">(</span>dge 3 1 <span style="color: #183691;">[</span>1 -1 -2<span style="color: #183691;">]</span><span style="color: #795da3;">)</span><span style="color: #a71d5d;">)</span>
+<span style="color: #a71d5d;">(</span><span style="color: #a71d5d;">def</span> <span style="color: #ed6a43;">solution</span> <span style="color: #795da3;">(</span>sv <span style="color: #183691;">(</span>view-sy <span style="color: #183691;">(</span>mm <span style="color: #795da3;">(</span>trans a<span style="color: #795da3;">)</span> a<span style="color: #183691;">)</span><span style="color: #183691;">)</span> <span style="color: #183691;">(</span>mm <span style="color: #183691;">(</span>trans a<span style="color: #183691;">)</span> b<span style="color: #183691;">)</span><span style="color: #795da3;">)</span><span style="color: #a71d5d;">)</span>
+</code></pre>
+</div>
+
+<div class="org-src-container">
+<pre><code class="src src-clojure">solution
+</code></pre>
+</div>
+
+<pre class="example">
+#RealGEMatrix[double, mxn:2x1, layout:column, offset:0]
+   ▥       ↓       ┓
+   →      -0.55
+   →      -0.37
+   ┗               ┛
+
+</pre>
+
+<p>
+This should be the LS solution, and we'll check later whether a more general method will give the same answer.
+Yes, there are more general methods, so what I've shown you until now is just a learning-oriented warm-up.
+Usually you do not need to be so creative, and can just go to the method X and say "Solve this for me!".
+</p>
+
+<p>
+An interesting side note here is that solving these <i>normal equations</i> is connected to solving
+<i>gradient equations</i>. Which might be an interesting topic if you're interested in machine learning.
+I'll have to say more on that when I finish these more general topics in the Linear Algebra series.
+</p>
+
+<p>
+When we find the LS solution \(x_{LS}\), we can also compute the <i>minimum residual</i> \(r_{LS} = b-Ax_{LS}\). It's
+norm will tell us how far the system we solved exactly is from the original system.
+</p>
+
+<div class="org-src-container">
+<pre><code class="src src-clojure"><span style="color: #a71d5d;">(</span>axpy -1 <span style="color: #795da3;">(</span>mm a solution<span style="color: #795da3;">)</span> b<span style="color: #a71d5d;">)</span>
+</code></pre>
+</div>
+
+<pre class="example">
+#RealGEMatrix[double, mxn:3x1, layout:column, offset:0]
+   ▥       ↓       ┓
+   →       1.18
+   →       0.47
+   →      -0.71
+   ┗               ┛
+
+</pre>
+
+<p>
+Minimum residual, the norm of the residual, seems quite high here. We'll check whether our solution
+is correct later.
+</p>
+
+<div class="org-src-container">
+<pre><code class="src src-clojure"><span style="color: #a71d5d;">(</span>nrm2 <span style="color: #795da3;">(</span>axpy -1 <span style="color: #183691;">(</span>mm a solution<span style="color: #183691;">)</span> b<span style="color: #795da3;">)</span><span style="color: #a71d5d;">)</span>
+</code></pre>
+</div>
+
+<pre class="example">
+1.459992790176863
+
+</pre>
+
+<p>
+This method is quite OK for full-rank systems, but even then, it is sensitive to the presence of
+small singular values (recall the last article about Singular Value Decomposition).
+</p>
+
+<p>
+Another method is to use normal equations, which includes Cholesky factorization, matrix multiplication
+and matrix-vector multiplication. I'll skip this, because there is a better and more general method.
+</p>
+
+<p>
+These better methods usually rely on the QR factorization.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org31d9141" class="outline-2">
+<h2 id="org31d9141">QR Factorization</h2>
+<div class="outline-text-2" id="text-org31d9141">
+<p>
+The idea behind the QR factorization is similar to the idea behind the LU and Cholesky factorizations
+that we met in previous articles: destructure matrix \(A\) to a product of a few matrices that have special
+properties (symmetric, triangular, positive definite, etc.) and then use that destructured form in
+"easier" computations. In the QR, the trick is to find an <i>orthogonal</i> matrix \(Q\) and and upper triangular \(R\),
+such that \(A=QR\). Recall from the refresher series that \(Q\) is orthogonal if \(Q^{-1}=Q^T\).
+</p>
+
+<p>
+There is a proven theorem (look it up in a math textbook if you're interested in the details :)
+that for \(A\in{R^{m\times{n}}}\), there are orthogonal \(Q\in{R^{m\times{n}}}\) and upper triangular
+ \(R\in{R^{m\times{n}}}\) such that \(A=QR\), the QR factorization of \(A\).
+</p>
+
+<p>
+Since Q is orthogonal, and orthogonal transformations preserve the rank, shape and distance,
+we can intuitively guess that such factorization have many properties useful in rank-sensitive
+operations. I'll plead with you to trust the theory and believe me that this work quite well without
+further convincing (if you want to know more, the textbooks are at your disposal).
+</p>
+
+<p>
+Most of these techniques are based on partitioning the columns of into the form such as
+</p>
+\begin{equation}
+A=QR= [Q_1 | Q_2]
+  \begin{bmatrix}
+    R_1\\0\\
+  \end{bmatrix}
+\end{equation}
+
+<p>
+and then using \(Q_1 R_1\) further. What is important to me as a programmer is, mostly:
+</p>
+
+<ul class="org-ul">
+<li>To keep in mind that the QR factorization is the key step for these kinds of problems</li>
+<li>To know what can be computed from QR factorization, and which method does it.</li>
+<li>To keep in mind that, while very powerful, QR-based algorithms are not almighty; there are cases when further options should be explored.</li>
+</ul>
+
+<p>
+The complexity of various flavors varies, but boils down to \(O(m\times{n^2})\).
+</p>
+
+<p>
+But how to solve the system with it?
+</p>
+
+<p>
+From \(Ax=QRx=b\), we have \(Q^{T}Ax=Rx\) and
+</p>
+\begin{equation}
+Q^Tb=
+  \begin{bmatrix}
+    c\\d\\
+  \end{bmatrix}
+\end{equation}
+
+<p>
+so \(R_1x_{LS}=c\). Since \(c\) is readily computed by a matrix multiplication, \(R_1\) is upper triangular system, and
+and triangular systems are quite easy to solve, this is what we were looking for.
+</p>
+
+<p>
+Here I call Neanderthal's <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#var-sv">sv</a> method, which computes the factorization and maintains all crutial parts of it.
+Please note that the matrix <code>:or</code> and vector <code>:tau</code> together hold Q and R encoded. Using raw <code>:or</code> would
+produce gibberish. Other functions in Neanderthal expect exactly this raw structure and know how to work with it,
+ so do not mess with its contents yourself.
+</p>
+<div class="org-src-container">
+<pre><code class="src src-clojure"><span style="color: #a71d5d;">(</span><span style="color: #a71d5d;">def</span> <span style="color: #ed6a43;">qr</span> <span style="color: #795da3;">(</span>qrf a<span style="color: #795da3;">)</span><span style="color: #a71d5d;">)</span>
+</code></pre>
+</div>
+
+<div class="org-src-container">
+<pre><code class="src src-clojure">qr
+</code></pre>
+</div>
+
+<pre class="example">
+#uncomplicate.neanderthal.internal.common.OrthogonalFactorization{:eng #object[uncomplicate.neanderthal.internal.host.mkl.DoubleGEEngine 0x4e780e3a "uncomplicate.neanderthal.internal.host.mkl.DoubleGEEngine@4e780e3a"], :or #RealGEMatrix[double, mxn:3x2, layout:column, offset:0]
+   ▥       ↓       ↓       ┓
+   →      -3.74    0.53
+   →       0.42   -1.65
+   →       0.63   -0.01
+   ┗                       ┛
+, :jpiv nil, :tau #RealBlockVector[double, n:2, offset: 0, stride:1]
+[   1.27    2.00 ]
+, :master true, :fresh #atom[true 0x4a43cc2b], :m 3, :n 3, :or-type :qr, :api-orm #function[uncomplicate.neanderthal.internal.api/eval6950/fn--7034/G--6891--7047], :api-org #function[uncomplicate.neanderthal.internal.api/eval6950/fn--7129/G--6923--7138]}
+
+</pre>
+
+<p>
+Did you know that even the <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-mm.21">mm!</a> method can work with Q encoded in this form? It is important, since we need
+to compute \(Q^Tb\). Even transpose works with QR, although it is not a proper matrix itself:
+</p>
+
+<div class="org-src-container">
+<pre><code class="src src-clojure"><span style="color: #a71d5d;">(</span><span style="color: #a71d5d;">def</span> <span style="color: #ed6a43;">cd</span> <span style="color: #795da3;">(</span>mm! 1 <span style="color: #183691;">(</span>trans qr<span style="color: #183691;">)</span> <span style="color: #183691;">(</span>copy b<span style="color: #183691;">)</span><span style="color: #795da3;">)</span><span style="color: #a71d5d;">)</span>
+</code></pre>
+</div>
+
+<div class="org-src-container">
+<pre><code class="src src-clojure">cd
+</code></pre>
+</div>
+
+<pre class="example">
+#RealGEMatrix[double, mxn:3x1, layout:column, offset:0]
+   ▥       ↓       ┓
+   →       1.87
+   →       0.61
+   →      -1.46
+   ┗               ┛
+
+</pre>
+
+<p>
+\(R\) is just the upper triangular part of the <code>qr</code> instance that we have, so:
+</p>
+
+<div class="org-src-container">
+<pre><code class="src src-clojure"><span style="color: #a71d5d;">(</span><span style="color: #a71d5d;">let</span> <span style="color: #795da3;">[</span>r1 <span style="color: #183691;">(</span>view-tr <span style="color: #183691;">(</span><span style="color: #a71d5d;">:or</span> qr<span style="color: #183691;">)</span> <span style="color: #183691;">{</span><span style="color: #a71d5d;">:uplo</span> <span style="color: #a71d5d;">:upper</span><span style="color: #183691;">}</span><span style="color: #183691;">)</span><span style="color: #795da3;">]</span>
+  <span style="color: #795da3;">(</span>sv r1 <span style="color: #183691;">(</span>submatrix cd 0 0 2 1<span style="color: #183691;">)</span><span style="color: #795da3;">)</span><span style="color: #a71d5d;">)</span>
+</code></pre>
+</div>
+
+<pre class="example">
+#RealGEMatrix[double, mxn:2x1, layout:column, offset:0]
+   ▥       ↓       ┓
+   →      -0.55
+   →      -0.37
+   ┗               ┛
+
+</pre>
+
+<p>
+Yep, we got the same result using different method. Please note that the third component, \(d\) is equals
+with the one that we predicted using minimum residual \({\rho_{LS}= \lVert d \rVert}_2\) with the first method.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgfcf1c4e" class="outline-2">
+<h2 id="orgfcf1c4e">Least Squares in one quick sweep</h2>
+<div class="outline-text-2" id="text-orgfcf1c4e">
+<p>
+Let's check with the function we could have used at the start, <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#var-ls">ls</a>. Yes, there is a simple almighty method that
+makes all this fuss unnecessary. But, If I just showed you that, what would have we learned about the fine points
+of solving these kinds of systems and the many gotchas that await us there?
+</p>
+
+<p>
+So:
+</p>
+
+<div class="org-src-container">
+<pre><code class="src src-clojure"><span style="color: #a71d5d;">(</span>ls! <span style="color: #795da3;">(</span>copy a<span style="color: #795da3;">)</span> <span style="color: #795da3;">(</span>copy b<span style="color: #795da3;">)</span><span style="color: #a71d5d;">)</span>
+</code></pre>
+</div>
+
+<pre class="example">
+#RealGEMatrix[double, mxn:3x1, layout:column, offset:0]
+   ▥       ↓       ┓
+   →      -0.55
+   →      -0.37
+   →      -1.46
+   ┗               ┛
+
+</pre>
+
+<p>
+Hey, all methods that we used gave the same solution! That's a good sign.
+</p>
+
+<p>
+Let's see whether we can recover the original Q and try with it, just to further our understanding:
+</p>
+
+<div class="org-src-container">
+<pre><code class="src src-clojure"><span style="color: #a71d5d;">(</span><span style="color: #a71d5d;">let</span> <span style="color: #795da3;">[</span>q <span style="color: #183691;">(</span>org qr<span style="color: #183691;">)</span>
+      r1 <span style="color: #183691;">(</span>view-tr <span style="color: #183691;">(</span><span style="color: #a71d5d;">:or</span> qr<span style="color: #183691;">)</span> <span style="color: #183691;">{</span><span style="color: #a71d5d;">:uplo</span> <span style="color: #a71d5d;">:upper</span><span style="color: #183691;">}</span><span style="color: #183691;">)</span><span style="color: #795da3;">]</span>
+  <span style="color: #795da3;">(</span>sv r1 <span style="color: #183691;">(</span>mm <span style="color: #183691;">(</span>trans q<span style="color: #183691;">)</span> b<span style="color: #183691;">)</span><span style="color: #795da3;">)</span><span style="color: #a71d5d;">)</span>
+</code></pre>
+</div>
+
+<pre class="example">
+#RealGEMatrix[double, mxn:2x1, layout:column, offset:0]
+   ▥       ↓       ┓
+   →      -0.55
+   →      -0.37
+   ┗               ┛
+
+</pre>
+
+<p>
+This is the same result indeed! This is good enough for me, today at least.
+</p>
+
+<p>
+Please note that I copied all these instances in code, but for best performance, you'd probably
+use the destructive variants of those methods.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org4b0ecb2" class="outline-2">
+<h2 id="org4b0ecb2">Next installments&#x2026;</h2>
+<div class="outline-text-2" id="text-org4b0ecb2">
+<p>
+I'll probably take some time to write some more about problems connected to least squares, and their
+solutions. Or I'll skip right to eigen-problems. We'll see. Anyway, more Clojure &amp; Neanderthal stuff
+follows soon.
+</p>
+</div>
+</div>
