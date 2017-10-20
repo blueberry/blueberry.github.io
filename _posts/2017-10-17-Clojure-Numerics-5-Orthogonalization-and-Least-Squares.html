@@ -75,7 +75,7 @@ called <i>overdetermined</i>, and usually there is no exact solution to such sys
 </p>
 
 <p>
-Since we can't find the exact solution, we opt for the next best, the "nearest" solution. Recall form
+Since we can't find the exact solution, we opt for the next best, the "nearest" solution. Recall from
 the <a href="./Clojure-Linear-Algebra-Refresher-Vector-Spaces">Clojure Linear Algebra Refresher</a> series that in linear algebra we use <i>norms</i> to measure distance.
 Therefore, the nearest something is something with the least norm \({\lVert Ax-b \rVert}_p\). But, which
 norm to choose? 1-norm? &infin;-norm? Different norms will give different answers. The matter is, fortunately,
@@ -257,7 +257,7 @@ that for \(A\in{R^{m\times{n}}}\), there are orthogonal \(Q\in{R^{m\times{n}}}\)
 <p>
 Since Q is orthogonal, and orthogonal transformations preserve the rank, shape and distance,
 we can intuitively guess that such factorization have many properties useful in rank-sensitive
-operations. I'll plead with you to trust the theory and believe me that this work quite well without
+operations. I'll plead with you to trust the theory and believe me that this works quite well without
 further convincing (if you want to know more, the textbooks are at your disposal).
 </p>
 
@@ -379,7 +379,7 @@ to compute \(Q^Tb\). Even transpose works with QR, although it is not a proper m
 
 <p>
 Yep, we got the same result using different method. Please note that the third component, \(d\) is equals
-with the one that we predicted using minimum residual \({\rho_{LS}= \lVert d \rVert}_2\) with the first method.
+to the one that we predicted using minimum residual \({\rho_{LS}= \lVert d \rVert}_2\) with the first method.
 </p>
 </div>
 </div>
@@ -389,7 +389,7 @@ with the one that we predicted using minimum residual \({\rho_{LS}= \lVert d \rV
 <div class="outline-text-2" id="text-orgfcf1c4e">
 <p>
 Let's check with the function we could have used at the start, <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#var-ls">ls</a>. Yes, there is a simple almighty method that
-makes all this fuss unnecessary. But, If I just showed you that, what would have we learned about the fine points
+makes all this fuss unnecessary. But, If I just showed you that, what would we have learned about the fine points
 of solving these kinds of systems and the many gotchas that await us there?
 </p>
 
