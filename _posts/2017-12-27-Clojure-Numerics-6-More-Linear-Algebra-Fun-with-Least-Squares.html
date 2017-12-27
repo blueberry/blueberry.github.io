@@ -1,0 +1,194 @@
+---
+date: 2017-12-27
+tags:
+- Least Squares with Constraints
+- Generalized Least Squares
+- overdetermined systems
+- Neanderthal
+- Clojure
+- linear algebra
+- MKL
+-
+author: dragan
+layout: post
+title: Clojure Numerics, Part 6 - More Linear Algebra Fun with Least Squares
+excerpt: This time, we look at a few important variants of the least squares problem. Least squares with equality constraints, and generalized least squares. They show how we can solve problems where there is some norm to be minimized with additional constraints to be satisfied. A very cool and useful thing to know.
+categories:
+- Neanderthal
+- Clojure
+- linear algebra
+---
+<p>
+This time, we look at a few important variants of the least squares problem: least squares with equality constraints,
+and generalized least squares. They show how we can solve problems where there is some norm to be minimized
+with additional constraints to be satisfied. A very cool and useful thing to know!
+</p>
+
+<p>
+Before I continue, a few reminders:
+</p>
+<ul class="org-ul">
+<li>Include <a href="http://neanderthal.uncomplicate.org">Neanderthal library</a> in your project to be able to use ready-made high-performance linear algebra functions.</li>
+<li>Read articles in the introductory <a href="./Clojure-Linear-Algebra-Refresher-Vector-Spaces">Clojure Linear Algebra Refresher</a> series.</li>
+<li>This is the sixth article in a more advanced series. It is a good idea to read them all in sequence if this is your first contact with this kind of software.</li>
+</ul>
+
+<p>
+The namespaces we'll use:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>require '<span style="color: #006400;">[</span><span style="color: #afd8af;">uncomplicate.neanderthal</span>
+           <span style="color: #ff1493;">[</span>native <span style="color: #96CBFE;">:refer</span> <span style="color: #ffff00;">[</span>dge dv<span style="color: #ffff00;">]</span><span style="color: #ff1493;">]</span>
+           <span style="color: #ff1493;">[</span>core <span style="color: #96CBFE;">:refer</span> <span style="color: #ffff00;">[</span>mm mv<span style="color: #ffff00;">]</span><span style="color: #ff1493;">]</span>
+           <span style="color: #ff1493;">[</span>linalg <span style="color: #96CBFE;">:refer</span> <span style="color: #ffff00;">[</span>lse gls<span style="color: #ffff00;">]</span><span style="color: #ff1493;">]</span><span style="color: #006400;">]</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<div id="outline-container-org155f2ee" class="outline-2">
+<h2 id="org155f2ee">Least Squares With Equality Constraints</h2>
+<div class="outline-text-2" id="text-org155f2ee">
+<p>
+We have a system \(Ax=c\) that we need to find the least squares solution, as in <a href="./Clojure-Numerics-5-Orthogonalization-and-Least-Squares">the last article</a>. But, additionally,
+we have the constraint \(Bx=d\). There is much theory connected to how to do this in a stable way, but
+the programmer in me just want to skip it and show you the code. So, here it is. In Clojure, just use the
+<a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#var-lse">lse</a> function!
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #4c83ff;">let</span> <span style="color: #006400;">[</span>a <span style="color: #ff1493;">(</span>dge 6 4 <span style="color: #ffff00;">[</span>-0.57 -1.28 -0.39 0.25
+                  -1.93 1.08 -0.31 -2.14
+                  2.30 0.24 0.40 -0.35
+                  -1.93 0.64 -0.66 0.08
+                  0.15 0.30 0.15 -2.13
+                  -0.02 1.03 -1.43 0.50<span style="color: #ffff00;">]</span>
+             <span style="color: #ffff00;">{</span><span style="color: #96CBFE;">:layout</span> <span style="color: #96CBFE;">:row</span><span style="color: #ffff00;">}</span><span style="color: #ff1493;">)</span>
+      b <span style="color: #ff1493;">(</span>dge 2 4 <span style="color: #ffff00;">[</span>1 0 -1 0
+                  0 1 0 -1<span style="color: #ffff00;">]</span>
+             <span style="color: #ffff00;">{</span><span style="color: #96CBFE;">:layout</span> <span style="color: #96CBFE;">:row</span><span style="color: #ffff00;">}</span><span style="color: #ff1493;">)</span>
+      c <span style="color: #ff1493;">(</span>dv <span style="color: #ffff00;">[</span>-1.50 -2.14 1.23 -0.54 -1.68 0.82<span style="color: #ffff00;">]</span><span style="color: #ff1493;">)</span>
+      d <span style="color: #ff1493;">(</span>dv <span style="color: #ffff00;">[</span>7 2<span style="color: #ffff00;">]</span><span style="color: #ff1493;">)</span><span style="color: #006400;">]</span>
+  <span style="color: #006400;">(</span>lse a b c d<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealBlockVector[double, n:4, offset: 0, stride:1]
+[   2.57    1.12   -4.43   -0.88 ]
+
+</pre>
+
+<p>
+Our solution is \(x=(2.57, 1.12, -4.43, -0.88)\).
+</p>
+
+<p>
+Is it correct? Let's see if it satisfies the constraint:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>mv <span style="color: #006400;">(</span>dge 2 4 <span style="color: #ff1493;">[</span>1 0 -1 0
+              0 1 0 -1<span style="color: #ff1493;">]</span>
+         <span style="color: #ff1493;">{</span><span style="color: #96CBFE;">:layout</span> <span style="color: #96CBFE;">:row</span><span style="color: #ff1493;">}</span><span style="color: #006400;">)</span>
+    <span style="color: #006400;">(</span>dv <span style="color: #ff1493;">[</span>2.57 1.12 -4.43 -0.88 <span style="color: #ff1493;">]</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealBlockVector[double, n:2, offset: 0, stride:1]
+[   7.00    2.00 ]
+
+</pre>
+
+<p>
+Yes!
+</p>
+
+<p>
+I won't bother you longer with this, other than repeat that the search key phrase for this kind of
+problems is Least Sqares with Equality Constraints (LSE) and that the <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#var-lse">lse</a> and its impure cousin <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#var-lse.21">lse!</a> is
+what you need in those cases.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org9d6f64b" class="outline-2">
+<h2 id="org9d6f64b">Generalized Least Squares</h2>
+<div class="outline-text-2" id="text-org9d6f64b">
+<p>
+Here's another stock problem from the Least Squares family. This one is connected to problems commonly found
+in statistics, data analysis, machine learning, etc. such as regularization, weighting and similar stuff.
+</p>
+
+<p>
+Let's see this case similar to the stock problem solvable by least squares: \(Ax+w=c\). We added \(w\) to the
+basic equation. It can describe, for example, normally distributed noise in the system, with zero mean,
+and covariance matirx \(\sigma^2 W\), where \(W=BB^T\). Now, we could have proceeded by
+doing some matrix algebra and concluding that the solution can be found by minimizing \({\lVert B^{-1}(Ax-c) \rVert}_2\).
+We know (since we read that in the previous articles in this series! :) that computing and working with
+inverse matrices is bad, bad, bad: a slow procedure that often gives wrong answers.
+</p>
+
+<p>
+It was shown by smart mathematicians that this problem is equivalent to the problem of minimizing the norm
+\({\lVert y^Ty \rVert}\) with the constraint \(Ax+By=c\). Fair enough, but how does it help us?
+</p>
+
+<p>
+That problem is called the <i>Generalized Least Sqares</i> problem (GLS) and it is numerically stable! It is done
+by a flavor of QR factorization that is too exotic for us to look in detail. The neat thing is that we don't
+have to, because Neanderthal comes with the function that does everything for us: <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#var-gls">gls</a>.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #4c83ff;">let</span> <span style="color: #006400;">[</span>a <span style="color: #ff1493;">(</span>dge 4 3 <span style="color: #ffff00;">[</span>-0.57 -1.28 -0.39
+                  -1.93 1.08 -0.31
+                  2.30 0.24 -0.40
+                  -0.02 1.03 -1.43<span style="color: #ffff00;">]</span>
+             <span style="color: #ffff00;">{</span><span style="color: #96CBFE;">:layout</span> <span style="color: #96CBFE;">:row</span><span style="color: #ffff00;">}</span><span style="color: #ff1493;">)</span>
+      b <span style="color: #ff1493;">(</span>dge 4 4 <span style="color: #ffff00;">[</span>0.5 0 0 0
+                  0 1 0 0
+                  0 0 2 0
+                  0 0 0 5<span style="color: #ffff00;">]</span>
+             <span style="color: #ffff00;">{</span><span style="color: #96CBFE;">:layout</span> <span style="color: #96CBFE;">:row</span><span style="color: #ffff00;">}</span><span style="color: #ff1493;">)</span>
+      c <span style="color: #ff1493;">(</span>dv <span style="color: #ffff00;">[</span>1.32 -4 5.52 3.24<span style="color: #ffff00;">]</span><span style="color: #ff1493;">)</span><span style="color: #006400;">]</span>
+  <span style="color: #006400;">(</span>gls a b c<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+'(#RealBlockVector(double  n:3  offset: 0  stride:1)
+(   1.99   -1.01   -2.99 )
+ #RealBlockVector(double  n:4  offset: 0  stride:1)
+(  -0.00   -0.00   -0.00    0.01 )
+)
+
+</pre>
+
+<p>
+The solution is given as a Clojure vector; a pair containing \(x\) and \(y\). In this example,
+GLS solution is \(x=(1.99, -1.01, -2.99), y=(0, 0, 0, 0.01)\) (roughly; here, only the first two decimals are printed).
+</p>
+</div>
+</div>
+
+<div id="outline-container-org99ea2fd" class="outline-2">
+<h2 id="org99ea2fd">Enough of the least squares</h2>
+<div class="outline-text-2" id="text-org99ea2fd">
+<p>
+Huh. This time I managed to be brief. For better or for worse :)
+</p>
+
+<p>
+There are quite a few problems that can be described and solved as one of the variants of least squares.
+I hope that these typical flavors that I showed can give you enough foundations to find your own way when
+there's something more exotic to be solved. Don't think that what we'd covered is a small thing, though.
+Quite a lot of problems could be solved with : <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#var-ls">ls</a>, <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#var-lse">lse</a>, and <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#var-gls">gls</a>. A lot!
+</p>
+
+<p>
+Maybe it's time to give some attention to eigen problems now. Remember the <a href="./Clojure-Linear-Algebra-Refresher-Eigenvalues-and-Eigenvectors">Clojure Linear Algebra Refresher (2) - Eigenvalues and Eigenvectors</a>
+article from the Linear Algebra Refresher series? In the upcoming articles, we'll look into it a bit more seriously.
+</p>
+</div>
+</div>
