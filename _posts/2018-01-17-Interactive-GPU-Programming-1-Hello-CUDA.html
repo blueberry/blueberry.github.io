@@ -1,0 +1,632 @@
+---
+date: 2018-01-17
+tags:
+- CUDA
+- Clojure
+- ClojureCUDA
+- Neanderthal
+- OpenCL
+- Nvidia
+- AMD
+- Intel
+author: dragan
+layout: post
+title: Interactive GPU Programming - Part 1 - Hello CUDA
+excerpt: Today, fast number crunching means parallel programs that run on Graphical Processing Units (GPUs). Thanks to the recent highly publicized deep learning and artificial intelligence advances, everyone has heard about Nvidia's CUDA - an environment and set of C++ oriented tools that transform your GPU card into a sort of a desktop supercomputer. Yes, that is interesting, and we want to get in! But we would also like an interactive environment that is easy to set up and easy to play with, without a loss of power or performance.
+categories:
+- CUDA
+- Clojure
+- ClojureCUDA
+- Neanderthal
+- OpenCL
+---
+<p>
+Who wouldn't like to speed up their programs by thousands of times? When we reach the limits of software optimizations,
+the only hope is faster hardware. Today, that means parallel programs that run on Graphical
+Processing Units (GPUs). Thanks to the recent highly publicized deep learning and artificial intelligence
+advances, everyone has heard about Nvidia's <a href="https://en.wikipedia.org/wiki/CUDA">CUDA</a> - an environment and set of C++ oriented tools that transform your
+GPU card into a sort of a desktop supercomputer. Yes, that is interesting, and we want to get on board! But we would
+also like an <a href="https://en.wikipedia.org/wiki/Interactive_programming">interactive programming</a> experience. I like power and performance, but I also like to experiment and play with flexible code interactively.
+</p>
+
+<p>
+Listening to <a href="https://www.tensorflow.org/extend/architecture">hunting stories of Google engineers</a> is the furthest most programmers who work with
+higher-level platforms such as Java, .Net, Ruby, Python, Javascript, etc. will go. Except for the Pythonistas.
+They will get a bit further despite not knowing how to write any GPU-aware code, since there are DL libraries such as <a href="https://www.tensorflow.org/">TensorFlow</a>, <a href="http://caffe.berkeleyvision.org/">Caffe</a>, or <a href="http://pytorch.org/">PyTorch</a>,
+which <i>run</i> on GPUs under the hood. However, even that depends on the other people writing the code that solves your problem. Sometimes there is such code, but
+more often there isn't any, and <b>you</b> are the one to write it.
+</p>
+
+<p>
+The whole GPU programming ecosystem is not very approachable. Not only that you have to learn about parallel hardware
+and algorithms, but you have to find your way through the complex maze of different drivers, operating systems,
+and modified C++ build chains that is in itself the endless jungle of nitty-gritty details and incompatibilities.
+</p>
+
+<p>
+There is a saner way I intend to show you in this series of blog posts. This better way relies on
+the environment that is:
+</p>
+
+<ol class="org-ol">
+<li>platform-independent (you access it from Java Virtual Machine)</li>
+<li>easy to set up and start with (relative to the "official" C++ way at least)</li>
+<li>interactive (gives an <i>instant feedback</i> for each tiny piece of code you write)</li>
+<li>easy to experiment and play with</li>
+</ol>
+
+<p>
+And the best of all: it offers the access to almost <b>the full power</b> of your hardware, without hiding
+the details that do matter.
+</p>
+
+<p>
+On top of it, there is a bonus: these tools work on Intel and AMD hardware too, so you are not constrained
+with Nvidia's proprietary ecosystem!
+</p>
+
+<p>
+What also demonstrate how easy and malleable this approach is that this whole page has
+been automatically generated from a live org-mode session (this is a kind of interactive notebook),
+connected to a live <a href="https://clojure.org/">Clojure</a> <a href="https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop">REPL (read-eval-print-loop) session</a>.
+The immediate output from the code execution is shown in the
+text as-is.
+</p>
+
+<p>
+This first post shows the introductory Hello World example, and gives a glimpse of a
+typical CUDA application. In the following articles - this is only the first part of a series -
+I will explore major CUDA and OpenCL topics in detail.
+</p>
+
+<div id="outline-container-org84936e2" class="outline-2">
+<h2 id="org84936e2">Set up the environment</h2>
+<div class="outline-text-2" id="text-org84936e2">
+</div>
+<div id="outline-container-org791561e" class="outline-3">
+<h3 id="org791561e">Hardware</h3>
+<div class="outline-text-3" id="text-org791561e">
+<p>
+The one thing we can't continue without is the hardware: ideally, you'd have a GPU in your machine:
+</p>
+
+<ul class="org-ul">
+<li>Nvidia's GPU (supports <a href="https://en.wikipedia.org/wiki/CUDA">CUDA</a>)</li>
+<li>AMD's GPU (you'd have to use <a href="https://en.wikipedia.org/wiki/OpenCL">OpenCL</a> instead)</li>
+<li>Intel's CPU and GPU (also supports <a href="https://en.wikipedia.org/wiki/OpenCL">OpenCL</a>)</li>
+</ul>
+
+<p>
+We access these hardware devices through the appropriate device drivers. Our everyday CPU programs do
+not need any special support of this kind only because the whole operating system is based around the
+specific architecture of the CPU (usually x86/amd64) and is a sort of the device driver for the CPU.
+So, you'd install the appropriate device drivers from the manufacturer of your GPU. Note that the generic
+drivers that come with your operating system are usually only capable of basic 2D display, and do not
+support GPU computing. Install the "real" drivers from Nvidia or AMD.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgf8b119d" class="outline-3">
+<h3 id="orgf8b119d">Toolkits</h3>
+<div class="outline-text-3" id="text-orgf8b119d">
+<p>
+On top of that we need the actual GPU computing tools:
+</p>
+
+<ul class="org-ul">
+<li>Nvidia: install the <a href="https://developer.nvidia.com/cuda-toolkit">CUDA toolkit</a></li>
+<li>AMD or Intel: install the support for OpenCL for your operating system</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-org9c12e0f" class="outline-3">
+<h3 id="org9c12e0f">Clojure and Java</h3>
+<div class="outline-text-3" id="text-org9c12e0f">
+<p>
+I assume that you already have a recent <a href="http://www.oracle.com/technetwork/java/javase/downloads/jdk8-downloads-2133151.html">Java Development Kit (JDK)</a>. I also assume you like or are
+willing to try the fantastic <a href="http://www.clojure.org">Clojure programming language</a> that compiles directly to the Java bytecode.
+There are many <a href="https://clojure.org/community/books">books</a>, <a href="http://www.clojurenewbieguide.com/">newbie tutorials</a>, and <a href="https://www.youtube.com/channel/UCaLlzGqiPE2QRj6sSOawJRg">conference talks</a> that can help you quickly learning enough Clojure
+to be dangerous. I thing the <i>free</i> book <a href="https://www.braveclojure.com/">Clojure for the Brave and True</a> is very approachable and fun. You'll need
+to know at least basic Clojure to <i>run</i> this code yourself. If you do not have time to learn it right now,
+though, you'll still be able to <i>read</i> and understand examples, since Clojure has trivially simple syntax.
+</p>
+
+<p>
+So, you'll create a new Clojure project (or use <a href="https://github.com/uncomplicate/neanderthal/tree/master/examples/hello-world">an example</a>) that includes the actual
+library for GPU computing that I am talking about:
+</p>
+
+<ul class="org-ul">
+<li><a href="http://clojurecuda.uncomplicate.org/articles/getting_started.html#installation">ClojureCUDA</a> for Nvidia with CUDA</li>
+<li><a href="http://clojurecl.uncomplicate.org/articles/getting_started.html#installation">ClojureCL</a> for AMD, Intel, and Nvidia with OpenCL</li>
+</ul>
+
+<p>
+You can use any Java IDE, or any text editor + a Java environment that you like that has Clojure support (most do).
+I recommend the fantastic (if a bit unusual in Java community) <a href="https://www.gnu.org/software/emacs/">Emacs</a> + <a href="http://cider.readthedocs.io/en/latest/">CIDER</a>, with a <i>convenient easy setup</i> via <a href="http://batsov.com/prelude/">Prelude</a>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orga84b913" class="outline-3">
+<h3 id="orga84b913">Ready?</h3>
+<div class="outline-text-3" id="text-orga84b913">
+<p>
+It seems there are lots of steps when I describe it like this, but that's because I've tried to support
+all kinds of cases. Most computers already have the drivers, many have CUDA Toolkit, most already
+have Java Virtual Machine, and Clojure is technically just a Java library we include in our Java projects
+through Maven (or a nicer Clojure build "mavens" Leiningen or Boot). Many readers have already been ready :)
+</p>
+
+<p>
+<b>This article uses CUDA, while the next one will show the code for OpenCL (most of the narrative applies for both).</b>
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org6019409" class="outline-2">
+<h2 id="org6019409">Handle the GPU device(s)</h2>
+<div class="outline-text-2" id="text-org6019409">
+<p>
+At the beginning, we'll require the namespaces that contain functions for GPU programming. Functions that work with CUDA
+are in the <a href="http://clojurecuda.uncomplicate.org/codox/uncomplicate.clojurecuda.core.html">uncomplicate.clojurecuda.core</a> namespace of the <a href="http://clojurecuda.uncomplicate.org">ClojureCUDA</a> library, while a few interactive compilation
+functions that we'll need are in the <a href="http://clojurecuda.uncomplicate.org/codox/uncomplicate.clojurecuda.nvrtc.html">uncomplicate.clojurecuda.nvrtc</a> namespace.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span><span style="color: #2F8B58; font-weight: bold;">uncomplicate.clojurecuda.core</span> <span style="color: #F5666D;">:refer</span> <span style="color: #F5666D;">:all</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span><span style="color: #2F8B58; font-weight: bold;">uncomplicate.clojurecuda.nvrtc</span> <span style="color: #F5666D;">:refer</span> <span style="color: #F5666D;">:all</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+CUDA environment has to be initialized before use. After that, I query the environment to see how many
+Nvidia GPU cards I have:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>init<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>device-count<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+1
+
+</pre>
+
+<p>
+Now that I know that there is a CUDA-capable GPU device in my computer, I can grab it by the handle:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">my-nvidia-gpu</span> <span style="color: #7388d6;">(</span>device 0<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+I've stored the handle of my GTX 1080 in the <code>my-nvidia-gpu</code> global var. Storing data in global vars
+is fine and convenient for tutorials, but should not be done in the "real" programs. There is support
+in ClojureCUDA for nice functional approach to writing programs, though, so this technique is fine in this case.
+</p>
+
+<p>
+What is the type of this object and how does it look like?
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure">my-nvidia-gpu
+</pre>
+</div>
+
+<pre class="example">
+#object[jcuda.driver.CUdevice 0x5ead6204 "CUdevice[nativePointer=0x0]"]
+
+</pre>
+
+<p>
+It's an instance of <code>jcuda.driver.CUdevice</code>, which itself stores a reference to a
+<code>CUdevice</code> native pointer. This is not something you should concern yourself with most of the time,
+ but there is a reason why I'm showing it here:
+</p>
+
+<ul class="org-ul">
+<li>ClojureCUDA shields you from the low-level details and lets you concentrate on the things that does matter;</li>
+<li>Sometimes what matters is low-level, and you should be able to control it for full effectiveness;</li>
+<li>You should be able to use existing CUDA-based books, articles, and documentation to learn and properly use GPU programming.</li>
+</ul>
+
+<p>
+Although ClojureCUDA is fairly pleasant and high-level, it is designed to directly correspond to familiar
+CUDA constructs. It helps when it can, and moves out of the way when necessary!
+</p>
+
+<p>
+Congratulations, there is the hello world! Just kidding. Although this is the code that interacts
+with the driver, I hope you'd expected some "real" code that actually compute something on the GPU.
+You won't be disappointed. I would still like to point out that you have witnessed something cool, though:
+a real code, that lets your write CUDA-ish stuff <i>interactively</i>, without even knowing <i>what</i> a basic CUDA
+program looks like. The best of all, we are able to experiment and get the <i>instant feedback</i>,
+which is the key thing for <i>learning how a CUDA program looks like and what it can do</i> in the first place!
+</p>
+</div>
+</div>
+
+<div id="outline-container-org93dff6e" class="outline-2">
+<h2 id="org93dff6e">Working in the context</h2>
+<div class="outline-text-2" id="text-org93dff6e">
+<p>
+The first thing we have to do in all CUDA programs is to create the context through which we will be
+controlling the device(s). It is a step analogous to setting up a connection with a database in
+traditional programs.
+</p>
+
+<p>
+CPU can execute multiple programs simultaneously, and GPU can as well. An analogous of a CPU proccess is
+a GPU <i>context</i>. It manages the life cycles of various CUDA objects, such as: memory, modules (program code),
+streams (a kind of threads), events, etc. It's a management unit that sets up an environment in which your
+device will execute your programs.
+</p>
+
+<p>
+The default context setup can be easily created with ClojureCUDA:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">ctx</span> <span style="color: #7388d6;">(</span>context my-nvidia-gpu<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure">ctx
+</pre>
+</div>
+
+<pre class="example">
+#object[jcuda.driver.CUcontext 0x23562b7a "CUcontext[nativePointer=0x7f41085c7b80]"]
+
+</pre>
+
+<p>
+As with <code>CUdevice</code>, when you need a specific information about how to use contexts, there is a convenient
+fallback to the official literature; just look for <code>CUcontext</code>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org1c5c504" class="outline-2">
+<h2 id="org1c5c504">Manage the memory on the GPU device</h2>
+<div class="outline-text-2" id="text-org1c5c504">
+<p>
+To utilize the capacity of GPU computing cores, we need to feed them enough data at enough speed. GPU has
+its own fast memory and dedicated integrated memory controller(s) on board, but, on top of it, it does offer a direct way
+to control that memory.
+</p>
+
+<p>
+An important thing to notice is that, unlike the CPU, which is an all-round skillful commando,
+the GPU is good at very narrow set of relatively simple tasks, and most of these tasks revolve around numerical operations.
+The memory management will usually deal with supplying huge arrays of primitive numbers to huge
+number of parallel workers, and taking care that each worker work on the appropriate part of a huge raw array.
+</p>
+
+<p>
+When thinking about CUDA memory, think about huge raw byte arrays. Additional libraries such as <a href="http://neanderthal.uncomplicate.org">Neanderthal</a>
+would add more structure on top of this, but CUDA API typically manages raw bytes of memory. Here's how:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>current-context! ctx<span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">gpu-array</span> <span style="color: #7388d6;">(</span>mem-alloc 1024<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+This creates the handle to a chunk of 1024 bytes of global GPU memory called <i>linear memory</i> in CUDA terminology.
+It is nothing more than a 1 dimensional array of raw bytes in the main (global) memory on the GPU board, as
+opposed to graphics-oriented 2D, 3D, and texture memory.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure">gpu-array
+</pre>
+</div>
+
+<pre class="example">
+#object[uncomplicate.clojurecuda.core.CULinearMemory 0x601db1cc "uncomplicate.clojurecuda.core.CULinearMemory@601db1cc"]
+
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org36d572d" class="outline-2">
+<h2 id="org36d572d">Transferring the data from the main memory to the GPU memory</h2>
+<div class="outline-text-2" id="text-org36d572d">
+<p>
+We have defined the memory on which to unleash our many GPU cores. But, before going further, we should think about how
+to get the data there in the first place, and how to return the result. I assume that the data is not on
+the hard disk or in the CSV file available over the internet, but that we have already parsed it and loaded
+it in a float array in our main Clojure program in the Java virtual machine:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>current-context! ctx<span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">main-array</span> <span style="color: #7388d6;">(</span>float-array <span style="color: #909183;">(</span>range 256<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>take 10 main-array<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+</colgroup>
+<tbody>
+<tr>
+<td class="org-right">0.0</td>
+<td class="org-right">1.0</td>
+<td class="org-right">2.0</td>
+<td class="org-right">3.0</td>
+<td class="org-right">4.0</td>
+<td class="org-right">5.0</td>
+<td class="org-right">6.0</td>
+<td class="org-right">7.0</td>
+<td class="org-right">8.0</td>
+<td class="org-right">9.0</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+We have created a <code>float</code> array of 256 numbers. Each <code>float</code> takes 4 bytes, so its size of 1024 bytes matches
+the capacity of the GPU array that is the destination for this data.
+</p>
+
+<p>
+In GPU computing terminology, the memory on the GPU is called <i>device memory</i>, while the main memory is
+called <i>host memory</i>.
+</p>
+
+<p>
+Let's do the transfer!
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>current-context! ctx<span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>memcpy-host! main-array gpu-array<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#object[jcuda.driver.CUcontext 0x23562b7a "CUcontext[nativePointer=0x7f41085c7b80]"]class clojure.lang.ExceptionInfoclass clojure.lang.ExceptionInfoExceptionInfo CUDA error: CUDA_ERROR_CONTEXT_IS_DESTROYED.  clojure.core/ex-info (core.clj:4617)
+
+</pre>
+
+<p>
+To convince you that the data have really been transferred to the GPU memory, I'll transfer it back into
+a new empty float-array:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>take 12 <span style="color: #7388d6;">(</span>memcpy-host! gpu-array <span style="color: #909183;">(</span>float-array 256<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+class clojure.lang.ExceptionInfoclass clojure.lang.ExceptionInfoExceptionInfo CUDA error: CUDA_ERROR_CONTEXT_IS_DESTROYED.  clojure.core/ex-info (core.clj:4617)
+
+</pre>
+
+<p>
+Now you believe me the data is on the GPU!
+</p>
+</div>
+</div>
+
+<div id="outline-container-org7dcd606" class="outline-2">
+<h2 id="org7dcd606">Compute something already!</h2>
+<div class="outline-text-2" id="text-org7dcd606">
+<p>
+We have the data in memory, but we do not have the program to crunch it. There's a lot to talk about
+here, but since this is a hello world article after all, I'll be as brief as possible.
+</p>
+
+<p>
+In GPU programming terminology, there are two kinds of code:
+</p>
+
+<ul class="org-ul">
+<li><i>host code</i> that runs on the CPU and do various management calls to the device driver (such as <code>memcpy-host!</code>)</li>
+<li><i>kernels</i> that run on the GPU cores</li>
+</ul>
+
+<p>
+We write the host code in Clojure, while the kernels are written in CUDA C. Our hello world example
+will increment each element in the array, in parallel of course. The kernel looks like this:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-c"><span style="color: #A52A2A; font-weight: bold;">extern</span> <span style="color: #4E9A06;">"C"</span>
+__global__ <span style="color: #2F8B58; font-weight: bold;">void</span> <span style="color: #00578E; font-weight: bold;">add</span>(<span style="color: #2F8B58; font-weight: bold;">int</span> <span style="color: #0084C8; font-weight: bold;">n</span>, <span style="color: #2F8B58; font-weight: bold;">float</span> *<span style="color: #0084C8; font-weight: bold;">a</span>) {
+    <span style="color: #2F8B58; font-weight: bold;">int</span> <span style="color: #0084C8; font-weight: bold;">i</span> = blockIdx.x * blockDim.x + threadIdx.x;
+    <span style="color: #A52A2A; font-weight: bold;">if</span> (i &lt; n) {
+        a[i] = a[i] + 1.0f;
+    }
+};
+</pre>
+</div>
+
+<p>
+Keyword <code>__global__</code> indicates that this is a CUDA kernel. Otherwise, it is a plain C function, that has some
+parameters, and calls some operators on arrays. Another CUDA-specific things are <code>blockIdx.x</code> and similar fields.
+Remember that each parallel worker will execute this same code at the same time. Thus, each worker need to
+position itself in the whole squadron. CUDA environment will make sure that each unit ("worker") will
+get this data populated. In this hello world case, each worker will be able to compute its ID, and work
+only on one cell of the array. It will read the value of that cell, add one, and write it to the same location
+in the global GPU memory.
+</p>
+
+<p>
+How will the GPU know which kernel is going to be executed on which array in which order? That's the
+job of the host code:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">kernel-source</span>
+      <span style="color: #4E9A06;">"extern \"C\"</span>
+<span style="color: #4E9A06;">         __global__ void increment (int n, float *a) {</span>
+<span style="color: #4E9A06;">           int i = blockIdx.x * blockDim.x + threadIdx.x;</span>
+<span style="color: #4E9A06;">           if (i &lt; n) {</span>
+<span style="color: #4E9A06;">             a[i] = a[i] + 1.0f;</span>
+<span style="color: #4E9A06;">        }</span>
+<span style="color: #4E9A06;">       };"</span><span style="color: #707183;">)</span>
+
+<span style="color: #707183;">(</span>current-context! ctx<span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">hello-program</span> <span style="color: #7388d6;">(</span>compile! <span style="color: #909183;">(</span>program kernel-source<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">hello-module</span> <span style="color: #7388d6;">(</span>module hello-program<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">increment</span> <span style="color: #7388d6;">(</span>function hello-module <span style="color: #4E9A06;">"increment"</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>launch! increment <span style="color: #7388d6;">(</span>grid-1d 256<span style="color: #7388d6;">)</span> <span style="color: #7388d6;">(</span>parameters 256 gpu-array<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">result</span> <span style="color: #7388d6;">(</span>memcpy-host! gpu-array <span style="color: #909183;">(</span>float-array 256<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>take 12 result<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+</colgroup>
+<tbody>
+<tr>
+<td class="org-right">1.0</td>
+<td class="org-right">2.0</td>
+<td class="org-right">3.0</td>
+<td class="org-right">4.0</td>
+<td class="org-right">5.0</td>
+<td class="org-right">6.0</td>
+<td class="org-right">7.0</td>
+<td class="org-right">8.0</td>
+<td class="org-right">9.0</td>
+<td class="org-right">10.0</td>
+<td class="org-right">11.0</td>
+<td class="org-right">12.0</td>
+</tr>
+</tbody>
+</table>
+
+
+<p>
+Each element of our array has been incremented! Cheers!
+</p>
+
+<p>
+Why not write kernels in Clojure,
+or another higher-level language? It is possible to implement, but in my opinion it does more harm than good. Kernels
+are tiny, not very complex compared to the typical C++ code, and they match the problem of floating point
+computations really well. On the other hand, the host code can be long and complex, and C++ is notoriously
+hard to build. Therefore, simplifying host code by wrapping it with Clojure makes sense, while kernels - not so much.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orga25a96e" class="outline-2">
+<h2 id="orga25a96e">Keep the environment clean!</h2>
+<div class="outline-text-2" id="text-orga25a96e">
+<p>
+The key to fast code is managing the scarce resources on the GPU. That means <i>manually</i> managing the key resource: memory!
+</p>
+
+<p>
+ClojureCUDA has macros that can do the bookkeeping for us, which I'll show you in the following articles,
+but for now, we'll do that in the plain CUDA style: by freeing them by hand. Various specific CUDA functions
+are avilable for this task, and we can uniformly access them with the <code>release</code> function:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span><span style="color: #2F8B58; font-weight: bold;">uncomplicate.commons.core</span> <span style="color: #F5666D;">:refer</span> <span style="color: #F5666D;">:all</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>release gpu-array<span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>release hello-module<span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>release hello-program<span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>release ctx<span style="color: #707183;">)</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgc632f88" class="outline-2">
+<h2 id="orgc632f88">What follows next</h2>
+<div class="outline-text-2" id="text-orgc632f88">
+<p>
+Now that we have broken the ice by creating and running a complete CUDA program from scratch interactively
+in the REPL, I'll take time to get into the details of how to handle memory, kernels, transfer, contexts,
+and all these specialized CUDA topics. We'll also see how to integrate the custom low-level CUDA code we write with
+some powerful Clojure number crunching libraries such as <a href="https://github.com/uncomplicate/neanderthal">Neanderthal</a>.
+</p>
+
+<p>
+But first, we'll repeat this hello world in OpenCL, for those of us who have AMD or Intel hardware,
+or just prefer to use a more open and standards-based solution with Nvidia.
+</p>
+</div>
+</div>
