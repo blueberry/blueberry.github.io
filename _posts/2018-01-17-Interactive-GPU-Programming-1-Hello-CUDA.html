@@ -227,7 +227,7 @@ What is the type of this object and how does it look like?
 </div>
 
 <pre class="example">
-#object[jcuda.driver.CUdevice 0x5ead6204 "CUdevice[nativePointer=0x0]"]
+#object[jcuda.driver.CUdevice 0x460cb871 "CUdevice[nativePointer=0x0]"]
 
 </pre>
 
@@ -290,7 +290,7 @@ The default context setup can be easily created with ClojureCUDA:
 </div>
 
 <pre class="example">
-#object[jcuda.driver.CUcontext 0x23562b7a "CUcontext[nativePointer=0x7f41085c7b80]"]
+#object[jcuda.driver.CUcontext 0x32f800ef "CUcontext[nativePointer=0x7f40800902e0]"]
 
 </pre>
 
@@ -340,7 +340,7 @@ opposed to graphics-oriented 2D, 3D, and texture memory.
 </div>
 
 <pre class="example">
-#object[uncomplicate.clojurecuda.core.CULinearMemory 0x601db1cc "uncomplicate.clojurecuda.core.CULinearMemory@601db1cc"]
+#object[uncomplicate.clojurecuda.core.CULinearMemory 0x3b8c8905 "uncomplicate.clojurecuda.core.CULinearMemory@3b8c8905"]
 
 </pre>
 </div>
@@ -428,7 +428,7 @@ Let's do the transfer!
 </div>
 
 <pre class="example">
-#object[jcuda.driver.CUcontext 0x23562b7a "CUcontext[nativePointer=0x7f41085c7b80]"]class clojure.lang.ExceptionInfoclass clojure.lang.ExceptionInfoExceptionInfo CUDA error: CUDA_ERROR_CONTEXT_IS_DESTROYED.  clojure.core/ex-info (core.clj:4617)
+#object[jcuda.driver.CUcontext 0x32f800ef "CUcontext[nativePointer=0x7f40800902e0]"]#object[uncomplicate.clojurecuda.core.CULinearMemory 0x3b8c8905 "uncomplicate.clojurecuda.core.CULinearMemory@3b8c8905"]
 
 </pre>
 
@@ -442,10 +442,51 @@ a new empty float-array:
 </pre>
 </div>
 
-<pre class="example">
-class clojure.lang.ExceptionInfoclass clojure.lang.ExceptionInfoExceptionInfo CUDA error: CUDA_ERROR_CONTEXT_IS_DESTROYED.  clojure.core/ex-info (core.clj:4617)
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
 
-</pre>
+
+<colgroup>
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+</colgroup>
+<tbody>
+<tr>
+<td class="org-right">0.0</td>
+<td class="org-right">1.0</td>
+<td class="org-right">2.0</td>
+<td class="org-right">3.0</td>
+<td class="org-right">4.0</td>
+<td class="org-right">5.0</td>
+<td class="org-right">6.0</td>
+<td class="org-right">7.0</td>
+<td class="org-right">8.0</td>
+<td class="org-right">9.0</td>
+<td class="org-right">10.0</td>
+<td class="org-right">11.0</td>
+</tr>
+</tbody>
+</table>
 
 <p>
 Now you believe me the data is on the GPU!
