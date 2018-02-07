@@ -1,0 +1,511 @@
+---
+date: 2018-02-07
+tags:
+- CUDA
+- Clojure
+- ClojureCUDA
+- Neanderthal
+- OpenCL
+- Nvidia
+- AMD
+- Intel
+author: dragan
+layout: post
+title: Interactive GPU Programming - Part 2 - Hello OpenCL
+excerpt: This is really the same article as Part 1 - Hello CUDA, but with the focus on OpenCL, so I'll skip most of the narration and just show you the code.
+categories:
+- CUDA
+- Clojure
+- ClojureCUDA
+- Neanderthal
+- OpenCL
+---
+<p>
+This is really the same article as <a href="./Interactive-GPU-Programming-1-Hello-CUDA">Part 1 - Hello CUDA</a>, but focused on <a href="https://www.khronos.org/opencl/">OpenCL</a>, so I'll
+skip most of the narration and just show you the code. <a href="https://www.khronos.org/opencl/">OpenCL</a> is an open standard for heterogeneous,
+cross-platform parallel programming that supports GPU's, CPU's, and other accelerators.
+</p>
+
+<div id="outline-container-org04729ee" class="outline-2">
+<h2 id="org04729ee">Set up the environment</h2>
+<div class="outline-text-2" id="text-org04729ee">
+</div>
+<div id="outline-container-org47158d5" class="outline-3">
+<h3 id="org47158d5">Hardware</h3>
+<div class="outline-text-3" id="text-org47158d5">
+<p>
+Nothing specific to add here. You have to have either an AMD, Intel, or Nvidia GPU. OpenCL can
+work on CPU's too. You have to install the appropriate drivers that support OpenCL, which usually
+means <i>regular GPU drivers</i> from AMD and Nvidia.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgfe7e6fe" class="outline-3">
+<h3 id="orgfe7e6fe">Toolkits</h3>
+<div class="outline-text-3" id="text-orgfe7e6fe">
+<p>
+Here, things are a bit more fuzzy. Graphic drivers usually support OpenCL, but sometimes there need
+to be an additional library on top. Also, AMD supports OpenCL 2.0 for some hardware, but reverted
+back to OpenCL 1.2 support in their latest libraries. Nvidia supports OpenCL 1.2, but
+some OpenCL 2.0 features are supported unofficially. All in all, you have to be careful to see what is supported by your
+vendor, install the appropriate drivers and, optionally, additional toolkits that best support that hardware.
+Long story short, on recent (4 years) GPU's, you should end up with OpenCL 1.2 or 2.0.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org6eae9bf" class="outline-3">
+<h3 id="org6eae9bf">Clojure and Java</h3>
+<div class="outline-text-3" id="text-org6eae9bf">
+<p>
+Same as in <a href="./Interactive-GPU-Programming-1-Hello-CUDA">Part 1 - Hello CUDA</a>, here we are using <a href="http://clojurecl.uncomplicate.org/articles/getting_started.html#installation">ClojureCL</a>. Visit ClojureCL's page for more
+installation instructions.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orge2badb0" class="outline-2">
+<h2 id="orge2badb0">Handle the GPU device(s)</h2>
+<div class="outline-text-2" id="text-orge2badb0">
+<p>
+At the beginning, we'll require the namespaces that contain functions for GPU programming.
+Functions that work with OpenCL are in the <a href="http://clojurecl.uncomplicate.org/codox/uncomplicate.clojurecl.core.html">uncomplicate.clojurecl.core</a> namespace of the <a href="http://clojurecl.uncomplicate.org">ClojureCL</a> library.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>require '<span style="color: #006400;">[</span><span style="color: #2F8B58; font-weight: bold;">uncomplicate.clojurecl.core</span> <span style="color: #F5666D;">:refer</span> <span style="color: #F5666D;">:all</span><span style="color: #006400;">]</span>
+         '<span style="color: #006400;">[</span><span style="color: #2F8B58; font-weight: bold;">uncomplicate.clojurecl.info</span> <span style="color: #F5666D;">:refer</span> <span style="color: #F5666D;">:all</span><span style="color: #006400;">]</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<p>
+Although most concepts of OpenCL are similar to what we've seen with CUDA, the environment setup is a bit more
+detailed. That's because OpenCL does not support only GPU's, and only from one vendor, but multiple hardware
+devices from multiple vendors. It has to offer a choice of drivers and supported versions, at the same time.
+</p>
+
+<p>
+The entry point is the concept of <i>platform</i>. The <a href="http://clojurecl.uncomplicate.org/codox/uncomplicate.clojurecl.core.html#var-platforms">platforms</a> function returns a sequence of platforms available on the system:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>map name-info <span style="color: #006400;">(</span>platforms<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-left" />
+
+<col  class="org-left" />
+</colgroup>
+<tbody>
+<tr>
+<td class="org-left">NVIDIA CUDA</td>
+<td class="org-left">AMD Accelerated Parallel Processing</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+My machine reports two platforms: Nvidia and AMD. I'll use AMD platform for this session:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">amd-platform</span> <span style="color: #006400;">(</span>second <span style="color: #ff1493;">(</span>platforms<span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#'user/amd-platform
+
+</pre>
+
+<p>
+Different platforms support different versions of OpenCL standard, and some additional vendor-specific extensions.
+Each platform can be used to access the appropriate hardware. What devices do I have on AMD's platform?
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>map name-info <span style="color: #006400;">(</span>devices amd-platform<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+</colgroup>
+<tbody>
+<tr>
+<td class="org-left">Hawaii</td>
+<td class="org-left">Hawaii</td>
+<td class="org-left">Intel(R) Core(TM) i7-4790K CPU @ 4.00GHz</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+Now I know that there are two Hawaii GPU's (R9 290X) and one CPU that can be accessed through AMD's platform.
+Let's grab the handle of the first device:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">my-amd-gpu</span> <span style="color: #006400;">(</span>first <span style="color: #ff1493;">(</span>devices amd-platform<span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<p>
+What is the type of this object and how does it look like?
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure">my-amd-gpu
+</pre>
+</div>
+
+<pre class="example">
+#object[org.jocl.cl_device_id 0x30af1ea4 "cl_device_id[0x7f6ffc71fc30]"]
+
+</pre>
+
+<p>
+Having the handle of the device, we can proceed in a fashion similar to the Hello CUDA tutorial.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org4ac00ca" class="outline-2">
+<h2 id="org4ac00ca">Working in the context</h2>
+<div class="outline-text-2" id="text-org4ac00ca">
+<p>
+The default context setup can be easily created with ClojureCL:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">ctx</span> <span style="color: #006400;">(</span>context <span style="color: #ff1493;">[</span>my-amd-gpu<span style="color: #ff1493;">]</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure">ctx
+</pre>
+</div>
+
+<pre class="example">
+#object[org.jocl.cl_context 0x5a773a7a "cl_context[0x7f6ffc3b7310]"]
+
+</pre>
+
+<p>
+As with CUDA, when you need a specific information about how to use contexts, there is a convenient
+fallback to the official literature; just look for <code>cl_context</code>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org1e8dea9" class="outline-2">
+<h2 id="org1e8dea9">Manage the memory on the GPU device</h2>
+<div class="outline-text-2" id="text-org1e8dea9">
+<p>
+Memory in OpenCL is created in the explicitly supplied context:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">gpu-array</span> <span style="color: #006400;">(</span>cl-buffer ctx 1024 <span style="color: #F5666D;">:read-write</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure">gpu-array
+</pre>
+</div>
+
+<pre class="example">
+#object[uncomplicate.clojurecl.core.CLBuffer 0xad4e84b "uncomplicate.clojurecl.core.CLBuffer@ad4e84b"]
+
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org6423e47" class="outline-2">
+<h2 id="org6423e47">Transferring the data from the main memory to the GPU memory</h2>
+<div class="outline-text-2" id="text-org6423e47">
+<p>
+Create the data:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">main-array</span> <span style="color: #006400;">(</span>float-array <span style="color: #ff1493;">(</span>range 256<span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>take 10 main-array<span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+</colgroup>
+<tbody>
+<tr>
+<td class="org-right">0.0</td>
+<td class="org-right">1.0</td>
+<td class="org-right">2.0</td>
+<td class="org-right">3.0</td>
+<td class="org-right">4.0</td>
+<td class="org-right">5.0</td>
+<td class="org-right">6.0</td>
+<td class="org-right">7.0</td>
+<td class="org-right">8.0</td>
+<td class="org-right">9.0</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+Let's do the transfer!
+</p>
+
+<p>
+Differently from CUDA, in OpenCL we have to explicitly set the context and <i>command queue</i> (equivalent of CUDA stream)
+that will process the tasks (that is a good thing!).
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">queue</span> <span style="color: #006400;">(</span>command-queue ctx my-amd-gpu<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<span style="color: #8b0000;">(</span>enq-write! queue gpu-array main-array<span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#'user/queue#object[org.jocl.cl_command_queue 0x4821e434 "cl_command_queue[0x7f6ffcf166e0]"]
+
+</pre>
+
+<p>
+To convince you that the data have really been transferred to the GPU memory, I'll transfer it back into
+a new empty float-array:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">roundtrip-array</span> <span style="color: #006400;">(</span>float-array 256<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<span style="color: #8b0000;">(</span>enq-read! queue gpu-array roundtrip-array<span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>take 12 roundtrip-array<span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+</colgroup>
+<tbody>
+<tr>
+<td class="org-right">0.0</td>
+<td class="org-right">1.0</td>
+<td class="org-right">2.0</td>
+<td class="org-right">3.0</td>
+<td class="org-right">4.0</td>
+<td class="org-right">5.0</td>
+<td class="org-right">6.0</td>
+<td class="org-right">7.0</td>
+<td class="org-right">8.0</td>
+<td class="org-right">9.0</td>
+<td class="org-right">10.0</td>
+<td class="org-right">11.0</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+Now you believe me the data is on the GPU!
+</p>
+</div>
+</div>
+
+<div id="outline-container-org6062833" class="outline-2">
+<h2 id="org6062833">Compute something already!</h2>
+<div class="outline-text-2" id="text-org6062833">
+<p>
+Both OpenCL and CUDA kernels are based on C, with some additional parallel programming additions.
+Here's the OpenCL version of the mul10 kernel.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-c">__kernel <span style="color: #2F8B58; font-weight: bold;">void</span> <span style="color: #00578E; font-weight: bold;">mul10</span>(__global <span style="color: #2F8B58; font-weight: bold;">float</span> *<span style="color: #0084C8; font-weight: bold;">a</span>) {
+    <span style="color: #2F8B58; font-weight: bold;">int</span> <span style="color: #0084C8; font-weight: bold;">i</span> = get_global_id(0);
+    a[i] = a[i] * 10.0f;
+};
+</pre>
+</div>
+
+<p>
+The host code:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">kernel-source</span>
+      <span style="color: #FBDE2D;">"__kernel void mul10(__global float *a) {</span>
+<span style="color: #FBDE2D;">         int i = get_global_id(0);</span>
+<span style="color: #FBDE2D;">         a[i] = a[i] * 10.0f;</span>
+<span style="color: #FBDE2D;">       };"</span><span style="color: #8b0000;">)</span>
+
+
+<span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">hello-program</span> <span style="color: #006400;">(</span>build-program! <span style="color: #ff1493;">(</span>program-with-source ctx <span style="color: #ffff00;">[</span>kernel-source<span style="color: #ffff00;">]</span><span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">mul10</span> <span style="color: #006400;">(</span>kernel hello-program <span style="color: #4E9A06;">"mul10"</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">result</span> <span style="color: #006400;">(</span>float-array 256<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<span style="color: #8b0000;">(</span>set-arg! mul10 0 gpu-array<span style="color: #8b0000;">)</span>
+<span style="color: #8b0000;">(</span>enq-nd! queue mul10 <span style="color: #006400;">(</span>work-size-1d 256<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<span style="color: #8b0000;">(</span>enq-read! queue gpu-array result<span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>take 12 result<span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+</colgroup>
+<tbody>
+<tr>
+<td class="org-right">0.0</td>
+<td class="org-right">10.0</td>
+<td class="org-right">20.0</td>
+<td class="org-right">30.0</td>
+<td class="org-right">40.0</td>
+<td class="org-right">50.0</td>
+<td class="org-right">60.0</td>
+<td class="org-right">70.0</td>
+<td class="org-right">80.0</td>
+<td class="org-right">90.0</td>
+<td class="org-right">100.0</td>
+<td class="org-right">110.0</td>
+</tr>
+</tbody>
+</table>
+
+
+<p>
+Each element of our array has been multiplied by 10! Cheers!
+</p>
+</div>
+</div>
+
+<div id="outline-container-org4930d95" class="outline-2">
+<h2 id="org4930d95">Keep the environment clean!</h2>
+<div class="outline-text-2" id="text-org4930d95">
+<p>
+OpenCL also requires that we take care of the loose ends:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>require '<span style="color: #006400;">[</span><span style="color: #2F8B58; font-weight: bold;">uncomplicate.commons.core</span> <span style="color: #F5666D;">:refer</span> <span style="color: #F5666D;">:all</span><span style="color: #006400;">]</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>release gpu-array<span style="color: #8b0000;">)</span>
+<span style="color: #8b0000;">(</span>release hello-program<span style="color: #8b0000;">)</span>
+<span style="color: #8b0000;">(</span>release queue<span style="color: #8b0000;">)</span>
+<span style="color: #8b0000;">(</span>release ctx<span style="color: #8b0000;">)</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org1edc6f5" class="outline-2">
+<h2 id="org1edc6f5">What follows next</h2>
+<div class="outline-text-2" id="text-org1edc6f5">
+<p>
+We've seen that working in OpenCL is similar to CUDA programming. Next, we will explore each of the steps
+we've done in more detail. I know that you are most interested in kernels and algorithms, but contexts, platforms,
+memory, and streams is what we should get a firm grasp on first. Please be patient, it is for a good reason.
+</p>
+</div>
+</div>
