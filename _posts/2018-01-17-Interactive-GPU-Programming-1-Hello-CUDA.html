@@ -32,7 +32,7 @@ also like an <a href="https://en.wikipedia.org/wiki/Interactive_programming">int
 <p>
 Listening to <a href="https://www.tensorflow.org/extend/architecture">hunting stories of Google engineers</a> is the furthest most programmers who work with
 higher-level platforms such as Java, .Net, Ruby, Python, Javascript, etc. will go. Except for the Pythonistas.
-They will get a bit further despite not knowing how to write any GPU-aware code, since there are DL libraries such as <a href="https://www.tensorflow.org/">TensorFlow</a>, <a href="http://caffe.berkeleyvision.org/">Caffe</a>, or <a href="http://pytorch.org/">PyTorch</a>,
+They will get a bit further despite not knowing how to write any GPU-aware code, since there are DL libraries such as <a href="https://www.tensorflow.org/">TensorFlow</a>, <a href="https://caffe.berkeleyvision.org/">Caffe</a>, or <a href="https://pytorch.org/">PyTorch</a>,
 which <i>run</i> on GPUs under the hood. However, even that depends on the other people writing the code that solves your problem. Sometimes there is such code, but
 more often there isn't any, and <b>you</b> are the one to write it.
 </p>
@@ -125,9 +125,9 @@ On top of that we need the actual GPU computing tools:
 <h3 id="org9c12e0f">Clojure and Java</h3>
 <div class="outline-text-3" id="text-org9c12e0f">
 <p>
-I assume that you already have a recent <a href="http://www.oracle.com/technetwork/java/javase/downloads/jdk8-downloads-2133151.html">Java Development Kit (JDK)</a>. I also assume you like or are
-willing to try the fantastic <a href="http://www.clojure.org">Clojure programming language</a> that compiles directly to the Java bytecode.
-There are many <a href="https://clojure.org/community/books">books</a>, <a href="http://www.clojurenewbieguide.com/">newbie tutorials</a>, and <a href="https://www.youtube.com/channel/UCaLlzGqiPE2QRj6sSOawJRg">conference talks</a> that can help you quickly learning enough Clojure
+I assume that you already have a recent <a href="https://www.oracle.com/technetwork/java/javase/downloads/jdk8-downloads-2133151.html">Java Development Kit (JDK)</a>. I also assume you like or are
+willing to try the fantastic <a href="https://www.clojure.org">Clojure programming language</a> that compiles directly to the Java bytecode.
+There are many <a href="https://clojure.org/community/books">books</a>, <a href="https://www.clojurenewbieguide.com/">newbie tutorials</a>, and <a href="https://www.youtube.com/channel/UCaLlzGqiPE2QRj6sSOawJRg">conference talks</a> that can help you quickly learning enough Clojure
 to be dangerous. I thing the <i>free</i> book <a href="https://www.braveclojure.com/">Clojure for the Brave and True</a> is very approachable and fun. You'll need
 to know at least basic Clojure to <i>run</i> this code yourself. If you do not have time to learn it right now,
 though, you'll still be able to <i>read</i> and understand examples, since Clojure has trivially simple syntax.
@@ -139,13 +139,13 @@ library for GPU computing that I am talking about:
 </p>
 
 <ul class="org-ul">
-<li><a href="http://clojurecuda.uncomplicate.org/articles/getting_started.html#installation">ClojureCUDA</a> for Nvidia with CUDA</li>
-<li><a href="http://clojurecl.uncomplicate.org/articles/getting_started.html#installation">ClojureCL</a> for AMD, Intel, and Nvidia with OpenCL</li>
+<li><a href="https://clojurecuda.uncomplicate.org/articles/getting_started.html#installation">ClojureCUDA</a> for Nvidia with CUDA</li>
+<li><a href="https://clojurecl.uncomplicate.org/articles/getting_started.html#installation">ClojureCL</a> for AMD, Intel, and Nvidia with OpenCL</li>
 </ul>
 
 <p>
 You can use any Java IDE, or any text editor + a Java environment that you like that has Clojure support (most do).
-I recommend the fantastic (if a bit unusual in Java community) <a href="https://www.gnu.org/software/emacs/">Emacs</a> + <a href="http://cider.readthedocs.io/en/latest/">CIDER</a>, with a <i>convenient easy setup</i> via <a href="http://batsov.com/prelude/">Prelude</a>.
+I recommend the fantastic (if a bit unusual in Java community) <a href="https://www.gnu.org/software/emacs/">Emacs</a> + <a href="https://cider.readthedocs.io/en/latest/">CIDER</a>, with a <i>convenient easy setup</i> via <a href="https://batsov.com/prelude/">Prelude</a>.
 </p>
 </div>
 </div>
@@ -172,8 +172,8 @@ through Maven (or a nicer Clojure build "mavens" Leiningen or Boot). Many reader
 <div class="outline-text-2" id="text-org6019409">
 <p>
 At the beginning, we'll require the namespaces that contain functions for GPU programming. Functions that work with CUDA
-are in the <a href="http://clojurecuda.uncomplicate.org/codox/uncomplicate.clojurecuda.core.html">uncomplicate.clojurecuda.core</a> namespace of the <a href="http://clojurecuda.uncomplicate.org">ClojureCUDA</a> library, while a few interactive compilation
-functions that we'll need are in the <a href="http://clojurecuda.uncomplicate.org/codox/uncomplicate.clojurecuda.nvrtc.html">uncomplicate.clojurecuda.nvrtc</a> namespace.
+are in the <a href="https://clojurecuda.uncomplicate.org/codox/uncomplicate.clojurecuda.core.html">uncomplicate.clojurecuda.core</a> namespace of the <a href="https://clojurecuda.uncomplicate.org">ClojureCUDA</a> library, while a few interactive compilation
+functions that we'll need are in the <a href="https://clojurecuda.uncomplicate.org/codox/uncomplicate.clojurecuda.nvrtc.html">uncomplicate.clojurecuda.nvrtc</a> namespace.
 </p>
 
 <div class="org-src-container">
@@ -318,7 +318,7 @@ number of parallel workers, and taking care that each worker work on the appropr
 </p>
 
 <p>
-When thinking about CUDA memory, think about huge raw byte arrays. Additional libraries such as <a href="http://neanderthal.uncomplicate.org">Neanderthal</a>
+When thinking about CUDA memory, think about huge raw byte arrays. Additional libraries such as <a href="https://neanderthal.uncomplicate.org">Neanderthal</a>
 would add more structure on top of this, but CUDA API typically manages raw bytes of memory. Here's how:
 </p>
 

@@ -24,9 +24,9 @@ releases: CUDA 9, Java 9, and Clojure 1.9.
 <h2 id="org2480b7a">Where to get it</h2>
 <div class="outline-text-2" id="text-org2480b7a">
 <p>
-I guess it is not difficult to Google it, but <a href="http://neanderthal.uncomplicate.org">here is the Neanderthal homepage</a>. <a href="http://clojurecuda.uncomplicate.org">There is ClojureCUDA home page</a>,
-and other <a href="http://www.uncomplicate.org">Uncomplicate projects also have their web pages with documentation and tutorials.</a>
-Make sure to check out <a href="http://github.com/uncomplicate">the source code repositories of Uncomplicate libraries at GitHub.</a>
+I guess it is not difficult to Google it, but <a href="https://neanderthal.uncomplicate.org">here is the Neanderthal homepage</a>. <a href="https://clojurecuda.uncomplicate.org">There is ClojureCUDA home page</a>,
+and other <a href="https://www.uncomplicate.org">Uncomplicate projects also have their web pages with documentation and tutorials.</a>
+Make sure to check out <a href="https://github.com/uncomplicate">the source code repositories of Uncomplicate libraries at GitHub.</a>
 </p>
 </div>
 </div>
@@ -35,14 +35,14 @@ Make sure to check out <a href="http://github.com/uncomplicate">the source code 
 <h2 id="orgf0cc42a">CUDA</h2>
 <div class="outline-text-2" id="text-orgf0cc42a">
 <p>
-<a href="http://clojurecuda.uncomplicate.org">ClojureCUDA</a> now supports the latest CUDA 9.1. That should eliminate the trouble of downgrading
+<a href="https://clojurecuda.uncomplicate.org">ClojureCUDA</a> now supports the latest CUDA 9.1. That should eliminate the trouble of downgrading
 your CUDA installation to CUDA 8. If you install the latest CUDA toolkit, everything should work
 smoothly. If you have CUDA 9.0, it will work. I am not sure about CUDA 8 - even that should work, but
 I haven't bothered to try it, since by now CUDA 9 is what most people install by default.
 </p>
 
 <p>
-Of course, CUDA 9 is also suported in <a href="http://neanderthal.uncomplicate.org">Neanderthal</a>.
+Of course, CUDA 9 is also suported in <a href="https://neanderthal.uncomplicate.org">Neanderthal</a>.
 </p>
 </div>
 </div>
@@ -51,7 +51,7 @@ Of course, CUDA 9 is also suported in <a href="http://neanderthal.uncomplicate.o
 <h2 id="org22f08d8">Java 9</h2>
 <div class="outline-text-2" id="text-org22f08d8">
 <p>
-<a href="http://clojurecuda.uncomplicate.org">ClojureCUDA</a>, <a href="http://clojurecl.uncomplicate.org">ClojureCL</a>, and <a href="http://neanderthal.uncomplicate.org">Neanderthal</a> use some JVM internals to manage memory efficiently, which
+<a href="https://clojurecuda.uncomplicate.org">ClojureCUDA</a>, <a href="https://clojurecl.uncomplicate.org">ClojureCL</a>, and <a href="https://neanderthal.uncomplicate.org">Neanderthal</a> use some JVM internals to manage memory efficiently, which
 can clash with Java 9 modules. Fortunately, this has a solution! Include
 <code>"--add-opens=java.base/jdk.internal.ref=ALL-UNNAMED"</code> in your JVM options if you use these
 libraries with Java 9, and everything will work smoothly, with no code changes required!

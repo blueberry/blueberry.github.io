@@ -35,7 +35,7 @@ to make working software out of that cryptic formula involving matrices.
 In other words, you are not completely illiterate when it comes to maths, but you can not really work out
 this proof or that out of the blue; your math-fu is way below your Clojure-fu.
 Fortunately, you are a good programmer, and do not need much hand holding when it comes to Clojure.
-You just need some dots connecting what you read in the math textbooks and the functions in the <a href="http://neanderthal.uncomplicate.org">Clojure linear algebra library Neanderthal</a>.
+You just need some dots connecting what you read in the math textbooks and the functions in the <a href="https://neanderthal.uncomplicate.org">Clojure linear algebra library Neanderthal</a>.
 </p>
 
 <p>
@@ -60,7 +60,7 @@ textbook will have this chapter as a starting chapter.
 <h2 id="org80a0b15">The Vector Space \(R^n\)</h2>
 <div class="outline-text-2" id="text-org80a0b15">
 <p>
-To work with vectors in a vector space \(R^n\), I use <a href="http://neanderthal.uncomplicate.org">Neanderthal</a> vectors, and specify the dimension
+To work with vectors in a vector space \(R^n\), I use <a href="https://neanderthal.uncomplicate.org">Neanderthal</a> vectors, and specify the dimension
 \(n\) as a part of the construction of the vector. Sometimes the general <code>vctr</code> function is appropriate,
 and sometimes it is easier to work with specialized functions such as <code>dv</code> and <code>sv</code> (for native vectors on the CPU),
 <code>clv</code> (OpenCL vectors on GPU or CPU), or <code>cuv</code> (CUDA GPU vectors).
@@ -207,7 +207,7 @@ memory copying, and fuse multiple operations into one.
 <p>
 When it comes to vector addition and scalar multiplication, this means that we can fuse <code>scal</code> and
 <code>xpy</code> into <code>axpy</code> (scalar a times vector x plus vector y) and avoid memory copying by using
-destructive functions such as <code>scal!</code> and <code>axpy!</code> (note the <code>!</code> suffix). For more varieties, please check <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html">the documentation
+destructive functions such as <code>scal!</code> and <code>axpy!</code> (note the <code>!</code> suffix). For more varieties, please check <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html">the documentation
 of the neanderthal core namespace</a> out.
 </p>
 
@@ -524,7 +524,7 @@ The first difference is that we can use different optimized implementations of m
 of their structure. Therefore, there are dense matrices (GE), dense triangular matrices (TR), dense symmetrical matrices (SY),
 various banded storages for symmetric and triangular matrices, sparse matrices (Sp), etc. Some of those
 are already implemented and supported in Neanderthal at the time of this writing, some are waiting their
-turn to be implemented (and may be at the time you're reading this - check <a href="http://neanderthal.uncomplicate.org/codox">Neanderthal API docs</a> out).
+turn to be implemented (and may be at the time you're reading this - check <a href="https://neanderthal.uncomplicate.org/codox">Neanderthal API docs</a> out).
 </p>
 
 <p>
@@ -562,7 +562,7 @@ Euclidean norm applied to matrices is known as Frobenius norm (FYI).
 
 <p>
 Most of the functions that can be applied to vectors, can also be applied to matrices. Furthermore,
-there are many more functions in linear algebra that work exclusively with matrices. <a href="http://neanderthal.uncomplicate.org/codox">Neanderthal API docs</a>
+there are many more functions in linear algebra that work exclusively with matrices. <a href="https://neanderthal.uncomplicate.org/codox">Neanderthal API docs</a>
 list what is available in Clojure at the moment when you read this.
 </p>
 </div>
@@ -588,7 +588,7 @@ are independent. There is a catch, though: floating-point computations are not a
 large vectors, sometime there will be rounding error, so you might get something like 0.99999999 or 1.000001.
 Equality comparison of floating-point numbers is a tricky business. Keep that in mind, and know that even
 there Neanderthal can help you, since it offers functions that take some imprecision margin into account.
-See the <a href="http://neanderthal.uncomplicate.org/codox">Neanderthal API docs</a> and look up for functions such as <code>f=</code> in the math namespace.
+See the <a href="https://neanderthal.uncomplicate.org/codox">Neanderthal API docs</a> and look up for functions such as <code>f=</code> in the math namespace.
 </p>
 
 <p>

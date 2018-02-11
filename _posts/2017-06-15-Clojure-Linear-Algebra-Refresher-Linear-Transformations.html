@@ -126,7 +126,7 @@ and then form a matrix whose columns are those images. Easy!
 Excuse the imperative code in function <code>t!</code>, but we've found the matrix that represents the
 linear transformation. Please keep in mind that vectors and matrices are functions that can retrieve
 or update values at specific index, but that these functions are usually boxed. In tight loops, you'd
-want to use <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.real.html#var-entry">entry</a> and <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.real.html#var-entry.21">entry!</a> from the <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.real.html">uncomplicate.neanderthal.real</a> namespace, or some other
+want to use <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.real.html#var-entry">entry</a> and <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.real.html#var-entry.21">entry!</a> from the <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.real.html">uncomplicate.neanderthal.real</a> namespace, or some other
 operation optimized for performance.
 </p>
 
@@ -239,8 +239,8 @@ grasp the theory. Therefore, I'll only mention the important stuff, and direct y
 <p>
 Example 2 (page 273) demonstrates how to find the kernel, by solving a system of equations
 \(T(\mathbf{x}) = A\mathbf{x} = \mathbf{0}\). The first thing that we could do is to try to use
-the function for solving linear systems of equations <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#var-sv.21">sv!</a>. That won't help us much; since our
-system is homogeneous, <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#var-sv.21">sv!</a> can only give us the trivial solution \(\mathbf{x}=\mathbf{0}\).
+the function for solving linear systems of equations <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#var-sv.21">sv!</a>. That won't help us much; since our
+system is homogeneous, <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#var-sv.21">sv!</a> can only give us the trivial solution \(\mathbf{x}=\mathbf{0}\).
 Fortunately, in this example, \(A\) is a square matrix, so we can exploit the equality
 \(A\mathbf{x}=\lambda\mathbf{x}\) between eigenvectors \(\mathbf{x}\) and eigenvalue(s) \(\lambda=0\),
 if such \(\lambda\) exists (since this is a textbook example, I'd be surprised if it didn't).
@@ -343,7 +343,7 @@ of the <i>nonhomogeneous system</i> \(A\mathbf{x}=\mathbf{y}\), and every other 
 
 <p>
 Look the details up in the textbook, an I'm showing you example 2 (page 286) in Clojure. We can use
-the <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#var-sv.21">sv!</a> function to solve this non-homogeneous system.
+the <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#var-sv.21">sv!</a> function to solve this non-homogeneous system.
 </p>
 
 <div class="org-src-container">
@@ -385,7 +385,7 @@ As an exercise, you can check whether those vectors are really solutions (and in
 </p>
 
 <p>
-<a href="http://neanderthal.uncomplicate.org">Neanderthal's</a> <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#var-sv.21">sv!</a> solves not only one system at a time; you can give it a bunch of systems, and solve them
+<a href="https://neanderthal.uncomplicate.org">Neanderthal's</a> <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#var-sv.21">sv!</a> solves not only one system at a time; you can give it a bunch of systems, and solve them
 in one sweep:
 </p>
 

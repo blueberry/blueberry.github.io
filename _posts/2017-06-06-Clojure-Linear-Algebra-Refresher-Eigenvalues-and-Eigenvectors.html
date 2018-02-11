@@ -21,7 +21,7 @@ categories:
 I stumble upon <i>eigenvectors</i> and <i>eigenvalues</i> regularly when reading about machine learning topics. They
 seem to be important. They are not introduced in those texts, though, so you might be scratching your head
 wondering how the authors got the idea in the first place to use them and why. Luckily, they are introduced
-soon enough in linear algebra textbooks, and they are available at high-speed in Clojure via <a href="http://neanderthal.uncomplicate.org">Neanderthal</a>, that we should
+soon enough in linear algebra textbooks, and they are available at high-speed in Clojure via <a href="https://neanderthal.uncomplicate.org">Neanderthal</a>, that we should
 be able to at least try them out easily, and then build upon that knowledge fearlessly when we encounter them
 in the wild.
 </p>
@@ -62,7 +62,7 @@ can be computed, and some useful theorems can be build upon this simple definiti
 
 <p>
 Let's do some Clojure: given a matrix, how do I find eigenvalues and eigenvectors? The function is called
-<a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#var-ev.21"><code>ev!</code></a> and it can be found in the <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html"><code>uncomplicate.neanderthal.linalg</code></a> namespace:
+<a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#var-ev.21"><code>ev!</code></a> and it can be found in the <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html"><code>uncomplicate.neanderthal.linalg</code></a> namespace:
 </p>
 
 <div class="org-src-container">
@@ -172,7 +172,7 @@ to two decimals for readability. These are the actual values to the max precisio
 </table>
 
 <p>
-Another benefit of using a good numerical software (such as <a href="http://neanderthal.uncomplicate.org">Neanderthal</a>) is that the
+Another benefit of using a good numerical software (such as <a href="https://neanderthal.uncomplicate.org">Neanderthal</a>) is that the
 eigenvectors we get are normalized:
 </p>
 
@@ -279,9 +279,9 @@ an inverse of the whole matrix, we can compute it from \(LU\) factors.
 </p>
 
 <p>
-Relevant functions can be found in the <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html"><code>uncomplicate.neanderthal.linalg</code></a> namespace.
-Function <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#var-trf.21"><code>trf!</code></a> does the LU
-("tr" is for <i>triangular</i> and "f" for <i>factorization</i>) and <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#var-tri.21"><code>tri!</code></a> the inverse given the previously LU-processed
+Relevant functions can be found in the <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html"><code>uncomplicate.neanderthal.linalg</code></a> namespace.
+Function <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#var-trf.21"><code>trf!</code></a> does the LU
+("tr" is for <i>triangular</i> and "f" for <i>factorization</i>) and <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#var-tri.21"><code>tri!</code></a> the inverse given the previously LU-processed
 input (<code>trf</code>). Use it only when you absolutely need an inverse, and avoid it when LU (or QR etc.) factors are enough.
 </p>
 
@@ -384,8 +384,8 @@ elements.
 </p>
 
 <p>
-I'll use <a href="http://neanderthal.uncomplicate.org">Neanderthal's</a> <code>dia</code> function to access the diagonal of \(D\), and <a href="http://fluokitten.uncomplicate.org">Fluokitten</a>'s <a href="http://fluokitten.uncomplicate.org/codox/uncomplicate.fluokitten.core.html#var-fmap.21"><code>fmap!</code></a> function
-to apply the <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.math.html#var-pow"><code>pow</code></a> function to each of its elements (<a href="http://fluokitten.uncomplicate.org/codox/uncomplicate.fluokitten.core.html#var-fmap.21"><code>fmap!</code></a> is similar to <code>map</code>, just more efficient, and polymorphic
+I'll use <a href="https://neanderthal.uncomplicate.org">Neanderthal's</a> <code>dia</code> function to access the diagonal of \(D\), and <a href="https://fluokitten.uncomplicate.org">Fluokitten</a>'s <a href="https://fluokitten.uncomplicate.org/codox/uncomplicate.fluokitten.core.html#var-fmap.21"><code>fmap!</code></a> function
+to apply the <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.math.html#var-pow"><code>pow</code></a> function to each of its elements (<a href="https://fluokitten.uncomplicate.org/codox/uncomplicate.fluokitten.core.html#var-fmap.21"><code>fmap!</code></a> is similar to <code>map</code>, just more efficient, and polymorphic
 so it supports vectors, matrices and many more structures).
 </p>
 
@@ -422,8 +422,8 @@ you get bored of doing these step-by-step instructions, offload some work to the
 There is a theorem that claims that symmetric matrices are diagonalizable. That's also
 something that you might demonstrate as an exercise. There is an even more significant property of
 symmetric matrices: they are <i>orthogonaly diagonalizable</i>, meaning that \(D = C^tAC\) (since by definition
-\(C^{-1} = C^t\) for orthogonal matrices). Of course, \(C^t\) is much easier to compute than \(C^{-1}\), <a href="http://neanderthal.uncomplicate.org">Neanderthal's</a>
-<a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-trans"><code>trans</code></a> function will do that in \(O(1)\), that is - instantly.
+\(C^{-1} = C^t\) for orthogonal matrices). Of course, \(C^t\) is much easier to compute than \(C^{-1}\), <a href="https://neanderthal.uncomplicate.org">Neanderthal's</a>
+<a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-trans"><code>trans</code></a> function will do that in \(O(1)\), that is - instantly.
 </p>
 </div>
 </div>
@@ -439,7 +439,7 @@ Eigenvalues and eigenvectors are then special values and vectors of a matrix, it
 
 <p>
 You can continue with the next post in the series: <a href="./Clojure-Linear-Algebra-Refresher-Matrix-Transformations">Matrix Transformations</a>.
-In the meantime, you might be interested in checking out some <a href="http://neanderthal.uncomplicate.org/articles/guides.html">Neanderthal Tutorials</a>.
+In the meantime, you might be interested in checking out some <a href="https://neanderthal.uncomplicate.org/articles/guides.html">Neanderthal Tutorials</a>.
 </p>
 </div>
 </div>

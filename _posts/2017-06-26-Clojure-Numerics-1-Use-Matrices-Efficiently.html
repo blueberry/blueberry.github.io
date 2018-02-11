@@ -34,7 +34,7 @@ Before I continue, a few reminders:
 </p>
 <ul class="org-ul">
 <li>You should keep a linear algebra textbook around. I recommend <a href="https://www.amazon.com/Applications-Alternate-Bartlett-Publishers-Mathematics/dp/0763782491">Linear Algebra With Applications, Alternate Edition</a> by Gareth Williams (<a href="./Clojure-Linear-Algebra-Refresher-Vector-Spaces">see more in part 1 of Clojure Linear Algebra Refresher</a>).</li>
-<li>Include <a href="http://neanderthal.uncomplicate.org">Neanderthal library</a> in your project to be able to use ready-made high-performance linear algebra functions.</li>
+<li>Include <a href="https://neanderthal.uncomplicate.org">Neanderthal library</a> in your project to be able to use ready-made high-performance linear algebra functions.</li>
 <li>Read my <a href="./Clojure-Linear-Algebra-Refresher-Vector-Spaces">Clojure Linear Algebra Refresher</a> series.</li>
 </ul>
 
@@ -123,11 +123,11 @@ The answer is: it depends on how your algorithm accesses it most often.
 </p>
 
 <p>
-<a href="http://neanderthal.uncomplicate.org">Neanderthal</a> gives you both options. When you create any kind of matrix, you can specify whether you
+<a href="https://neanderthal.uncomplicate.org">Neanderthal</a> gives you both options. When you create any kind of matrix, you can specify whether you
 want it to be <i>column-oriented</i> (<code>:column</code>, which is the default), or <i>row-oriented</i> (<code>:row</code>). In the
-following example, we will use CPU matrices from the <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.native.html">native</a> namespace. The same options also work
-for functions that create GPU CUDA matrices (<a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.cuda.html">cuda</a> namespace), or OpenCL's GPU and CPU matrices
-(<a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.opencl.html">opencl</a> namespace).
+following example, we will use CPU matrices from the <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.native.html">native</a> namespace. The same options also work
+for functions that create GPU CUDA matrices (<a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.cuda.html">cuda</a> namespace), or OpenCL's GPU and CPU matrices
+(<a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.opencl.html">opencl</a> namespace).
 </p>
 
 <div class="org-src-container">
@@ -307,8 +307,8 @@ data, the original structure also changes!
 
 <p>
 By scaling the submatrix \(B\) by 100, we also changed the "master" matrix. Neanderthal
-offers two variants of many functions: pure and destructive. The destructive variant, <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-scal.21">scal!</a>,
-changes the original data, while the pure variant <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-scal">scal</a>, would keep the data intact, and work
+offers two variants of many functions: pure and destructive. The destructive variant, <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-scal.21">scal!</a>,
+changes the original data, while the pure variant <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-scal">scal</a>, would keep the data intact, and work
 on the copy of the data instead. That is often desirable, but can be inefficient, especially if we
 work with large data, or change data a lot. You'll probably have to use the destructive variants
 more often than not, and it's not a matter of taste, but of brutal necessity.
@@ -325,8 +325,8 @@ memory movements and coercions under the hood.
 
 <p>
 When it comes to memory copying and transfer, there are also destructive and pure variants:
-The destructive <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-copy.21">copy!</a> function moves the data from the existing source to the existing and pre-allocated
-destination. The pure <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-copy">copy</a> function accepts the source and returns a fresh objects with the same contents,
+The destructive <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-copy.21">copy!</a> function moves the data from the existing source to the existing and pre-allocated
+destination. The pure <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-copy">copy</a> function accepts the source and returns a fresh objects with the same contents,
 which is not a view of the buffer, but a master of a separate copy of its own.
 </p>
 
@@ -365,7 +365,7 @@ Copy works whenever objects are compatible, meaning they have the same structure
 
 <p>
 If I want to move data from a Clojure list to a matrix, I need to transfer it. Constructors,
-such as <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-ge">ge</a>, or <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.native.html#var-dge">dge</a>, will attempt to transfer the source, as we've already seen.
+such as <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-ge">ge</a>, or <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.native.html#var-dge">dge</a>, will attempt to transfer the source, as we've already seen.
 </p>
 
 <div class="org-src-container">
@@ -524,22 +524,22 @@ There are four broad groups of storage:
 <ul class="org-ul">
 <li><i>Full</i> storage: a matrix is stored densely, and all or only some elements are accessible. Matrix operations might be optimized for specific storage. Examples are:
 <ul class="org-ul">
-<li><i>General</i> matrices (<a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-ge">ge</a>), which use a dense rectangle,</li>
-<li><i>Triangular</i> matrices, (<a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-tr">tr</a>), use lower or upper triangle of a dense rectangle,</li>
-<li><i>Symmetric</i> matrices (<a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-sy">sy</a>) , use lower or upper triangle of dense storage.</li>
+<li><i>General</i> matrices (<a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-ge">ge</a>), which use a dense rectangle,</li>
+<li><i>Triangular</i> matrices, (<a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-tr">tr</a>), use lower or upper triangle of a dense rectangle,</li>
+<li><i>Symmetric</i> matrices (<a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-sy">sy</a>) , use lower or upper triangle of dense storage.</li>
 </ul></li>
 
 <li><i>Packed</i> storage scheme stores special matrices more compactly. It stores only the data that is used.
 <ul class="org-ul">
-<li><i>Symmetric</i> packed (<a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-sp">sp</a>),</li>
-<li><i>Triangular</i> packed (<a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-tp">tp</a>).</li>
+<li><i>Symmetric</i> packed (<a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-sp">sp</a>),</li>
+<li><i>Triangular</i> packed (<a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-tp">tp</a>).</li>
 </ul></li>
 
 <li><i>Banded</i> storage: matrices whose data are concentrated on a relatively narrow band around the diagonal, can take advantage and only store that band in memory.
 <ul class="org-ul">
-<li><i>General band</i> matrices (<a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-gb">gb</a>),</li>
-<li><i>Triangular band</i> matrices, (<a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-tb">tb</a>),</li>
-<li><i>Symmetric band</i> matrices (<a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-sb">sb</a>).</li>
+<li><i>General band</i> matrices (<a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-gb">gb</a>),</li>
+<li><i>Triangular band</i> matrices, (<a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-tb">tb</a>),</li>
+<li><i>Symmetric band</i> matrices (<a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-sb">sb</a>).</li>
 </ul></li>
 
 <li><i>Sparse</i> storage: for the case where we need to work with huge, but sparsely populated, matrices, there is a number of standard formats for compressing the data and storing only the (rare) entries that matter:
@@ -571,7 +571,7 @@ documentation, and future articles for the rest.
 </p>
 
 <p>
-First, the basic stuff. I use <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.native.html#var-dtr">dtr</a> to create a dense triangular matrix in memory that is lower triangular,
+First, the basic stuff. I use <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.native.html#var-dtr">dtr</a> to create a dense triangular matrix in memory that is lower triangular,
 and has ones on the diagonal. Then I multiply it with a dense matrix.
 </p>
 
@@ -628,13 +628,13 @@ many numerical techniques produce one or a few triangular matrices as a result. 
 that consist of two triangular matrices, for example, can be nicely packed into one rectangle,
 which is laid out as one chunk of memory. Further, such nicely packaged matrices can be used
 in further operations that are aware of this structure. This is something that many functions
-from the <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html">linalg</a> namespace.
+from the <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html">linalg</a> namespace.
 </p>
 
 <p>
 Take as an example the ubiquitous LU factorization. Its job is to find two triangular matrices,
 that can further be used in solving systems of linear equations, or finding determinants, or
-other tasks. In Clojure, we can use the <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#trf.21">trf!</a> and  <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#trf">trf</a> functions to compute that:
+other tasks. In Clojure, we can use the <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#trf.21">trf!</a> and  <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#trf">trf</a> functions to compute that:
 </p>
 
 <div class="org-src-container">
@@ -747,7 +747,7 @@ That was the inverse, indeed!
 <div class="outline-text-2" id="text-org4ca8750">
 <p>
 So it should be the right time to wrap it up and remind you that there is more documentation
-at <a href="http://neanderthal.uncomplicate.org">Neanderthal</a>'s website. Next time you feel like doing some high-performance coding, you can check it out :)
+at <a href="https://neanderthal.uncomplicate.org">Neanderthal</a>'s website. Next time you feel like doing some high-performance coding, you can check it out :)
 </p>
 </div>
 </div>

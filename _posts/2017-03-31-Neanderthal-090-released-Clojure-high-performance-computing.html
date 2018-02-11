@@ -24,9 +24,9 @@ categories:
 - data analysis
 ---
 <p>
-Today, I have the pleasure to announce the new release of <a href="http://neanderthal.uncomplicate.org">Neanderthal</a>, the high-performance <a href="http://clojure.org">Clojure</a> matrix library, which brings some important
+Today, I have the pleasure to announce the new release of <a href="https://neanderthal.uncomplicate.org">Neanderthal</a>, the high-performance <a href="https://clojure.org">Clojure</a> matrix library, which brings some important
 major improvements, and beats the path to even better stuff that will follow in subsequent versions. If you are not
-sure why you would even need such a library in Clojure, I recommend <a href="https://www.youtube.com/watch?v=bEOOYbscyTs">this EuroClojure talk</a> (<a href="http://dragan.rocks/talks/EuroClojure2016/clojure-is-not-afraid-of-the-gpu.html">slides</a>). Let's explore major
+sure why you would even need such a library in Clojure, I recommend <a href="https://www.youtube.com/watch?v=bEOOYbscyTs">this EuroClojure talk</a> (<a href="https://dragan.rocks/talks/EuroClojure2016/clojure-is-not-afraid-of-the-gpu.html">slides</a>). Let's explore major
 stuff (and also see some code :)
 </p>
 
@@ -34,7 +34,7 @@ stuff (and also see some code :)
 <h2 id="org35e8698">Streamlined installation</h2>
 <div class="outline-text-2" id="text-org35e8698">
 <p>
-Neanderthal is written in Clojure, so you can explore its <a href="http://github.com/uncomplicate/neanderthal">source code</a>, improve it, or mold it to your needs in your favorite programming language. However,
+Neanderthal is written in Clojure, so you can explore its <a href="https://github.com/uncomplicate/neanderthal">source code</a>, improve it, or mold it to your needs in your favorite programming language. However,
 that Clojure code must rely on natively optimized low-level operations when it comes to linear algebra computations
 standardized as BLAS and LAPACK.
 Such stuff is a couple of orders of magnitudes faster than is possible with Java, and is also really hard to implement.
@@ -52,7 +52,7 @@ Only on OS X, it worked out of the box, without installing anything, since OS X 
 
 <p>
 From version 0.9.0, I switched to Intel's Math Kernel Library (MKL) instead of ATLAS. <b>MKL does not require compiling or tuning</b>,
-but is instead a <a href="http://neanderthal.uncomplicate.org/articles/getting_started.html#the-native-library-used-by-neanderthals-native-engine">drop-in installation</a>. The trade-off is that MKL is not open-source, but on the other hand <b>it is free as free beer</b>. On yet
+but is instead a <a href="https://neanderthal.uncomplicate.org/articles/getting_started.html#the-native-library-used-by-neanderthals-native-engine">drop-in installation</a>. The trade-off is that MKL is not open-source, but on the other hand <b>it is free as free beer</b>. On yet
 another hand, MKL is the fastest thing around, and also support many features that are missing from its open-source cousins.
 </p>
 </div>
@@ -69,12 +69,12 @@ I guess I can say that it's the fastest offering around. This improvement came f
 </p>
 
 <p>
-To see what you can expect from this, see <a href="http://neanderthal.uncomplicate.org/articles/benchmarks.html">the benchmarks.</a> I have done many more measurements, and Neanderthal is
+To see what you can expect from this, see <a href="https://neanderthal.uncomplicate.org/articles/benchmarks.html">the benchmarks.</a> I have done many more measurements, and Neanderthal is
 consistently fast across operations, but matrix multiplication is the most representative overall.
 </p>
 
 <p>
-Of course, <a href="http://neanderthal.uncomplicate.org/articles/tutorial_opencl.html">Neanderthal's GPU engine</a> is still here, and is much faster than CPU (even with MKL), if you have really large
+Of course, <a href="https://neanderthal.uncomplicate.org/articles/tutorial_opencl.html">Neanderthal's GPU engine</a> is still here, and is much faster than CPU (even with MKL), if you have really large
 structues.
 </p>
 </div>
@@ -141,7 +141,7 @@ pen and paper, or any Java library that has that feature. The value of Neanderth
 </p>
 
 <p>
-To see what functions are available now, visit <a href="http://neanderthal.uncomplicate.org/codox">The API documentation, especially the section about the `linalg` namespace</a>.
+To see what functions are available now, visit <a href="https://neanderthal.uncomplicate.org/codox">The API documentation, especially the section about the `linalg` namespace</a>.
 Do not skip it, there's valuable info there, including the links to the literature.
 </p>
 </div>
@@ -159,8 +159,8 @@ Neanderthal is pretty useful in its current state, but it'll get even more usefu
 <h3 id="org971db25">CUDA integration.</h3>
 <div class="outline-text-3" id="text-org971db25">
 <p>
-Neanderthal already <a href="http://neanderthal.uncomplicate.org/articles/tutorial_opencl.html">supports GPU computing</a> through OpenCL. This also helps when we need to build our own GPU kernels
- through <a href="http://clojurecl.uncomplicate.org">ClojureCL</a>. However, this leaves a bunch of CUDA-based libraries out of the reach. I'll change that
+Neanderthal already <a href="https://neanderthal.uncomplicate.org/articles/tutorial_opencl.html">supports GPU computing</a> through OpenCL. This also helps when we need to build our own GPU kernels
+ through <a href="https://clojurecl.uncomplicate.org">ClojureCL</a>. However, this leaves a bunch of CUDA-based libraries out of the reach. I'll change that
  and enable Neanderthal to have the same functionality based on CUDA, too. This is very important, since it will
 enable the code based on Neanderthal to easily communicate to Deep Learning libraries that are usually based
 on Nvidia's cuDNN.
@@ -192,8 +192,8 @@ Last, but not least, I also decided to support tensors. I can't promise when, bu
 <h2 id="orga169a95">Happy hacking!</h2>
 <div class="outline-text-2" id="text-orga169a95">
 <p>
-If you find Neanderthal useful, do not forget to check out the <a href="http://neanderthal.uncomplicate.org/articles/guides.html">tutorials</a>, and other complementary Clojure libraries:
-<a href="http://clojurecl.uncomplicate.org">ClojureCL</a>, which brings GPU computing to Clojure, and <a href="http://fluokitten.uncomplicate.org">Fluokitten</a>, Clojure monadic library. Both of them have been used
+If you find Neanderthal useful, do not forget to check out the <a href="https://neanderthal.uncomplicate.org/articles/guides.html">tutorials</a>, and other complementary Clojure libraries:
+<a href="https://clojurecl.uncomplicate.org">ClojureCL</a>, which brings GPU computing to Clojure, and <a href="https://fluokitten.uncomplicate.org">Fluokitten</a>, Clojure monadic library. Both of them have been used
 as Neanderthal's building blocks, and can be useful in your code.
 </p>
 

@@ -38,7 +38,7 @@ Before I continue, a few reminders:
 <li>These articles are <span class="underline">not stand-alone</span>. You should follow along with a linear algebra textbook. I recommend <a href="https://www.amazon.com/Applications-Alternate-Bartlett-Publishers-Mathematics/dp/0763782491">Linear Algebra With Applications, Alternate Edition</a> by Gareth Williams (<a href="./Clojure-Linear-Algebra-Refresher-Vector-Spaces">see more in part 1 of this series</a>).</li>
 <li>The intention is to connect the dots from a math textbook to Clojure code, rather than explain math theory or teach you basics of Clojure.</li>
 <li>Please read <a href="./Clojure-Linear-Algebra-Refresher-Vector-Spaces">Clojure Linear Algebra Refresher (1) - Vector Spaces</a>, and, optionally, <a href="./Clojure-Linear-Algebra-Refresher-Eigenvalues-and-Eigenvectors">Clojure Linear Algebra Refresher (2) - Eigenvalues and Eigenvectors</a> first.</li>
-<li>Include <a href="http://neanderthal.uncomplicate.org">Neanderthal library</a> in your project to be able to use ready-made high-performance linear algebra functions.</li>
+<li>Include <a href="https://neanderthal.uncomplicate.org">Neanderthal library</a> in your project to be able to use ready-made high-performance linear algebra functions.</li>
 </ul>
 
 <p>
@@ -271,7 +271,7 @@ The code:
 
 <p>
 And, we got a parallelogram, since \(A\) is invertible. Check that as an exercise; a matrix is
-invertible if its determinant is non-zero (you can use the <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-det">det</a> function).
+invertible if its determinant is non-zero (you can use the <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-det">det</a> function).
 </p>
 
 <p>
@@ -331,8 +331,8 @@ I like this approach much more.
 </p>
 
 <ul class="org-ul">
-<li>It's <b>simpler</b>. Instead of maintaining disparate points of a unit square, we can treat them as one entity. If we still want access to points, we just call the <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-col">col</a> function.</li>
-<li>It's <b>faster</b>. Instead of calling <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-mv">mv</a> four times, we call <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-mm">mm</a> once. In addition to that, our data is concentrated next to each other, in a structure that is cache-friendly. This can give huge performance yields when we work with large matrices.</li>
+<li>It's <b>simpler</b>. Instead of maintaining disparate points of a unit square, we can treat them as one entity. If we still want access to points, we just call the <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-col">col</a> function.</li>
+<li>It's <b>faster</b>. Instead of calling <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-mv">mv</a> four times, we call <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-mm">mm</a> once. In addition to that, our data is concentrated next to each other, in a structure that is cache-friendly. This can give huge performance yields when we work with large matrices.</li>
 </ul>
 
 <p>
@@ -382,7 +382,7 @@ It can be extended naturally to a composition of \(n\) matrix transformations.
 </p>
 
 <p>
-In Clojure, I can compose matrices with the <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-mm">mm</a> function. Not only that <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-mm">mm</a> supports 2, 3, or more arguments,
+In Clojure, I can compose matrices with the <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-mm">mm</a> function. Not only that <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-mm">mm</a> supports 2, 3, or more arguments,
 it also takes care of multiplying them optimally.
 </p>
 
@@ -507,7 +507,7 @@ This transformation slides points in the direction of vector \(\mathbf{v}\).
 </p>
 
 <p>
-In Clojure, the translation is done with the good old <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-axpy">axpy</a> function.
+In Clojure, the translation is done with the good old <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-axpy">axpy</a> function.
 </p>
 
 <div class="org-src-container">
@@ -525,7 +525,7 @@ In Clojure, the translation is done with the good old <a href="http://neandertha
 <i>Affine transformation</i> is a transformation \(T:R_n \rightarrow R_n\) defined by
  \(T(\mathbf{u}) = A\mathbf{u} + \mathbf{v}\). It can be interpreted as a matrix transformation followed
 by a translation. See the textbook for more details, and you can do a Clojure example as a customary
-trivial exercise left to the reader. Hint: the <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-mv">mv</a> function can do affine transformations.
+trivial exercise left to the reader. Hint: the <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-mv">mv</a> function can do affine transformations.
 </p>
 </div>
 </div>

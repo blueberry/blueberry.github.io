@@ -32,7 +32,7 @@ make those unknowns known? What functions do I call?
 Before I continue, a few reminders:
 </p>
 <ul class="org-ul">
-<li>Include <a href="http://neanderthal.uncomplicate.org">Neanderthal library</a> in your project to be able to use ready-made high-performance linear algebra functions.</li>
+<li>Include <a href="https://neanderthal.uncomplicate.org">Neanderthal library</a> in your project to be able to use ready-made high-performance linear algebra functions.</li>
 <li>Read articles in the introductory <a href="./Clojure-Linear-Algebra-Refresher-Vector-Spaces">Clojure Linear Algebra Refresher</a> series.</li>
 <li>This is the fifth article in a more advanced series. It is a good idea to read them all in sequence if this is your first contact with this kind of software.</li>
 </ul>
@@ -305,7 +305,7 @@ and triangular systems are quite easy to solve, this is what we were looking for
 </p>
 
 <p>
-Here I call Neanderthal's <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#var-sv">sv</a> method, which computes the factorization and maintains all crutial parts of it.
+Here I call Neanderthal's <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#var-sv">sv</a> method, which computes the factorization and maintains all crutial parts of it.
 Please note that the matrix <code>:or</code> and vector <code>:tau</code> together hold Q and R encoded. Using raw <code>:or</code> would
 produce gibberish. Other functions in Neanderthal expect exactly this raw structure and know how to work with it,
  so do not mess with its contents yourself.
@@ -334,7 +334,7 @@ produce gibberish. Other functions in Neanderthal expect exactly this raw struct
 </pre>
 
 <p>
-Did you know that even the <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-mm.21">mm!</a> method can work with Q encoded in this form? It is important, since we need
+Did you know that even the <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-mm.21">mm!</a> method can work with Q encoded in this form? It is important, since we need
 to compute \(Q^Tb\). Even transpose works with QR, although it is not a proper matrix itself:
 </p>
 
@@ -388,7 +388,7 @@ to the one that we predicted using minimum residual \({\rho_{LS}= \lVert d \rVer
 <h2 id="orgfcf1c4e">Least Squares in one quick sweep</h2>
 <div class="outline-text-2" id="text-orgfcf1c4e">
 <p>
-Let's check with the function we could have used at the start, <a href="http://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#var-ls">ls</a>. Yes, there is a simple almighty method that
+Let's check with the function we could have used at the start, <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html#var-ls">ls</a>. Yes, there is a simple almighty method that
 makes all this fuss unnecessary. But, If I just showed you that, what would we have learned about the fine points
 of solving these kinds of systems and the many gotchas that await us there?
 </p>
