@@ -1,0 +1,382 @@
+---
+date: 2018-03-01
+tags:
+- CUDA
+- Clojure
+- ClojureCUDA
+- Neanderthal
+- OpenCL
+- Nvidia
+- AMD
+- Intel
+author: dragan
+layout: post
+title: Interactive GPU Programming - Part 3 - CUDA Context Shenanigans
+excerpt: All communication with the GPU takes place in a context. Context is an analogous to a CPU program. It sets the environment for the particular GPU we want to use in the computations. Simple on the surface, it is, unfortunately, incidentally complex due to early CUDA legacy. So what? We have to deal with that, so, instead of complaining, we'll see how to tame it...
+categories:
+- CUDA
+- Clojure
+- ClojureCUDA
+- Neanderthal
+- OpenCL
+---
+<p>
+All communication with the GPU takes place in a context. Context is an analogous to a CPU program.
+It sets the environment for the particular GPU we want to use in the computations. Simple on the surface, it
+is, unfortunately, incidentally complex due to early CUDA legacy. So what? We have to deal with that, so,
+instead of complaining, we'll see how to tame it&#x2026;
+</p>
+
+<div id="outline-container-org8795fe4" class="outline-2">
+<h2 id="org8795fe4">Context is a life-cycle manager</h2>
+<div class="outline-text-2" id="text-org8795fe4">
+<p>
+GPU has quite a few of computing cores, and quite a bit of expensive memory. However, since we
+have huge demands, it is never enough of them. We always need top performance, and these resources are
+always scarce, no matter how abundant they are. Context manages the life-cycles of typical objects we find in CUDA programs, some of whom
+we have seen (and used through <a href="https://clojurecuda.github.com">ClojureCUDA</a> <iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=clojurecuda&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>) in <a href="./Interactive-GPU-Programming-1-Hello-CUDA">Part 1 - Hello CUDA</a>:
+</p>
+
+<ul class="org-ul">
+<li>memory buffers</li>
+<li>modules</li>
+<li>functions</li>
+<li>streams</li>
+<li>events</li>
+<li>textures, pinned staging buffers, etc.</li>
+</ul>
+
+<p>
+Each context isolates the resources within it. For example, the memory created in one context cannot
+be referenced by a function from another context, even if they are physically located on the same GPU.
+The objects are valid only in the context where they have been created: a linear memory address from
+one context points to garbage in another. Objects can be used only in the context in which they were created.
+When the context is destroyed (by calling the <code>release</code> function), all the resources (memory, streams, etc.) inside are
+destroyed.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgd7241d8" class="outline-2">
+<h2 id="orgd7241d8">One for all and all for one</h2>
+<div class="outline-text-2" id="text-orgd7241d8">
+<p>
+A context is attached to a specific device. Although more than one context may be created on one device, it is usually
+not a good idea. The recommended usage is to have one and only one context operating with the device.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span><span style="color: #2F8B58; font-weight: bold;">uncomplicate.clojurecuda.core</span> <span style="color: #F5666D;">:refer</span> <span style="color: #F5666D;">:all</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span><span style="color: #2F8B58; font-weight: bold;">uncomplicate.clojurecuda.nvrtc</span> <span style="color: #F5666D;">:refer</span> <span style="color: #F5666D;">:all</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>init<span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">ctx</span> <span style="color: #7388d6;">(</span>context <span style="color: #909183;">(</span>device 0<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+When I create a context using the <a href="http://clojurecuda.uncomplicate.org/codox/uncomplicate.clojurecuda.core.html#var-context">context</a> function, this context becomes <i>current</i> <b>for the thread
+where the function have been evaluated</b> and transparently supplied to functions that need a context to
+operate. Check this with the <a href="http://clojurecuda.uncomplicate.org/codox/uncomplicate.clojurecuda.core.html#var-current-context">current-context</a> function:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>current-context<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#object[jcuda.driver.CUcontext 0x3a0f3a6e "CUcontext[nativePointer=0x0]"]
+
+</pre>
+
+<p>
+Depending on how much time passed since you typed and evaluated the context creation function, and
+made a query for the current context, you might get the context we expected, or an empty one (<code>nativePointer=0x0</code>).
+</p>
+
+<p>
+This oddity is an (un)fortunate manifestation of the mismatch between CUDA's transparent management of thread local
+contexts and multi-threaded code. Although we expected that we are in the same thread in our REPL, Clojure's REPL
+is executing in a thread pool. You can check this by calling the following snippet a couple of times
+with a pause of several dozens of seconds.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A020F0;">.getId</span> <span style="color: #7388d6;">(</span><span style="color: #2F8B58; font-weight: bold;">Thread</span><span style="color: #2E3436; background-color: #EDEDED;">/</span><span style="color: #A020F0;">currentThread</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+81
+
+</pre>
+
+<p>
+You'll see a different <code>id</code> number if the REPL has been inactive for some time. The next call is evaluated in the
+same REPL, in the thread called "main", but the actual JVM/OS thread that executes is a random thread from
+the pool, so the CUDA driver thinks it doesn't have a context and sweeps the rug under our feet. How unfortunate!
+</p>
+</div>
+</div>
+
+<div id="outline-container-org9cacda6" class="outline-2">
+<h2 id="org9cacda6">The current context stack</h2>
+<div class="outline-text-2" id="text-org9cacda6">
+<p>
+During the walk-through in <a href="./Interactive-GPU-Programming-1-Hello-CUDA">Part 1 - Hello CUDA</a>, you might be puzzled by my
+constant calling of the <a href="http://clojurecuda.uncomplicate.org/codox/uncomplicate.clojurecuda.core.html#var-current-context.21">current-context!</a> function. Shouldn't once be enough? Or, even cleaner and
+more functional, wouldn't it be better to just supply the context as an argument to context-aware functions?
+Yes, it would be much better, especially in more complex systems. However, early design decisions in
+popular technologies are here to stay as legacy, and we do not have a choice.
+</p>
+
+<p>
+The designers of CUDA tried to design an API that appeals to what people are used to. CPU programs
+rarely need arguments such as context, device, etc. As you have seen in the Hello CUDA article,
+a function call that programmers like is <code>(launch! fun params)</code>, not <code>(launch! ctx device stream something-else fun params)</code>.
+Most C++ programs are not as heavily multithreaded as Clojure programs are, while managing extra
+arguments everywhere is an immediately obvious annoyance. However, in more dynamic threading setups,
+these side effects require constant nannying.
+</p>
+
+<p>
+To a functional programmer, that mistake seems obvious. An additional parameter or two are much easier to deal with,
+especially with Clojure's macros, than having to constantly worry about switching the current context to
+the right one for the actual thread. In the C++ world, it is still not so obvious! OpenCL takes the right approach by supplying
+context as an argument to functions that need it, but that leads to the API being a bit more verbose than
+CUDA, and it is one of the main sources for <i>complaints</i> related to OpenCL!
+</p>
+
+<p>
+I guess you've got the point by now, so <i>I'll</i> stop complaining about CUDA's sinful ways, and get on to how to handle contexts.
+</p>
+
+<p>
+Here is how the CUDA context handling was envisioned. The program has one or more threads, and is handling one
+or more contexts, while functions that need to be executed in the context do not receive that information
+as an argument. The function receives the current context from the thread-local storage that CUDA driver
+maintains for each thread.
+</p>
+
+<p>
+This leads to the following situations:
+</p>
+
+<ol class="org-ol">
+<li>One thread manages one context: this is the case in most example programs; CUDA seems easy and simple.</li>
+<li>One thread manages many contexts: the programmer needs to keep references and keep switching the current context whenever he wants to switch the GPU that will execute the trailing code.</li>
+<li>Many threads manage one context: the programmer needs to set the current context in each thread before CUDA function calls.</li>
+<li>Many threads manage many contexts: there will be a bunch of references and a bunch of setting the current context calls.</li>
+<li>Some of the previous cases, with a catch that the code does not control the thread it is executing in! Example: core.async!</li>
+</ol>
+
+<p>
+As calling <a href="http://clojurecuda.uncomplicate.org/codox/uncomplicate.clojurecuda.core.html#var-current-context.21">current-context!</a> <i>replaces</i> the context that may have previously been current, it may not be enough
+for cases beyond simple programs. CUDA driver maintains a <i>context stack</i> for each thread. There are functions <a href="http://clojurecuda.uncomplicate.org/codox/uncomplicate.clojurecuda.core.html#var-push-context.21">push-context!</a> and
+<a href="http://clojurecuda.uncomplicate.org/codox/uncomplicate.clojurecuda.core.html#var-pop-context.21">pop-context!</a> that can be used to put the context on top of the stack, making it current, and, after the
+work in that context has been done, remove the context from the top, reverting the current context to
+the one that was at the top previously. While <a href="http://clojurecuda.uncomplicate.org/codox/uncomplicate.clojurecuda.core.html#var-current-context.21">current-context!</a> is completely destructive, push/pop offer
+a bit more gracious mechanism. However, this mechanism still relies on side effects, and great care should
+be taken when working in multithreaded setups that use thread-pooled executors.
+</p>
+
+<p>
+A small demonstration:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">do</span>
+  <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">new-ctx</span> <span style="color: #909183;">(</span>context <span style="color: #709870;">(</span>device 0<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>current-context! ctx<span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>= ctx <span style="color: #909183;">(</span>current-context<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+true
+
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">do</span>
+  <span style="color: #7388d6;">(</span>push-context! new-ctx<span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>= new-ctx <span style="color: #909183;">(</span>current-context<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+true
+
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">do</span>
+  <span style="color: #7388d6;">(</span>pop-context!<span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>= ctx <span style="color: #909183;">(</span>current-context<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+true
+
+</pre>
+
+<p>
+The CUDA functions that work inside the context will always work with the top context in the
+current context stack <i>of the thread</i>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orge2e66e8" class="outline-2">
+<h2 id="orge2e66e8">The easy stuff</h2>
+<div class="outline-text-2" id="text-orge2e66e8">
+<p>
+If you need information about the hardware and software environment that your code will run on, the
+<a href="http://clojurecuda.uncomplicate.org/codox/uncomplicate.clojurecuda.info.html#var-info">info</a> <i>function</i> can provide it. There are many specialized info functions in the <a href="http://clojurecuda.uncomplicate.org/codox/uncomplicate.clojurecuda.info.html">info</a> <i>namespace</i>.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span><span style="color: #2F8B58; font-weight: bold;">uncomplicate.clojurecuda.info</span> <span style="color: #F5666D;">:refer</span> <span style="color: #F5666D;">:all</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Most of the information is related to the device.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>info <span style="color: #7388d6;">(</span>device 0<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+<a href="http://clojurecuda.uncomplicate.org/codox/uncomplicate.clojurecuda.info.html#var-info">info</a> returns the map that I show here pretty-printed. You can learn about these attributes in CUDA documentation
+and books.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">{</span><span style="color: #F5666D;">:async-engine-count</span> 2,
+ <span style="color: #F5666D;">:managed-memory</span> <span style="color: #F5666D;">true</span>,
+ <span style="color: #F5666D;">:multi-gpu-board</span> <span style="color: #F5666D;">false</span>,
+ <span style="color: #F5666D;">:maximum-surface2d-layered-layers</span> 2048,
+ <span style="color: #F5666D;">:maximum-texturecubemap-width</span> 32768,
+ <span style="color: #F5666D;">:ecc-enabled</span> <span style="color: #F5666D;">false</span>,
+ <span style="color: #F5666D;">:max-pitch</span> 2147483647,
+ <span style="color: #F5666D;">:max-grid-dim-y</span> 65535,
+ <span style="color: #F5666D;">:compute-mode</span> <span style="color: #F5666D;">:default</span>,
+ <span style="color: #F5666D;">:can-map-host-memory</span> <span style="color: #F5666D;">true</span>,
+ <span style="color: #F5666D;">:max-grid-dim-z</span> 65535,
+ <span style="color: #F5666D;">:pci-bus-id-string</span> <span style="color: #4E9A06;">"0000:01:00.0"</span>,
+ <span style="color: #F5666D;">:maximum-texture2d-mipmapped-width</span> 32768,
+ <span style="color: #F5666D;">:texture-pitch-alignment</span> 32,
+ <span style="color: #F5666D;">:kernel-exec-timeout</span> <span style="color: #F5666D;">false</span>,
+ <span style="color: #F5666D;">:maximum-texture2d-linear-height</span> 65000,
+ <span style="color: #F5666D;">:max-shared-memory-per-multiprocessor</span> 98304,
+ <span style="color: #F5666D;">:total-mem</span> 8508145664,
+ <span style="color: #F5666D;">:maximum-texture1d-layered-width</span> 32768,
+ <span style="color: #F5666D;">:maximum-texturecubemap-layered-layers</span> 2046,
+ <span style="color: #F5666D;">:maximum-texture3d-width</span> 16384,
+ <span style="color: #F5666D;">:maximum-surface2d-layered-height</span> 32768,
+ <span style="color: #F5666D;">:max-block-dim-z</span> 64,
+ <span style="color: #F5666D;">:maximum-surface1d-width</span> 32768,
+ <span style="color: #F5666D;">:maximum-surface3d-width</span> 16384,
+ <span style="color: #F5666D;">:name</span> <span style="color: #4E9A06;">"GeForce GTX 1080"</span>,
+ <span style="color: #F5666D;">:maximum-texture3d-height-alternate</span> 8192,
+ <span style="color: #F5666D;">:max-threads-per-multiprocessor</span> 2048,
+ <span style="color: #F5666D;">:max-shared-memory-per-block</span> 49152,
+ <span style="color: #F5666D;">:maximum-texture3d-width-alternate</span> 8192,
+ <span style="color: #F5666D;">:compute-capability-major</span> 6,
+ <span style="color: #F5666D;">:texture-alignment</span> 512,
+ <span style="color: #F5666D;">:global-memory-bus-width</span> 256,
+ <span style="color: #F5666D;">:maximum-surface2d-layered-width</span> 32768,
+ <span style="color: #F5666D;">:memory-clock-rate</span> 5005000,
+ <span style="color: #F5666D;">:maximum-surfacecubemap-layered-layers</span> 2046,
+ <span style="color: #F5666D;">:maximum-surface2d-height</span> 65536,
+ <span style="color: #F5666D;">:clock-rate</span> 1733500,
+ <span style="color: #F5666D;">:concurrent-kernels</span> 1,
+ <span style="color: #F5666D;">:compute-capability-minor</span> 1,
+ <span style="color: #F5666D;">:maximum-texture2d-width</span> 131072,
+ <span style="color: #F5666D;">:max-threads-per-block</span> 1024,
+ <span style="color: #F5666D;">:maximum-texture1d-linear-width</span> 134217728,
+ <span style="color: #F5666D;">:integrated</span> <span style="color: #F5666D;">false</span>,
+ <span style="color: #F5666D;">:maximum-texture2d-layered-layers</span> 2048,
+ <span style="color: #F5666D;">:max-block-dim-x</span> 1024,
+ <span style="color: #F5666D;">:maximum-texture1d-mipmapped-width</span> 16384,
+ <span style="color: #F5666D;">:maximum-texture2d-mipmapped-height</span> 32768,
+ <span style="color: #F5666D;">:local-L1-cache-supported</span> <span style="color: #F5666D;">true</span>,
+ <span style="color: #F5666D;">:maximum-surface1d-layered-layers</span> 2048,
+ <span style="color: #F5666D;">:pci-bus-id</span> 1,
+ <span style="color: #F5666D;">:maximum-texture1d-layered-layers</span> 2048,
+ <span style="color: #F5666D;">:maximum-surfacecubemap-layered-width</span> 32768,
+ <span style="color: #F5666D;">:max-grid-dim-x</span> 2147483647,
+ <span style="color: #F5666D;">:maximum-texture2d-height</span> 65536,
+ <span style="color: #F5666D;">:global-L1-cache-supported</span> <span style="color: #F5666D;">true</span>,
+ <span style="color: #F5666D;">:maximum-texture2d-linear-pitch</span> 2097120,
+ <span style="color: #F5666D;">:maximum-texturecubemap-layered-width</span> 32768,
+ <span style="color: #F5666D;">:multi-gpu-board-group-id</span> 0,
+ <span style="color: #F5666D;">:pci-domain-id</span> 0,
+ <span style="color: #F5666D;">:maximum-surface3d-depth</span> 16384,
+ <span style="color: #F5666D;">:maximum-surface2d-width</span> 131072,
+ <span style="color: #F5666D;">:stream-priorities-supported</span> <span style="color: #F5666D;">true</span>,
+ <span style="color: #F5666D;">:multiprocessor-count</span> 20,
+ <span style="color: #F5666D;">:tcc-driver</span> <span style="color: #F5666D;">false</span>,
+ <span style="color: #F5666D;">:warp-size</span> 32,
+ <span style="color: #F5666D;">:unified-addressing</span> <span style="color: #F5666D;">true</span>,
+ <span style="color: #F5666D;">:maximum-texture3d-height</span> 16384,
+ <span style="color: #F5666D;">:L2-cache-size</span> 2097152,
+ <span style="color: #F5666D;">:maximum-surfacecubemap-width</span> 32768,
+ <span style="color: #F5666D;">:maximum-texture1d-width</span> 131072,
+ <span style="color: #F5666D;">:maximum-surface1d-layered-width</span> 32768,
+ <span style="color: #F5666D;">:maximum-surface3d-height</span> 16384,
+ <span style="color: #F5666D;">:pci-device-id</span> 0,
+ <span style="color: #F5666D;">:max-registers-per-block</span> 65536,
+ <span style="color: #F5666D;">:max-block-dim-y</span> 1024,
+ <span style="color: #F5666D;">:surface-alignment</span> 512,
+ <span style="color: #F5666D;">:maximum-texture3d-depth-alternate</span> 32768,
+ <span style="color: #F5666D;">:maximum-texture3d-depth</span> 16384,
+ <span style="color: #F5666D;">:total-constant-memory</span> 65536,
+ <span style="color: #F5666D;">:maximum-texture2d-linear-width</span> 131072,
+ <span style="color: #F5666D;">:max-registers-per-multiprocessor</span> 65536,
+ <span style="color: #F5666D;">:maximum-texture2d-layered-height</span> 32768<span style="color: #707183;">}</span>
+</pre>
+</div>
+
+<p>
+What this has to do with contexts? Nothing directly, but in CUDA, context is usually strongly related
+one-to-one to the device. Otherwise, I hate CUDA contexts :)
+</p>
+</div>
+</div>
+
+<div id="outline-container-orga95536b" class="outline-2">
+<h2 id="orga95536b">Clean up what's left</h2>
+<div class="outline-text-2" id="text-orga95536b">
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span><span style="color: #2F8B58; font-weight: bold;">uncomplicate.commons.core</span> <span style="color: #F5666D;">:refer</span> <span style="color: #F5666D;">:all</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>release ctx<span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>release new-ctx<span style="color: #707183;">)</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orged5f195" class="outline-2">
+<h2 id="orged5f195">The next article&#x2026;</h2>
+<div class="outline-text-2" id="text-orged5f195">
+<p>
+&#x2026;is about OpenCL contexts, where we can see that this tricky issue can be much more straightforward
+to work with.
+</p>
+
+<p>
+In the meantime, you may wish to check higher level performance libraries, that offer Clojure functions
+that transparently execute on CPU and various vendor GPU devices, such as the vectorization library <a href="https://neanderthal.github.com">Neanderthal
+</a> <iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=neanderthal&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>.
+</p>
+</div>
+</div>
