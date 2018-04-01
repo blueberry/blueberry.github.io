@@ -8,3 +8,6 @@ excerpt: Out of the box support for TensorFlow and PyTorch for Clojure has lande
 ---
 
 April's Fools!
+
+Check out [Neanderthal](https://neanderthal.uncomplicate.org) though. It's quite powerful as a building
+block for high performance Clojure programs.
