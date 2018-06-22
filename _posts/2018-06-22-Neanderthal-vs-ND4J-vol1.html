@@ -133,7 +133,7 @@ Then, I'll import the ND4J stuff:
 <pre class="src src-clojure"><span style="color: #707183;">(</span>import org.nd4j.linalg.factory.Nd4j
         org.nd4j.linalg.api.ndarray.INDArray
         org.nd4j.linalg.cpu.nativecpu.NDArray
-        java.util.SplittableRandom.<span style="color: #707183;">)</span>
+        java.util.SplittableRandom<span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -230,9 +230,13 @@ The equivalent Neanderthal code:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">bench-neanderthal-mm!-float</span> <span style="color: #7388d6;">[</span>^long m ^long k ^long n<span style="color: #7388d6;">]</span>
-  <span style="color: #7388d6;">(</span>with-release <span style="color: #909183;">[</span>m1 <span style="color: #709870;">(</span>fge m k<span style="color: #709870;">)</span>
-                 m2 <span style="color: #709870;">(</span>fge k n<span style="color: #709870;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #7388d6;">[</span>splittable-random <span style="color: #909183;">(</span>SplittableRandom.<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">random</span> ^double <span style="color: #909183;">[</span>^double _<span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>.nextDouble ^SplittableRandom splittable-random<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">bench-neanderthal-mm!-float</span> <span style="color: #7388d6;">[</span>^long m ^long k ^long n<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>with-release <span style="color: #909183;">[</span>m1 <span style="color: #709870;">(</span>fmap! random <span style="color: #907373;">(</span>fge m k<span style="color: #907373;">)</span><span style="color: #709870;">)</span>
+                 m2 <span style="color: #709870;">(</span>fmap! random <span style="color: #907373;">(</span>fge k n<span style="color: #907373;">)</span><span style="color: #709870;">)</span>
                  result <span style="color: #709870;">(</span>fge m n<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
     <span style="color: #909183;">(</span>quick-bench
      <span style="color: #709870;">(</span><span style="color: #A52A2A; font-weight: bold;">do</span> <span style="color: #907373;">(</span>mm! 1.0 m1 m2 0.0 result<span style="color: #907373;">)</span>
@@ -505,7 +509,7 @@ I'm not disappointed to find out that it is a few dozen percents faster on avera
 <div class="outline-text-2" id="text-org804f1b0">
 <p>
 Of course, since I can't see his code, and I can't see the actual results that he got,
-I can not know for sure. However, I might guess. My guess is that he created run <b>double precision</b>
+I can not know for sure. However, I might guess. My guess is that he created <b>double precision</b>
 matrices in Neanderthal and then run those. Let's try to do that:
 </p>
 
@@ -521,7 +525,7 @@ matrices in Neanderthal and then run those. Let's try to do that:
 </div>
 
 <p>
-This should be the dimension where ND4J catches up:
+This should be the dimension where ND4J catches up in his reportx:
 </p>
 
 <div class="org-src-container">
@@ -605,7 +609,7 @@ Evaluation count : 2340 in 6 samples of 390 calls.
 <h2 id="orgffa0924">Conclusions</h2>
 <div class="outline-text-2" id="text-orgffa0924">
 <p>
-This post was long overdue, and it's good that I got intrigued and took time to write. I hope that
+This post was long overdue, and it's good that I got intrigued and took time to write it. I hope that
 it's a start of a series of experiments where you, me, and people from Skymind test and showcase Java for
 high speed computations.
 </p>
