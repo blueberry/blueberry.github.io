@@ -1,0 +1,640 @@
+---
+date: 2018-06-22
+tags:
+- Neanderthal
+- MKL
+- Clojure
+- Java
+- ND4J
+- Deeplearning4J
+author: dragan
+layout: post
+title: Neanderthal vs ND4J - vol 1 - Native performance, Java and CPU
+excerpt: Today, Java has a choice of a few well maintained libraries that can use [[https://software.intel.com/en-us/mkl][Intel's MKL]] for fast native operations. MKL is basically as fast as you can get today on the CPU. The reasoning is that, since two libraries use MKL, they should squeeze the same amount of juice out of it. It's not quite like that.
+categories:
+- Neanderthal
+- MKL
+- Clojure
+- Java
+- ND4J
+- Deeplearning4J
+---
+<p>
+TLDR; <a href="https://neanderthal.uncomplicate.org">Neanderthal</a> (<iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=neanderthal&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>) is considerably faster than ND4J. There is more to that, of course. It's not so much
+about the results but about the process. Read on.
+</p>
+
+<p>
+I have to be a good driver to get the power out of a Lamborghini (that I do not have ;),
+and a good driver can get an enjoyable ride out of any decent car. The same is with high-performance
+libraries. Simply throwing a powerful library blindly into a project wouldn't get me far, and might
+occasionally crash me into a wall. Only when I understand how this stuff works, I can <b>hope</b> to make
+everything fit together, as anyone doing deep learning today will agree :)
+</p>
+
+<p>
+Today, Java has a choice of a few well maintained libraries that can use <a href="https://software.intel.com/en-us/mkl">Intel's MKL</a> for fast native
+operations. MKL is basically as fast as you can get today on the CPU. The reasoning is that, since
+two libraries use MKL, they should squeeze the same amount of juice out of it. It's not quite like that.
+</p>
+
+<div id="outline-container-org9621817" class="outline-2">
+<h2 id="org9621817">What are we comparing here</h2>
+<div class="outline-text-2" id="text-org9621817">
+<p>
+Long time ago, when I started developing <a href="https://neanderthal.uncomplicate.org">Neanderthal</a>, the folk wisdom was that FFI in Java has huge overhead,
+so pure Java libraries are faster with small and medium sized matrices, while you can hope to get
+some speedup from using native bindings (such as <a href="http://jblas.org/">JBlas</a>) only when matrices are very large. Neanderthal showed this popular
+opinion to not be true; <a href="https://neanderthal.uncomplicate.org">Neanderthal</a>, a Clojure library backed by custom bindings to MKL, is much faster than
+pure Java libraries even for rather small matrices.
+</p>
+
+<p>
+Roughly at the same time, the folks from Skymind started developing <a href="https://deeplearning4j.org">Deeplearning4J</a> and <a href="https://github.com/deeplearning4j/deeplearning4j/tree/master/nd4j">ND4J</a>. They took
+a similar route, and also got some quite good results, because they did many things right. Somehow, though,
+it is difficult to find the actual performance numbers. Most folks who use DL4J and ND4J take for granted that
+ND4J is as fast as possible, and I don't blame them, for ND4J is much faster than any previous Java matrix
+library. Except Neanderthal, of course :)
+</p>
+
+<p>
+I developed <a href="https://neanderthal.uncomplicate.org">Neanderthal</a> to be able to meet some demanding computation requirements. I tirelessly optimized
+not only the speed, but API details that can't be find in other libraries. During that process, I compared
+the results not only to Java wrappers, but to native execution itself, to make sure the overhead is tiny,
+ideally non-existent. Whenever I measured ND4J, Neanderthal was faster. In some cases a little faster,
+in some cases much faster.
+</p>
+
+<p>
+That's why I was surprised to hear that Adam Gibson and his team at Skymind did some benchmarks where they
+<a href="https://twitter.com/agibsonccc/status/1009979906997006337">found out that ND4J was faster than Neanderthal</a>. Having measured Neanderthal extensively vs MKL itself, and
+knowing that the overhead is really, really small, I simply could not see how that would be possible, since
+that would mean that ND4J backed by MKL must be faster than MKL itself. I was intrigued.
+</p>
+
+<p>
+Adam pointed me to a code repository with some <a href="https://github.com/treo/benchmarking_nd4j/tree/master/src/main/java/com/example/neanderthal">basic matrix multiplication benchmarks</a> that they tried.
+Unfortunately, the code only contains ND4J calls, no Neanderthal calls. The results are not available,
+but the author, <a href="https://github.com/treo">Paul Dubs</a>, <a href="https://twitter.com/dot_treo/status/1010051481003806720">reports this</a>: "The result was that for matrices smaller than 128x128 Neanderthal won,
+for larger ND4J."
+</p>
+
+<p>
+In this experiment, I'll concentrate on replicating the tests that the guys from Skymind pointed out,
+comparing Neanderthal and ND4J brutal in-place matrix multiplication.
+We'll leave other issues such as the API ergonomics, GPU computing, solving linear equations for future posts.
+Here I am measuring the approaches: given that both libraries use MKL, I assume that the raw computation
+speed is the same, and ascribe any differences to the overhead that the library uses in keeping data around
+and calling appropriate operations.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org8a118b6" class="outline-2">
+<h2 id="org8a118b6">The setup</h2>
+<div class="outline-text-2" id="text-org8a118b6">
+<p>
+I created a project that anyone can use on their own machine to replicate what I'm doing here in the
+Clojure REPL. The whole code is contained in this post, so you can type it exactly as-is into your REPL.
+I purposefully have <b>not</b> created a binary that you run blindly and read the report, since the purpose
+of this blog is to help people learn this stuff. I hope you'll be satisfied with what you learn by
+typing this stuff out yourself.
+</p>
+
+<p>
+The only thing you have to have on your machine for this to work is MKL. Neanderhtal website has the information
+and I guess ND4J folks also wrote something similar. I assume MKL is available on your machine.
+</p>
+
+<p>
+The measurements are done with the Criterium library. It warms up the JVM, runs the code many times,
+and generates a nice report with statistics.
+</p>
+
+<p>
+After starting the REPL, the first thing we do is require Neanderthal's functions that we'll use.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span>uncomplicate.commons.core <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>with-release<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>uncomplicate.fluokitten.core <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>fmap!<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>uncomplicate.neanderthal
+           <span style="color: #909183;">[</span>core <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>mm!<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>native <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>dge fge<span style="color: #709870;">]</span><span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>criterium.core <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>quick-bench<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Then, I'll import the ND4J stuff:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>import org.nd4j.linalg.factory.Nd4j
+        org.nd4j.linalg.api.ndarray.INDArray
+        org.nd4j.linalg.cpu.nativecpu.NDArray
+        java.util.SplittableRandom.<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Since I am not an ND4J user, the first concern is to check whether I am using the right stuff. As a
+reference, I use the code from the Paul's project that Adam pointed to me.
+</p>
+
+<p>
+Here's how he created a matrix:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">m1</span> <span style="color: #7388d6;">(</span><span style="color: #2F8B58; font-weight: bold;">Nd4j</span>/rand 4 4<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+I am checking the implementation class of the matrix I got:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>class m1<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Now, there is one important thing that people often get wrong in such comparisons: floating point precision.
+Single precision operations are generally twice (or even more on the GPU) as fast as double precision FP operations.
+That's why I want to make sure that the ND4J matrices that I'll use in this code use single precision floats,
+so they are as fast as possible. It is not clear to me how to directly order ND4J factories to use
+single or double precision based backends. Fortunately, the default seems to be single precision:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>class <span style="color: #7388d6;">(</span>.data ^NDArray m1<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+since this is <code>FloatBuffer</code>, I assume that it is single precision, because there is also <code>DoubleBuffer</code> in ND4J,
+which I assume uses doubles.
+</p>
+
+<p>
+Another thing that people get wrong is that they use out-of place operations. Since those copy data, they obviously
+introduce much overhead. In ND4J, <code>mmul</code> is out of place, while <code>mmuli</code> is in-place matrix multiplication.
+Again, I use Paul's code as a reference, and he used <code>mmuli</code>, so I'm doing the same here.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #7388d6;">[</span>m2 <span style="color: #909183;">(</span><span style="color: #2F8B58; font-weight: bold;">Nd4j</span>/rand 4 4<span style="color: #909183;">)</span>
+      result <span style="color: #909183;">(</span><span style="color: #2F8B58; font-weight: bold;">Nd4j</span>/createUninitialized <span style="color: #709870;">(</span>.shape ^INDArray m2<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>.mmuli ^INDArray m1 ^INDArray m2 ^INDArray result<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+The result seems consistent, so I'll assume that I'm using ND4J correctly.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org922c938" class="outline-2">
+<h2 id="org922c938">The microbenchmark code</h2>
+<div class="outline-text-2" id="text-org922c938">
+<p>
+Now, the third thing that a careless coder might get wrong is to measure apples and oranges. For example,
+we might measure both the time to create or read matrices and the actual computations. Here, we want to make sure
+to prepare matrices <b>before</b> we begin any measurement. Note the <code>quick-bench</code> call. It is called only <b>after</b>
+<code>m1</code>, <code>m2</code>, and <code>result</code> have been instantiated and populated. Of course, in some applications the creation
+time can also be relevant. But usually it is not. Usually, we should populate, load, or initialize the data once,
+and then call many high-speed operations on it. But even if it is, it is not a topic of this benchmark.
+So, load the data in a whatever way, and then measure the matrix multiplication speed is what we do here.
+</p>
+
+<p>
+ND4J:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">bench-nd4j-mmuli-float</span> <span style="color: #7388d6;">[</span>^long m ^long k ^long n<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #909183;">[</span>m1 <span style="color: #709870;">(</span><span style="color: #2F8B58; font-weight: bold;">Nd4j</span>/rand m k<span style="color: #709870;">)</span>
+        m2 <span style="color: #709870;">(</span><span style="color: #2F8B58; font-weight: bold;">Nd4j</span>/rand k n<span style="color: #709870;">)</span>
+        result <span style="color: #709870;">(</span><span style="color: #2F8B58; font-weight: bold;">Nd4j</span>/createUninitialized m n<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>quick-bench
+     <span style="color: #709870;">(</span><span style="color: #A52A2A; font-weight: bold;">do</span> <span style="color: #907373;">(</span>.mmuli ^INDArray m1 ^INDArray m2 ^INDArray result<span style="color: #907373;">)</span>
+         <span style="color: #F5666D;">true</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+The equivalent Neanderthal code:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">bench-neanderthal-mm!-float</span> <span style="color: #7388d6;">[</span>^long m ^long k ^long n<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>with-release <span style="color: #909183;">[</span>m1 <span style="color: #709870;">(</span>fge m k<span style="color: #709870;">)</span>
+                 m2 <span style="color: #709870;">(</span>fge k n<span style="color: #709870;">)</span>
+                 result <span style="color: #709870;">(</span>fge m n<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>quick-bench
+     <span style="color: #709870;">(</span><span style="color: #A52A2A; font-weight: bold;">do</span> <span style="color: #907373;">(</span>mm! 1.0 m1 m2 0.0 result<span style="color: #907373;">)</span>
+         <span style="color: #F5666D;">true</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orga0aa2a8" class="outline-2">
+<h2 id="orga0aa2a8">Let's run it</h2>
+<div class="outline-text-2" id="text-orga0aa2a8">
+<p>
+I'll call these with the usual dimensions first. From small to large, and see how Neanderthal and ND4J compare.
+First we'll try the powers of 2. You know, the usual fastest cases.
+</p>
+</div>
+
+<div id="outline-container-org66c3091" class="outline-3">
+<h3 id="org66c3091">4x4</h3>
+<div class="outline-text-3" id="text-org66c3091">
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>bench-nd4j-mmuli-float 4 4 4<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+Evaluation count : 105222 in 6 samples of 17537 calls.
+             Execution time mean : 5.942944 µs
+    Execution time std-deviation : 157.029961 ns
+   Execution time lower quantile : 5.771839 µs ( 2.5%)
+   Execution time upper quantile : 6.125343 µs (97.5%)
+                   Overhead used : 1.364399 ns
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>bench-neanderthal-mm!-float 4 4 4<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+Evaluation count : 2425998 in 6 samples of 404333 calls.
+             Execution time mean : 249.515958 ns
+    Execution time std-deviation : 5.380322 ns
+   Execution time lower quantile : 242.310660 ns ( 2.5%)
+   Execution time upper quantile : 253.920545 ns (97.5%)
+                   Overhead used : 1.364399 ns
+</pre>
+
+<p>
+As expected, Neanderthal is 24 times faster.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orge5deb1d" class="outline-3">
+<h3 id="orge5deb1d">128x128</h3>
+<div class="outline-text-3" id="text-orge5deb1d">
+<p>
+In Paul's experiments, this was the dimension where ND4J catches up.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>bench-nd4j-mmuli-float 128 128 128<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+Evaluation count : 10548 in 6 samples of 1758 calls.
+             Execution time mean : 70.099357 µs
+    Execution time std-deviation : 5.436201 µs
+   Execution time lower quantile : 62.897093 µs ( 2.5%)
+   Execution time upper quantile : 75.951324 µs (97.5%)
+                   Overhead used : 1.364399 ns
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>bench-neanderthal-mm!-float 128 128 128<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+Evaluation count : 53238 in 6 samples of 8873 calls.
+             Execution time mean : 14.473891 µs
+    Execution time std-deviation : 4.845955 µs
+   Execution time lower quantile : 11.640464 µs ( 2.5%)
+   Execution time upper quantile : 21.214843 µs (97.5%)
+                   Overhead used : 1.364399 ns
+</pre>
+
+<p>
+Here, I get different numbers. Neanderthal is still 5 times faster! Read more for my explanation what might
+have happened in Paul's benchmarks.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org70b242c" class="outline-3">
+<h3 id="org70b242c">1024x1024</h3>
+<div class="outline-text-3" id="text-org70b242c">
+<p>
+OK, let's see. Maybe Paul's machine is simply different than mine, so the catch-up happens a bit later here?
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>bench-nd4j-mmuli-float 1024 1024 1024<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+Evaluation count : 48 in 6 samples of 8 calls.
+             Execution time mean : 13.769772 ms
+    Execution time std-deviation : 1.392356 ms
+   Execution time lower quantile : 12.100929 ms ( 2.5%)
+   Execution time upper quantile : 15.414595 ms (97.5%)
+                   Overhead used : 1.364399 ns
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>bench-neanderthal-mm!-float 1024 1024 1024<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+Evaluation count : 72 in 6 samples of 12 calls.
+             Execution time mean : 7.969413 ms
+    Execution time std-deviation : 2.128109 ms
+   Execution time lower quantile : 5.592680 ms ( 2.5%)
+   Execution time upper quantile : 10.434048 ms (97.5%)
+                   Overhead used : 1.364399 ns
+</pre>
+
+<p>
+Nope, on 1024x1024 matrices, which is already quite large, so the overhead should not be noticeable,
+Neanderthal is still almost twice as fast as ND4J!
+</p>
+</div>
+</div>
+
+<div id="outline-container-org4a44e62" class="outline-3">
+<h3 id="org4a44e62">4096x4096</h3>
+<div class="outline-text-3" id="text-org4a44e62">
+<p>
+What about increasing the dimensions even further?
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>bench-nd4j-mmuli-float 4096 4096 4096<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+Evaluation count : 6 in 6 samples of 1 calls.
+             Execution time mean : 519.947225 ms
+    Execution time std-deviation : 88.737480 ms
+   Execution time lower quantile : 457.144434 ms ( 2.5%)
+   Execution time upper quantile : 626.192143 ms (97.5%)
+                   Overhead used : 1.364399 ns
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>bench-neanderthal-mm!-float 4096 4096 4096<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+Evaluation count : 6 in 6 samples of 1 calls.
+             Execution time mean : 421.734319 ms
+    Execution time std-deviation : 38.450777 ms
+   Execution time lower quantile : 385.047354 ms ( 2.5%)
+   Execution time upper quantile : 464.568442 ms (97.5%)
+                   Overhead used : 1.364399 ns
+</pre>
+
+<p>
+Neanderthal is still faster. Not many times, but still a healthy 20% faster, which pleasantly surprised me!
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgf1a03e0" class="outline-2">
+<h2 id="orgf1a03e0">10000x10000</h2>
+<div class="outline-text-2" id="text-orgf1a03e0">
+<p>
+Cool. But what about huge, not-powers of 2 matrices? When the actual computation in MKL runs in
+seconds, both libraries should do the same? Apparently, not:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>bench-nd4j-mmuli-float 10000 10000 10000<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+Evaluation count : 6 in 6 samples of 1 calls.
+             Execution time mean : 7.454176 sec
+    Execution time std-deviation : 330.407747 ms
+   Execution time lower quantile : 7.079223 sec ( 2.5%)
+   Execution time upper quantile : 7.883593 sec (97.5%)
+                   Overhead used : 1.364399 ns
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>bench-neanderthal-mm!-float 10000 10000 10000<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+Evaluation count : 6 in 6 samples of 1 calls.
+             Execution time mean : 6.496778 sec
+    Execution time std-deviation : 216.152094 ms
+   Execution time lower quantile : 6.299091 sec ( 2.5%)
+   Execution time upper quantile : 6.796785 sec (97.5%)
+                   Overhead used : 1.364399 ns
+</pre>
+
+<p>
+There is still more than 15% lead by Neanderthal! This is much better than I expected!
+</p>
+</div>
+
+<div id="outline-container-org9c5cd75" class="outline-3">
+<h3 id="org9c5cd75">Some random odd dimensions</h3>
+<div class="outline-text-3" id="text-org9c5cd75">
+<p>
+MKL is rather optimized, so dimensions that are not power of 2 are still performant. Moreover,
+both libraries use the same MKL bakcend, so this should not be much relevant, but since it costs me nothing
+to run the benchmark function with different arguments, why not?
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>bench-nd4j-mmuli-float 3129 7845 1299<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+Evaluation count : 6 in 6 samples of 1 calls.
+             Execution time mean : 288.518780 ms
+    Execution time std-deviation : 82.622658 ms
+   Execution time lower quantile : 217.015311 ms ( 2.5%)
+   Execution time upper quantile : 392.145625 ms (97.5%)
+                   Overhead used : 1.364399 ns
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>bench-neanderthal-mm!-float 3129 7845 1299<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+Evaluation count : 6 in 6 samples of 1 calls.
+             Execution time mean : 196.261770 ms
+    Execution time std-deviation : 36.661680 ms
+   Execution time lower quantile : 166.886059 ms ( 2.5%)
+   Execution time upper quantile : 253.401196 ms (97.5%)
+                   Overhead used : 1.364399 ns
+</pre>
+
+<p>
+By this time, I expect Neanderthal to win no matter what shape I throw at it, and
+I'm not disappointed to find out that it is a few dozen percents faster on average.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org804f1b0" class="outline-2">
+<h2 id="org804f1b0">But why Paul got different results?</h2>
+<div class="outline-text-2" id="text-org804f1b0">
+<p>
+Of course, since I can't see his code, and I can't see the actual results that he got,
+I can not know for sure. However, I might guess. My guess is that he created run <b>double precision</b>
+matrices in Neanderthal and then run those. Let's try to do that:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">bench-neanderthal-mm!-double</span> <span style="color: #7388d6;">[</span>^long m ^long k ^long n<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>with-release <span style="color: #909183;">[</span>m1 <span style="color: #709870;">(</span>fmap! random <span style="color: #907373;">(</span>dge m k<span style="color: #907373;">)</span><span style="color: #709870;">)</span>
+                 m2 <span style="color: #709870;">(</span>fmap! random <span style="color: #907373;">(</span>dge k n<span style="color: #907373;">)</span><span style="color: #709870;">)</span>
+                 result <span style="color: #709870;">(</span>dge m n<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>quick-bench
+     <span style="color: #709870;">(</span><span style="color: #A52A2A; font-weight: bold;">do</span> <span style="color: #907373;">(</span>mm! 1.0 m1 m2 0.0 result<span style="color: #907373;">)</span>
+         <span style="color: #F5666D;">true</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+This should be the dimension where ND4J catches up:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>bench-neanderthal-mm!-double 128 128 128<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+Evaluation count : 20778 in 6 samples of 3463 calls.
+             Execution time mean : 43.818634 µs
+    Execution time std-deviation : 14.212249 µs
+   Execution time lower quantile : 25.217389 µs ( 2.5%)
+   Execution time upper quantile : 58.573658 µs (97.5%)
+                   Overhead used : 1.364399 ns
+</pre>
+
+<p>
+Scroll up to see that this is still faster than ND4J's single precision result of 70 microseconds! But Neanderthal's
+43 microseconds here with doubles are slower than Neanderthal's 14 microseconds with floats, so it's consistent
+with what Paul got on his machine.
+</p>
+
+<p>
+Let's try to ramp it up:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>bench-neanderthal-mm!-double 256 256 256<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+Evaluation count : 2664 in 6 samples of 444 calls.
+             Execution time mean : 289.675935 µs
+    Execution time std-deviation : 52.723462 µs
+   Execution time lower quantile : 237.323191 µs ( 2.5%)
+   Execution time upper quantile : 341.534073 µs (97.5%)
+                   Overhead used : 1.364399 ns
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>bench-nd4j-mmuli-float 256 256 256<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+Evaluation count : 2628 in 6 samples of 438 calls.
+             Execution time mean : 265.474912 µs
+    Execution time std-deviation : 11.124842 µs
+   Execution time lower quantile : 250.634715 µs ( 2.5%)
+   Execution time upper quantile : 276.895468 µs (97.5%)
+                   Overhead used : 1.364399 ns
+</pre>
+
+<p>
+So, running 256x256 matrices, ND4J single-precision and Neanderthal double precision, and the speed
+is roughly the same.
+</p>
+
+<p>
+Of course, Neanderthal running single-precision computation is twice as fast, as expected:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>bench-neanderthal-mm!-float 256 256 256<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+Evaluation count : 2340 in 6 samples of 390 calls.
+             Execution time mean : 155.588860 µs
+    Execution time std-deviation : 53.847954 µs
+   Execution time lower quantile : 96.616695 µs ( 2.5%)
+   Execution time upper quantile : 217.512076 µs (97.5%)
+                   Overhead used : 1.364399 ns
+</pre>
+</div>
+</div>
+
+<div id="outline-container-orgffa0924" class="outline-2">
+<h2 id="orgffa0924">Conclusions</h2>
+<div class="outline-text-2" id="text-orgffa0924">
+<p>
+This post was long overdue, and it's good that I got intrigued and took time to write. I hope that
+it's a start of a series of experiments where you, me, and people from Skymind test and showcase Java for
+high speed computations.
+</p>
+
+<p>
+I'm pleasently surprised by how Neanderthal was much faster across the board. I expected smaller difference.
+But these tests show both libraries in favorable light. I am almost sure that both would be faster than ND4J; that
+would be a good comparison.
+</p>
+
+<p>
+Of course, matrix multiplication speed is not the only one measurement. There are many more things
+to consider. But matrix multiplication is a good indicator of the overall overhead.
+Feel free to do some tests of the things you think are important, fix the goalposts,
+and I'll try to replicate those with Neanderthal.
+</p>
+
+<p>
+Some ideas for the next comparisons are GPU computing, linear equation solving, shifting data around etc.
+My favorite theme is also combining Neanderthal with custom kernels, both CUDA and OpenCL, so that will be
+covered for sure :)
+</p>
+
+<p>
+Please join the discussion :)
+</p>
+
+<p>
+You can find Neanderthal's source code here: <iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=neanderthal&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>
+</p>
+</div>
+</div>
