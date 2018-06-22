@@ -59,7 +59,7 @@ library. Except Neanderthal, of course :)
 
 <p>
 I developed <a href="https://neanderthal.uncomplicate.org">Neanderthal</a> to be able to meet some demanding computation requirements. I tirelessly optimized
-not only the speed, but API details that can't be find in other libraries. During that process, I compared
+not only the speed, but API details that can't be found in other libraries. During that process, I compared
 the results not only to Java wrappers, but to native execution itself, to make sure the overhead is tiny,
 ideally non-existent. Whenever I measured ND4J, Neanderthal was faster. In some cases a little faster,
 in some cases much faster.
@@ -202,7 +202,7 @@ Again, I use Paul's code as a reference, and he used <code>mmuli</code>, so I'm 
 </div>
 
 <pre class="example">
-#object[org.nd4j.linalg.cpu.nativecpu.NDArray 0x27781b48 "[[    1.4941,    0.9340,    1.2657,    1.1025], \n [    2.0116,    0.8335,    1.8198,    1.2399], \n [    1.8562,    1.0622,    1.7748,    0.7918], \n [    0.7914,    0.5628,    0.6935,    0.4819]]"]
+#object[org.nd4j.linalg.cpu.nativecpu.NDArray 0x7a2b2760 "[[    1.5376,    0.5348,    0.2911,    0.9459], \n [    2.2357,    1.2468,    0.8857,    1.5160], \n [    2.1034,    1.1342,    0.8752,    1.1078], \n [    0.7936,    0.2742,    0.1467,    0.4267]]"]
 
 </pre>
 
@@ -479,7 +479,7 @@ There is still more than 15% lead by Neanderthal! This is much better than I exp
 <div class="outline-text-3" id="text-org9c5cd75">
 <p>
 MKL is rather optimized, so dimensions that are not power of 2 are still performant. Moreover,
-both libraries use the same MKL bakcend, so this should not be much relevant, but since it costs me nothing
+both libraries use the same MKL backend, so this should not be much relevant, but since it costs me nothing
 to run the benchmark function with different arguments, why not?
 </p>
 
