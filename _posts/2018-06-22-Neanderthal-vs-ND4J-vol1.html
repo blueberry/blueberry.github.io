@@ -160,6 +160,11 @@ I am checking the implementation class of the matrix I got:
 </pre>
 </div>
 
+<pre class="example">
+org.nd4j.linalg.cpu.nativecpu.NDArray
+
+</pre>
+
 <p>
 Now, there is one important thing that people often get wrong in such comparisons: floating point precision.
 Single precision operations are generally twice (or even more on the GPU) as fast as double precision FP operations.
@@ -172,6 +177,11 @@ single or double precision based backends. Fortunately, the default seems to be 
 <pre class="src src-clojure"><span style="color: #8b0000;">(</span>class <span style="color: #006400;">(</span>.data ^NDArray m1<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
 </pre>
 </div>
+
+<pre class="example">
+org.nd4j.linalg.api.buffer.FloatBuffer
+
+</pre>
 
 <p>
 since this is <code>FloatBuffer</code>, I assume that it is single precision, because there is also <code>DoubleBuffer</code> in ND4J,
@@ -190,6 +200,11 @@ Again, I use Paul's code as a reference, and he used <code>mmuli</code>, so I'm 
   <span style="color: #006400;">(</span>.mmuli ^INDArray m1 ^INDArray m2 ^INDArray result<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
 </pre>
 </div>
+
+<pre class="example">
+#object[org.nd4j.linalg.cpu.nativecpu.NDArray 0x27781b48 "[[    1.4941,    0.9340,    1.2657,    1.1025], \n [    2.0116,    0.8335,    1.8198,    1.2399], \n [    1.8562,    1.0622,    1.7748,    0.7918], \n [    0.7914,    0.5628,    0.6935,    0.4819]]"]
+
+</pre>
 
 <p>
 The result seems consistent, so I'll assume that I'm using ND4J correctly.
