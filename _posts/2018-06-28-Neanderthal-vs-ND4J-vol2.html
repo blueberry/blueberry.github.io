@@ -1,0 +1,561 @@
+---
+date: 2018-06-28
+tags:
+- Neanderthal
+- MKL
+- Clojure
+- Java
+- ND4J
+- Deeplearning4J
+author: dragan
+layout: post
+title: Neanderthal vs ND4J - vol 2 - The Same Native MKL Backend, 1000 x Speedup
+excerpt: Mercenary work have been finished ahead of time; a handful of time to spare. Time for free software! More Neanderthal vs ND4J comparison, then?
+categories:
+- Neanderthal
+- MKL
+- Clojure
+- Java
+- ND4J
+- Deeplearning4J
+---
+<p>
+Mercenary work have been finished ahead of time - sounds incredible, but happens! -
+a handful of time to spare. With my shoulder slightly injured, I have to avoid the gym for a few weeks.
+Time for free software! More Neanderthal vs ND4J comparison, then?
+</p>
+
+<p>
+The <a href="./Neanderthal-vs-ND4J-vol1">part 1 of this series</a> contains the backstory and the first series of experiments comparing
+<a href="https://neanderthal.uncomplicate.org">Neanderthal</a> (<iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=neanderthal&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>)
+and <a href="https://nd4j.org">ND4J</a>, fast scientific computing libraries for Java platform. We are ready to dig further,
+still staying with matrix multiplication on the CPU. Upcoming articles will tackle
+other matrix and linear algebra functions, as well as GPU computing. There is more valuable
+insight at a place where we currently are.
+</p>
+
+<div id="outline-container-orga7fc5a5" class="outline-2">
+<h2 id="orga7fc5a5">Which one is faster, after all?</h2>
+<div class="outline-text-2" id="text-orga7fc5a5">
+<p>
+Comparisons of <a href="https://neanderthal.uncomplicate.org">Neanderthal</a> (<iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=neanderthal&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>)
+and ND4J started with ND4J's creator claiming that ND4J was considerably faster than Neanderthal in
+the tests that Skymind (the company that develops ND4J) conducted.
+Having been intrigued, I run the benchmarks they suggested. I've found the contrary,
+that Neanderthal was multiple times faster for small matrices, a couple of times faster
+than mid-sized matrices, and a few dozen percents faster for huge matrices.
+That was better than I expected! Since I checked the ND4J documentation
+and confirmed that I followed its recommendations, I called it a day and handed the ball over to the ND4J guys.
+This has been described in part 1 of this series, <a href="./Neanderthal-vs-ND4J-vol1">Neanderthal vs ND4J - vol 1 - Native Performance, Java, and CPU</a>.
+</p>
+
+<p>
+The ND4J guys investigated what happened, and found out that:
+</p>
+
+<ol class="org-ol">
+<li>While my measurements were correct, ND4J's performance is not optimal with default memory layout. To get the best performance, the resulting matrix has to be in <code>\f</code> order, while the default is \c.</li>
+<li>They dug out and fixed some bugs in ND4J.</li>
+</ol>
+
+<p>
+Those being fixed, ND4J improved. <code>\f</code> instead of <code>\c</code> order makes ND4J only a handful of times slower
+for small matrices, a few dozen percents slower for mid-sized, and almost the same speed as Neanderthal
+with large matrices. <a href="https://www.dubs.tech/blog/benchmarking-nd4j-and-neanderthal/">Paul published</a> the process and the result on his blog.
+</p>
+
+<p>
+I might have a minor issue with him changing the test to use the low-level static <code>Nd4j.gemm</code> method
+instead of <code>mmuli</code>, a method suggested by the documentation that the user would normally call, but since Neanderthal's
+high-level polymorphic <code>mm!</code> function still keeps the lead, I won't be splitting hairs and crying foul here.
+The results he reports are valid. Paul also reasoned that <code>mm!</code> is, after all, only a GEMM call with a few additional
+checks. I argue it does more than that.
+</p>
+
+<p>
+As a warm-up, I'll rerun some benchmarks with <code>\f</code> order, leaving you to run various dimensions yourself.
+</p>
+
+<p>
+The updated project is <a href="https://github.com/uncomplicate/neanderthal/blob/master/examples/benchmarks/src/benchmarks/neanderthal_vs_nd4j.clj">here</a>.
+</p>
+
+<p>
+First, the imports:
+</p>
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span>uncomplicate.commons.core <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>with-release release double-fn<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>uncomplicate.fluokitten.core <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>fmap!<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>uncomplicate.neanderthal
+           <span style="color: #909183;">[</span>core <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>mm! mm<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>native <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>dge fge<span style="color: #709870;">]</span><span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>criterium.core <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>quick-bench<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>import org.nd4j.linalg.factory.Nd4j
+        org.nd4j.linalg.api.ndarray.INDArray
+        org.nd4j.linalg.cpu.nativecpu.NDArray
+        java.util.SplittableRandom<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+We'll use <code>\f</code> layout and <code>Nd4j/gemm</code>:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">bench-nd4j-gemm-float</span> <span style="color: #7388d6;">[</span>^long m ^long k ^long n<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #909183;">[</span>m1 <span style="color: #709870;">(</span><span style="color: #2F8B58; font-weight: bold;">Nd4j</span>/rand m k<span style="color: #709870;">)</span>
+        m2 <span style="color: #709870;">(</span><span style="color: #2F8B58; font-weight: bold;">Nd4j</span>/rand k n<span style="color: #709870;">)</span>
+        result <span style="color: #709870;">(</span><span style="color: #2F8B58; font-weight: bold;">Nd4j</span>/createUninitialized <span style="color: #907373;">(</span>int-array <span style="color: #6276ba;">[</span>m n<span style="color: #6276ba;">]</span><span style="color: #907373;">)</span> <span style="color: #4E9A06;">\f</span><span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>quick-bench
+     <span style="color: #709870;">(</span><span style="color: #A52A2A; font-weight: bold;">do</span> <span style="color: #907373;">(</span><span style="color: #2F8B58; font-weight: bold;">Nd4j</span>/gemm ^INDArray m1 ^INDArray m2 ^INDArray result <span style="color: #F5666D;">false</span> <span style="color: #F5666D;">false</span> 1.0 0.0<span style="color: #907373;">)</span>
+         <span style="color: #F5666D;">true</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>bench-nd4j-gemm-float 128 128 128<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+Evaluation count : 34482 in 6 samples of 5747 calls.
+             Execution time mean : 19.596878 µs
+    Execution time std-deviation : 3.621484 µs
+   Execution time lower quantile : 17.475822 µs ( 2.5%)
+   Execution time upper quantile : 24.146490 µs (97.5%)
+                   Overhead used : 1.140086 ns
+</pre>
+
+<p>
+Much better than <a href="./Neanderthal-vs-ND4J-vol1">previously</a>, but still behind Neanderthal's timing, which is similar to what ND4J guys got.
+</p>
+
+<p>
+May I mention that Neanderthal handles all memory layouts equally well? It doesn't care whether
+it is CCC, FFF, CCF, CFC (in ND4J's terminology), Neanderthal will figure out how to get the same top speed from the
+underlying backend. Check that out by providing <code>{:layout :row}</code> (ND4J's C)
+as an optional argument to <code>fge</code>: <code>(fge m n {:layout :row})</code>.
+</p>
+
+<p>
+I can conclude that Neanderthal is the faster library indeed, at least when it comes to matrix multiplication.
+</p>
+<ul class="org-ul">
+<li>when the layout is optimal for ND4J, Neandrethal is at equal speed at worst, but often faster;</li>
+<li>with arbitrary memory layout combinations ND4J slows down, while Neanderthal keeps up its top speed.</li>
+</ul>
+
+<p>
+If the only thing we had to do was a single matrix multiplication, this would have been the concluding article
+in the series. It's not a difference that matters in most programs, and they have much larger
+inefficiencies in other places anyway.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org0d42c26" class="outline-2">
+<h2 id="org0d42c26">Beyond basic matrix multiplication</h2>
+<div class="outline-text-2" id="text-org0d42c26">
+<p>
+Just multiplying a few matrices rarely ever happens, though. Even the simplest
+algorithm does several calls, and combine different operations. Therefore, it is important
+that the API is amenable to composition of operations, and when those operations get composed,
+how they work together.
+</p>
+
+<p>
+Neanderthal is much more than native BLAS wrapper - it is a high-level numerical linear algebra environment.
+Its purpose is not only to provide fast access to underlying computation routines, but also:
+</p>
+<ul class="org-ul">
+<li>automate most of the bookkeeping and data tending</li>
+<li>automatically choose the right method for the underlying structure and call it with optimal options</li>
+<li>make the API as simple, composable, and declarative as possible</li>
+<li>guide and teach the programmer, keep simple things simple, and hard things still possible</li>
+</ul>
+
+<p>
+Enough talk, on with the examples!
+</p>
+
+<p>
+Meet the pure <code>mm</code> method. It's similar to <code>mm!</code> but it doesn't overwrite any of its arguments. It doesn't
+require a pre-created memory for the result. For simple use cases, ND4J has a counterpart, <code>mmul</code>. If we compare
+them, we'll find out that the difference in speed is what we'd expect by now.
+</p>
+</div>
+
+<div id="outline-container-org6bff83d" class="outline-3">
+<h3 id="org6bff83d">ND4J <code>mmul</code></h3>
+<div class="outline-text-3" id="text-org6bff83d">
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">bench-nd4j-mmul</span> <span style="color: #7388d6;">[</span>^long m ^long k ^long n<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #909183;">[</span>m1 <span style="color: #709870;">(</span><span style="color: #2F8B58; font-weight: bold;">Nd4j</span>/rand m k<span style="color: #709870;">)</span>
+        m2 <span style="color: #709870;">(</span><span style="color: #2F8B58; font-weight: bold;">Nd4j</span>/rand k n<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>quick-bench
+     <span style="color: #709870;">(</span><span style="color: #A52A2A; font-weight: bold;">do</span> <span style="color: #907373;">(</span>.mmul ^INDArray m1 ^INDArray m2<span style="color: #907373;">)</span>
+         <span style="color: #F5666D;">true</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>bench-nd4j-mmul 128 128 128<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+Evaluation count : 21276 in 6 samples of 3546 calls.
+             Execution time mean : 36.131573 µs
+    Execution time std-deviation : 4.488518 µs
+   Execution time lower quantile : 32.052519 µs ( 2.5%)
+   Execution time upper quantile : 42.751941 µs (97.5%)
+                   Overhead used : 1.140086 ns
+</pre>
+</div>
+</div>
+
+<div id="outline-container-orge75b8cb" class="outline-3">
+<h3 id="orge75b8cb">Neanderthal <code>mm</code></h3>
+<div class="outline-text-3" id="text-orge75b8cb">
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #7388d6;">[</span>splittable-random <span style="color: #909183;">(</span>SplittableRandom.<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">random</span> ^double <span style="color: #909183;">[</span>^double _<span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>.nextDouble ^SplittableRandom splittable-random<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">bench-neanderthal-mm</span> <span style="color: #7388d6;">[</span>^long m ^long k ^long n<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>with-release <span style="color: #909183;">[</span>m1 <span style="color: #709870;">(</span>fmap! random <span style="color: #907373;">(</span>fge m k<span style="color: #907373;">)</span><span style="color: #709870;">)</span>
+                 m2 <span style="color: #709870;">(</span>fmap! random <span style="color: #907373;">(</span>fge k n<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>quick-bench
+     <span style="color: #709870;">(</span>release <span style="color: #907373;">(</span>mm m1 m2<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>bench-neanderthal-mm 128 128 128<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+Evaluation count : 33714 in 6 samples of 5619 calls.
+             Execution time mean : 18.404674 µs
+    Execution time std-deviation : 3.261362 µs
+   Execution time lower quantile : 15.999125 µs ( 2.5%)
+   Execution time upper quantile : 22.894910 µs (97.5%)
+                   Overhead used : 1.140086 ns
+</pre>
+
+<p>
+Better, but nothing to write home about. I've run this only to show you that the starting positions for
+these methods are close.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org243e8d8" class="outline-3">
+<h3 id="org243e8d8">Matrix Transformations</h3>
+<div class="outline-text-3" id="text-org243e8d8">
+<p>
+You've probably seen formulas like this one in Linear Algebra literature:
+</p>
+
+\begin{gather*}
+  M_{m\times n} = A_{m \times k_1} B_{k_1 \times k_2} C_{k_2 \times k_3} D_{k_3 \times k_4} E_{k_4 \times n}\\
+\end{gather*}
+
+<p>
+or
+</p>
+
+\begin{gather*}
+ M = M_1 M_2 M_3 M_4 M_5 E
+\end{gather*}
+
+<p>
+We start from some data in matrix E, and do a series of matrix transformations on it.
+The example is abstract, but I hope you agree that things like this are not unheard of.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgf27077a" class="outline-3">
+<h3 id="orgf27077a">Neanderthal <code>mm</code> M=ABCDEF uniform sizes</h3>
+<div class="outline-text-3" id="text-orgf27077a">
+<p>
+Neanderthal's <code>mm</code> method can handle as many of those as we need in one call. Let's try with six:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">bench-neanderthal-mm</span> <span style="color: #7388d6;">[</span>m k1 k2 k3 k4 k5 n<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>with-release <span style="color: #909183;">[</span>m1 <span style="color: #709870;">(</span>fmap! random <span style="color: #907373;">(</span>fge m k1<span style="color: #907373;">)</span><span style="color: #709870;">)</span>
+                 m2 <span style="color: #709870;">(</span>fmap! random <span style="color: #907373;">(</span>fge k1 k2<span style="color: #907373;">)</span><span style="color: #709870;">)</span>
+                 m3 <span style="color: #709870;">(</span>fmap! random <span style="color: #907373;">(</span>fge k2 k3<span style="color: #907373;">)</span><span style="color: #709870;">)</span>
+                 m4 <span style="color: #709870;">(</span>fmap! random <span style="color: #907373;">(</span>fge k3 k4<span style="color: #907373;">)</span><span style="color: #709870;">)</span>
+                 m5 <span style="color: #709870;">(</span>fmap! random <span style="color: #907373;">(</span>fge k4 k5<span style="color: #907373;">)</span><span style="color: #709870;">)</span>
+                 m6 <span style="color: #709870;">(</span>fmap! random <span style="color: #907373;">(</span>fge k5 n<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>quick-bench
+     <span style="color: #709870;">(</span>release <span style="color: #907373;">(</span>mm m1 m2 m3 m4 m5 m6<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>bench-neanderthal-mm 128 128 128 128 128 128 128<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+Evaluation count : 6804 in 6 samples of 1134 calls.
+             Execution time mean : 98.326749 µs
+    Execution time std-deviation : 17.289847 µs
+   Execution time lower quantile : 89.346895 µs ( 2.5%)
+   Execution time upper quantile : 128.161994 µs (97.5%)
+                   Overhead used : 1.140086 ns
+
+Found 1 outliers in 6 samples (16.6667 %)
+	low-severe	 1 (16.6667 %)
+ Variance from outliers : 47.8944 % Variance is moderately inflated by outliers
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org303b4e9" class="outline-3">
+<h3 id="org303b4e9">ND4J <code>mmul</code> M=ABCDEF uniform sizes</h3>
+<div class="outline-text-3" id="text-org303b4e9">
+<p>
+I was unable to find the counterpart in ND4J. It seems that it only provides the simple binary matrix
+multiplication. We'll have to write the chain ourselves, which gives a somewhat awkward, but straightforward code.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">bench-nd4j-mmul</span> <span style="color: #7388d6;">[</span>m k1 k2 k3 k4 k5 n<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>with-release <span style="color: #909183;">[</span>m1 <span style="color: #709870;">(</span><span style="color: #2F8B58; font-weight: bold;">Nd4j</span>/rand ^int m ^int k1<span style="color: #709870;">)</span>
+                 m2 <span style="color: #709870;">(</span><span style="color: #2F8B58; font-weight: bold;">Nd4j</span>/rand ^int k1 ^int k2<span style="color: #709870;">)</span>
+                 m3 <span style="color: #709870;">(</span><span style="color: #2F8B58; font-weight: bold;">Nd4j</span>/rand ^int k2 ^int k3<span style="color: #709870;">)</span>
+                 m4 <span style="color: #709870;">(</span><span style="color: #2F8B58; font-weight: bold;">Nd4j</span>/rand ^int k3 ^int k4<span style="color: #709870;">)</span>
+                 m5 <span style="color: #709870;">(</span><span style="color: #2F8B58; font-weight: bold;">Nd4j</span>/rand ^int k4 ^int k5<span style="color: #709870;">)</span>
+                 m6 <span style="color: #709870;">(</span><span style="color: #2F8B58; font-weight: bold;">Nd4j</span>/rand ^int k5 ^int n<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>quick-bench
+     <span style="color: #709870;">(</span><span style="color: #A52A2A; font-weight: bold;">do</span> <span style="color: #907373;">(</span>.mmul ^INDArray m1
+                <span style="color: #6276ba;">(</span>.mmul ^INDArray m2
+                       <span style="color: #858580;">(</span>.mmul ^INDArray m3
+                              <span style="color: #80a880;">(</span>.mmul ^INDArray m4
+                                     <span style="color: #887070;">(</span>.mmul ^INDArray m5 ^INDArray m6<span style="color: #887070;">)</span><span style="color: #80a880;">)</span> <span style="color: #858580;">)</span><span style="color: #6276ba;">)</span><span style="color: #907373;">)</span>
+         <span style="color: #F5666D;">true</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>bench-nd4j-mmul 128 128 128 128 128 128 128<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+Evaluation count : 4752 in 6 samples of 792 calls.
+             Execution time mean : 202.247243 µs
+    Execution time std-deviation : 68.648835 µs
+   Execution time lower quantile : 147.452665 µs ( 2.5%)
+   Execution time upper quantile : 313.785035 µs (97.5%)
+                   Overhead used : 1.140086 ns
+
+Found 1 outliers in 6 samples (16.6667 %)
+	low-severe	 1 (16.6667 %)
+ Variance from outliers : 81.7637 % Variance is severely inflated by outliers
+</pre>
+
+<p>
+Hey, this ND4J fella keeps up quite well. Only twice as slow. Not something to write the blog post about.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org008dceb" class="outline-2">
+<h2 id="org008dceb">M=ABCDEF Neanderthal's <code>mm</code> vs ND4J's <code>mmul</code>: 1000 times faster</h2>
+<div class="outline-text-2" id="text-org008dceb">
+<p>
+It's unlikely that all matrices will be such finely serendipitous to have exactly the same dimension.
+Let's try to vary that a bit, and feed them some arbitrary sizes.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>bench-neanderthal-mm 8 120 800 28 3128 18 1208<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+Evaluation count : 14346 in 6 samples of 2391 calls.
+             Execution time mean : 55.179664 µs
+    Execution time std-deviation : 9.232348 µs
+   Execution time lower quantile : 42.028083 µs ( 2.5%)
+   Execution time upper quantile : 65.236952 µs (97.5%)
+                   Overhead used : 1.140086 ns
+</pre>
+
+<p>
+Neanderthal's still sprinting well!
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>bench-nd4j-mmul 8 120 800 28 3128 18 1208<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+Evaluation count : 210 in 6 samples of 35 calls.
+             Execution time mean : 4.046360 ms
+    Execution time std-deviation : 705.958030 µs
+   Execution time lower quantile : 3.060699 ms ( 2.5%)
+   Execution time upper quantile : 4.626018 ms (97.5%)
+                   Overhead used : 1.140086 ns
+</pre>
+
+<p>
+Whoops. ND4J is starting to lag behind. It took 4000 &mu;s, compared to Neanderthal's 55 &mu;s.
+That's 80 &times; slower! Two orders of magnitude&#x2026;
+</p>
+
+<p>
+Let's continue to play with dimensions.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>bench-neanderthal-mm 13 13456 2300 125 7700 810 100000<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+Evaluation count : 30 in 6 samples of 5 calls.
+             Execution time mean : 24.621988 ms
+    Execution time std-deviation : 1.619110 ms
+   Execution time lower quantile : 23.443505 ms ( 2.5%)
+   Execution time upper quantile : 26.843352 ms (97.5%)
+                   Overhead used : 1.140086 ns
+</pre>
+
+<p>
+Neanderthal got into the millisecond range. This seems to be a bit tougher problem than the last one.
+</p>
+
+<p>
+Now, when I tried to bench ND4J for the same problem, it seemed as if ND4J left for a long trip. That's
+why I have to resort to using the Clojure's <code>time</code> function to measure a single run.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">time-nd4j-mmul</span> <span style="color: #7388d6;">[</span>m k1 k2 k3 k4 k5 n<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>with-release <span style="color: #909183;">[</span>m1 <span style="color: #709870;">(</span><span style="color: #2F8B58; font-weight: bold;">Nd4j</span>/rand ^int m ^int k1<span style="color: #709870;">)</span>
+                 m2 <span style="color: #709870;">(</span><span style="color: #2F8B58; font-weight: bold;">Nd4j</span>/rand ^int k1 ^int k2<span style="color: #709870;">)</span>
+                 m3 <span style="color: #709870;">(</span><span style="color: #2F8B58; font-weight: bold;">Nd4j</span>/rand ^int k2 ^int k3<span style="color: #709870;">)</span>
+                 m4 <span style="color: #709870;">(</span><span style="color: #2F8B58; font-weight: bold;">Nd4j</span>/rand ^int k3 ^int k4<span style="color: #709870;">)</span>
+                 m5 <span style="color: #709870;">(</span><span style="color: #2F8B58; font-weight: bold;">Nd4j</span>/rand ^int k4 ^int k5<span style="color: #709870;">)</span>
+                 m6 <span style="color: #709870;">(</span><span style="color: #2F8B58; font-weight: bold;">Nd4j</span>/rand ^int k5 ^int n<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>time
+     <span style="color: #709870;">(</span><span style="color: #A52A2A; font-weight: bold;">do</span> <span style="color: #907373;">(</span>.mmul ^INDArray m1
+                <span style="color: #6276ba;">(</span>.mmul ^INDArray m2
+                       <span style="color: #858580;">(</span>.mmul ^INDArray m3
+                              <span style="color: #80a880;">(</span>.mmul ^INDArray m4
+                                     <span style="color: #887070;">(</span>.mmul ^INDArray m5 ^INDArray m6<span style="color: #887070;">)</span><span style="color: #80a880;">)</span> <span style="color: #858580;">)</span><span style="color: #6276ba;">)</span><span style="color: #907373;">)</span>
+         <span style="color: #F5666D;">true</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>time-nd4j-mmul 13 13456 2300 125 7700 810 100000<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+My patience was unbreakable, and I finally met the report:
+</p>
+
+<pre class="example">
+"Elapsed time: 25815.869081 msecs"
+</pre>
+
+<p>
+That's right. While Neanderthal sprinted, ND4J struggled to finish the task.
+</p>
+
+<p>
+25 <b>seconds</b> vs Neanderthal's 25 <b>milli</b> seconds. That's 1000 &times; the difference.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orga6b68d0" class="outline-2">
+<h2 id="orga6b68d0">Little API niceties in Clojure</h2>
+<div class="outline-text-2" id="text-orga6b68d0">
+<p>
+As a bonus, here's a benchmark function for Neanderthal that works for any number of matrices.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">bench-neanderthal-mm</span> <span style="color: #7388d6;">[</span>dimensions<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>with-release <span style="color: #909183;">[</span>ms <span style="color: #709870;">(</span>map <span style="color: #907373;">(</span>comp <span style="color: #6276ba;">(</span>partial fmap! random<span style="color: #6276ba;">)</span> fge<span style="color: #907373;">)</span>
+                         <span style="color: #907373;">(</span>butlast dimensions<span style="color: #907373;">)</span> <span style="color: #907373;">(</span>rest dimensions<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>quick-bench
+     <span style="color: #709870;">(</span>release <span style="color: #907373;">(</span>apply mm ms<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+This version expects a sequence of dimensions (note the <code>[</code> and <code>]</code>).
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>bench-neanderthal-mm <span style="color: #7388d6;">[</span>13 13456 2300 125 7700 810 100000<span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Yep, Neanderthal comes equipped with a fine touch of Clojure's famous elegance.
+</p>
+
+<p>
+If you feel adventurous, write the looping version for ND4J and play with various dimensions.
+Witness the wild swings in timing differences. Sometimes Neanderthal is multiple orders of magnitude
+faster, sometimes only a dozen times. When Moon is in the Seventh House,
+and Jupiter aligns with Mars, then peace will guide the planets and love will steer the stars.
+Once in a while ND4J aligns with planets, too, and comes within sight.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org57a6e7f" class="outline-2">
+<h2 id="org57a6e7f">Conclusions</h2>
+<div class="outline-text-2" id="text-org57a6e7f">
+<p>
+Now, It would be unfair to say that the speedup would always be 1000 &times;, or that
+you'll see such drastic speedup often. But it shows that, as soon as we move beyond straightforward
+operations into a more involved stuff, performance gotchas start to accumulate. A program might
+waste lots of resources without you even suspecting. After all, aren't all those libraries using
+the same superbly optimized MKL underneath?
+</p>
+
+<p>
+In addition to the top speed, Neanderthal holds the programmer's hand as much as possible - meaning: a lot - while
+ND4J seems to let me fend for myself.
+</p>
+
+<p>
+Would you like to see some more matrix multiplication stuff in the next article, or we are ready
+to explore other functions? Which ones? Feel free to suggest the themes for future articles.
+</p>
+
+<p>
+One cool thing that we should do is compare with Numpy. I'm quite confident in expecting that Clojure and Java
+win, but who knows. If you know Python ecosystem well, it would be great if you can provide some benchmark code.
+</p>
+
+<p>
+You can find Neanderthal's source code here: <iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=neanderthal&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>
+Documentation can be reached via <a href="https://neanderthal.uncomplicate.org">Neanderthal's homepage</a>, while there's a bunch of tutorials at the blog you're reading right now. If you need
+more theory-oriented textbook style linear algebra code, you can start with
+<a href="../17/Clojure-Linear-Algebra-Refresher-Vector-Spaces">Clojure Linear Algebra Refresher (1) - Vector Spaces</a>, while if you remember your matrix-fu, you might
+need some numerical computation tutorials; start with <a href="../17/Clojure-Numerics-1-Use-Matrices-Efficiently">Clojure Numerics - Part 1 - Use Matrices Efficiently</a>.
+</p>
+</div>
+</div>
