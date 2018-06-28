@@ -116,12 +116,12 @@ After starting the REPL, the first thing we do is require Neanderthal's function
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>require '<span style="color: #006400;">[</span>uncomplicate.commons.core <span style="color: #F5666D;">:refer</span> <span style="color: #ff1493;">[</span>with-release<span style="color: #ff1493;">]</span><span style="color: #006400;">]</span>
-         '<span style="color: #006400;">[</span>uncomplicate.fluokitten.core <span style="color: #F5666D;">:refer</span> <span style="color: #ff1493;">[</span>fmap!<span style="color: #ff1493;">]</span><span style="color: #006400;">]</span>
-         '<span style="color: #006400;">[</span>uncomplicate.neanderthal
-           <span style="color: #ff1493;">[</span>core <span style="color: #F5666D;">:refer</span> <span style="color: #ffff00;">[</span>mm!<span style="color: #ffff00;">]</span><span style="color: #ff1493;">]</span>
-           <span style="color: #ff1493;">[</span>native <span style="color: #F5666D;">:refer</span> <span style="color: #ffff00;">[</span>dge fge<span style="color: #ffff00;">]</span><span style="color: #ff1493;">]</span><span style="color: #006400;">]</span>
-         '<span style="color: #006400;">[</span>criterium.core <span style="color: #F5666D;">:refer</span> <span style="color: #ff1493;">[</span>quick-bench<span style="color: #ff1493;">]</span><span style="color: #006400;">]</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span>uncomplicate.commons.core <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>with-release<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>uncomplicate.fluokitten.core <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>fmap!<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>uncomplicate.neanderthal
+           <span style="color: #909183;">[</span>core <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>mm!<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>native <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>dge fge<span style="color: #709870;">]</span><span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>criterium.core <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>quick-bench<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -130,10 +130,10 @@ Then, I'll import the ND4J stuff:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>import org.nd4j.linalg.factory.Nd4j
+<pre class="src src-clojure"><span style="color: #707183;">(</span>import org.nd4j.linalg.factory.Nd4j
         org.nd4j.linalg.api.ndarray.INDArray
         org.nd4j.linalg.cpu.nativecpu.NDArray
-        java.util.SplittableRandom<span style="color: #8b0000;">)</span>
+        java.util.SplittableRandom<span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -147,7 +147,7 @@ Here's how he created a matrix:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">m1</span> <span style="color: #006400;">(</span><span style="color: #2F8B58; font-weight: bold;">Nd4j</span>/rand 4 4<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">m1</span> <span style="color: #7388d6;">(</span><span style="color: #2F8B58; font-weight: bold;">Nd4j</span>/rand 4 4<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -156,7 +156,7 @@ I am checking the implementation class of the matrix I got:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>class m1<span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>class m1<span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -174,7 +174,7 @@ single or double precision based backends. Fortunately, the default seems to be 
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>class <span style="color: #006400;">(</span>.data ^NDArray m1<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>class <span style="color: #7388d6;">(</span>.data ^NDArray m1<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -195,14 +195,14 @@ Again, I use Paul's code as a reference, and he used <code>mmuli</code>, so I'm 
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #006400;">[</span>m2 <span style="color: #ff1493;">(</span><span style="color: #2F8B58; font-weight: bold;">Nd4j</span>/rand 4 4<span style="color: #ff1493;">)</span>
-      result <span style="color: #ff1493;">(</span><span style="color: #2F8B58; font-weight: bold;">Nd4j</span>/createUninitialized <span style="color: #ffff00;">(</span>.shape ^INDArray m2<span style="color: #ffff00;">)</span><span style="color: #ff1493;">)</span><span style="color: #006400;">]</span>
-  <span style="color: #006400;">(</span>.mmuli ^INDArray m1 ^INDArray m2 ^INDArray result<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #7388d6;">[</span>m2 <span style="color: #909183;">(</span><span style="color: #2F8B58; font-weight: bold;">Nd4j</span>/rand 4 4<span style="color: #909183;">)</span>
+      result <span style="color: #909183;">(</span><span style="color: #2F8B58; font-weight: bold;">Nd4j</span>/createUninitialized <span style="color: #709870;">(</span>.shape ^INDArray m2<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>.mmuli ^INDArray m1 ^INDArray m2 ^INDArray result<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
 <pre class="example">
-#object[org.nd4j.linalg.cpu.nativecpu.NDArray 0x7a2b2760 "[[    1.5376,    0.5348,    0.2911,    0.9459], \n [    2.2357,    1.2468,    0.8857,    1.5160], \n [    2.1034,    1.1342,    0.8752,    1.1078], \n [    0.7936,    0.2742,    0.1467,    0.4267]]"]
+#object[org.nd4j.linalg.cpu.nativecpu.NDArray 0xee3e53b "[[    0.6359,    0.7100,    0.7950,    0.5909], \n [    0.6098,    0.6178,    0.7594,    0.6282], \n [    1.5101,    1.4069,    1.7199,    1.7073], \n [    0.4605,    0.6056,    0.1510,    0.3166]]"]
 
 </pre>
 
@@ -230,13 +230,13 @@ ND4J:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">bench-nd4j-mmuli-float</span> <span style="color: #006400;">[</span>^long m ^long k ^long n<span style="color: #006400;">]</span>
-  <span style="color: #006400;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #ff1493;">[</span>m1 <span style="color: #ffff00;">(</span><span style="color: #2F8B58; font-weight: bold;">Nd4j</span>/rand m k<span style="color: #ffff00;">)</span>
-        m2 <span style="color: #ffff00;">(</span><span style="color: #2F8B58; font-weight: bold;">Nd4j</span>/rand k n<span style="color: #ffff00;">)</span>
-        result <span style="color: #ffff00;">(</span><span style="color: #2F8B58; font-weight: bold;">Nd4j</span>/createUninitialized m n<span style="color: #ffff00;">)</span><span style="color: #ff1493;">]</span>
-    <span style="color: #ff1493;">(</span>quick-bench
-     <span style="color: #ffff00;">(</span><span style="color: #A52A2A; font-weight: bold;">do</span> <span style="color: #00ff00;">(</span>.mmuli ^INDArray m1 ^INDArray m2 ^INDArray result<span style="color: #00ff00;">)</span>
-         <span style="color: #F5666D;">true</span><span style="color: #ffff00;">)</span><span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">bench-nd4j-mmuli-float</span> <span style="color: #7388d6;">[</span>^long m ^long k ^long n<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #909183;">[</span>m1 <span style="color: #709870;">(</span><span style="color: #2F8B58; font-weight: bold;">Nd4j</span>/rand m k<span style="color: #709870;">)</span>
+        m2 <span style="color: #709870;">(</span><span style="color: #2F8B58; font-weight: bold;">Nd4j</span>/rand k n<span style="color: #709870;">)</span>
+        result <span style="color: #709870;">(</span><span style="color: #2F8B58; font-weight: bold;">Nd4j</span>/createUninitialized m n<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>quick-bench
+     <span style="color: #709870;">(</span><span style="color: #A52A2A; font-weight: bold;">do</span> <span style="color: #907373;">(</span>.mmuli ^INDArray m1 ^INDArray m2 ^INDArray result<span style="color: #907373;">)</span>
+         <span style="color: #F5666D;">true</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -245,17 +245,17 @@ The equivalent Neanderthal code:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #006400;">[</span>splittable-random <span style="color: #ff1493;">(</span>SplittableRandom.<span style="color: #ff1493;">)</span><span style="color: #006400;">]</span>
-  <span style="color: #006400;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">random</span> ^double <span style="color: #ff1493;">[</span>^double _<span style="color: #ff1493;">]</span>
-    <span style="color: #ff1493;">(</span>.nextDouble ^SplittableRandom splittable-random<span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #7388d6;">[</span>splittable-random <span style="color: #909183;">(</span>SplittableRandom.<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">random</span> ^double <span style="color: #909183;">[</span>^double _<span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>.nextDouble ^SplittableRandom splittable-random<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 
-<span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">bench-neanderthal-mm!-float</span> <span style="color: #006400;">[</span>^long m ^long k ^long n<span style="color: #006400;">]</span>
-  <span style="color: #006400;">(</span>with-release <span style="color: #ff1493;">[</span>m1 <span style="color: #ffff00;">(</span>fmap! random <span style="color: #00ff00;">(</span>fge m k<span style="color: #00ff00;">)</span><span style="color: #ffff00;">)</span>
-                 m2 <span style="color: #ffff00;">(</span>fmap! random <span style="color: #00ff00;">(</span>fge k n<span style="color: #00ff00;">)</span><span style="color: #ffff00;">)</span>
-                 result <span style="color: #ffff00;">(</span>fge m n<span style="color: #ffff00;">)</span><span style="color: #ff1493;">]</span>
-    <span style="color: #ff1493;">(</span>quick-bench
-     <span style="color: #ffff00;">(</span><span style="color: #A52A2A; font-weight: bold;">do</span> <span style="color: #00ff00;">(</span>mm! 1.0 m1 m2 0.0 result<span style="color: #00ff00;">)</span>
-         <span style="color: #F5666D;">true</span><span style="color: #ffff00;">)</span><span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">bench-neanderthal-mm!-float</span> <span style="color: #7388d6;">[</span>^long m ^long k ^long n<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>with-release <span style="color: #909183;">[</span>m1 <span style="color: #709870;">(</span>fmap! random <span style="color: #907373;">(</span>fge m k<span style="color: #907373;">)</span><span style="color: #709870;">)</span>
+                 m2 <span style="color: #709870;">(</span>fmap! random <span style="color: #907373;">(</span>fge k n<span style="color: #907373;">)</span><span style="color: #709870;">)</span>
+                 result <span style="color: #709870;">(</span>fge m n<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>quick-bench
+     <span style="color: #709870;">(</span><span style="color: #A52A2A; font-weight: bold;">do</span> <span style="color: #907373;">(</span>mm! 1.0 m1 m2 0.0 result<span style="color: #907373;">)</span>
+         <span style="color: #F5666D;">true</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 </div>
@@ -274,7 +274,7 @@ First we'll try the powers of 2. You know, the usual fastest cases.
 <h3 id="org66c3091">4x4</h3>
 <div class="outline-text-3" id="text-org66c3091">
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>bench-nd4j-mmuli-float 4 4 4<span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>bench-nd4j-mmuli-float 4 4 4<span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -288,7 +288,7 @@ Evaluation count : 105222 in 6 samples of 17537 calls.
 </pre>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>bench-neanderthal-mm!-float 4 4 4<span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>bench-neanderthal-mm!-float 4 4 4<span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -315,7 +315,7 @@ In Paul's experiments, this was the dimension where ND4J catches up.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>bench-nd4j-mmuli-float 128 128 128<span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>bench-nd4j-mmuli-float 128 128 128<span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -329,7 +329,7 @@ Evaluation count : 10548 in 6 samples of 1758 calls.
 </pre>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>bench-neanderthal-mm!-float 128 128 128<span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>bench-neanderthal-mm!-float 128 128 128<span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -357,7 +357,7 @@ OK, let's see. Maybe Paul's machine is simply different than mine, so the catch-
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>bench-nd4j-mmuli-float 1024 1024 1024<span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>bench-nd4j-mmuli-float 1024 1024 1024<span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -371,7 +371,7 @@ Evaluation count : 48 in 6 samples of 8 calls.
 </pre>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>bench-neanderthal-mm!-float 1024 1024 1024<span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>bench-neanderthal-mm!-float 1024 1024 1024<span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -399,7 +399,7 @@ What about increasing the dimensions even further?
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>bench-nd4j-mmuli-float 4096 4096 4096<span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>bench-nd4j-mmuli-float 4096 4096 4096<span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -413,7 +413,7 @@ Evaluation count : 6 in 6 samples of 1 calls.
 </pre>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>bench-neanderthal-mm!-float 4096 4096 4096<span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>bench-neanderthal-mm!-float 4096 4096 4096<span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -442,7 +442,7 @@ seconds, both libraries should do the same? Apparently, not:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>bench-nd4j-mmuli-float 10000 10000 10000<span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>bench-nd4j-mmuli-float 10000 10000 10000<span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -456,7 +456,7 @@ Evaluation count : 6 in 6 samples of 1 calls.
 </pre>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>bench-neanderthal-mm!-float 10000 10000 10000<span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>bench-neanderthal-mm!-float 10000 10000 10000<span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -484,7 +484,7 @@ to run the benchmark function with different arguments, why not?
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>bench-nd4j-mmuli-float 3129 7845 1299<span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>bench-nd4j-mmuli-float 3129 7845 1299<span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -498,7 +498,7 @@ Evaluation count : 6 in 6 samples of 1 calls.
 </pre>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>bench-neanderthal-mm!-float 3129 7845 1299<span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>bench-neanderthal-mm!-float 3129 7845 1299<span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -529,22 +529,22 @@ matrices in Neanderthal and then run those. Let's try to do that:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">bench-neanderthal-mm!-double</span> <span style="color: #006400;">[</span>^long m ^long k ^long n<span style="color: #006400;">]</span>
-  <span style="color: #006400;">(</span>with-release <span style="color: #ff1493;">[</span>m1 <span style="color: #ffff00;">(</span>fmap! random <span style="color: #00ff00;">(</span>dge m k<span style="color: #00ff00;">)</span><span style="color: #ffff00;">)</span>
-                 m2 <span style="color: #ffff00;">(</span>fmap! random <span style="color: #00ff00;">(</span>dge k n<span style="color: #00ff00;">)</span><span style="color: #ffff00;">)</span>
-                 result <span style="color: #ffff00;">(</span>dge m n<span style="color: #ffff00;">)</span><span style="color: #ff1493;">]</span>
-    <span style="color: #ff1493;">(</span>quick-bench
-     <span style="color: #ffff00;">(</span><span style="color: #A52A2A; font-weight: bold;">do</span> <span style="color: #00ff00;">(</span>mm! 1.0 m1 m2 0.0 result<span style="color: #00ff00;">)</span>
-         <span style="color: #F5666D;">true</span><span style="color: #ffff00;">)</span><span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">bench-neanderthal-mm!-double</span> <span style="color: #7388d6;">[</span>^long m ^long k ^long n<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>with-release <span style="color: #909183;">[</span>m1 <span style="color: #709870;">(</span>fmap! random <span style="color: #907373;">(</span>dge m k<span style="color: #907373;">)</span><span style="color: #709870;">)</span>
+                 m2 <span style="color: #709870;">(</span>fmap! random <span style="color: #907373;">(</span>dge k n<span style="color: #907373;">)</span><span style="color: #709870;">)</span>
+                 result <span style="color: #709870;">(</span>dge m n<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>quick-bench
+     <span style="color: #709870;">(</span><span style="color: #A52A2A; font-weight: bold;">do</span> <span style="color: #907373;">(</span>mm! 1.0 m1 m2 0.0 result<span style="color: #907373;">)</span>
+         <span style="color: #F5666D;">true</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
 <p>
-This should be the dimension where ND4J catches up in his reportx:
+This should be the dimension where ND4J catches up in his report:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>bench-neanderthal-mm!-double 128 128 128<span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>bench-neanderthal-mm!-double 128 128 128<span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -568,7 +568,7 @@ Let's try to ramp it up:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>bench-neanderthal-mm!-double 256 256 256<span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>bench-neanderthal-mm!-double 256 256 256<span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -582,7 +582,7 @@ Evaluation count : 2664 in 6 samples of 444 calls.
 </pre>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>bench-nd4j-mmuli-float 256 256 256<span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>bench-nd4j-mmuli-float 256 256 256<span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -605,7 +605,7 @@ Of course, Neanderthal running single-precision computation is twice as fast, as
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>bench-neanderthal-mm!-float 256 256 256<span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>bench-neanderthal-mm!-float 256 256 256<span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -650,6 +650,10 @@ covered for sure :)
 
 <p>
 Please join the discussion :)
+</p>
+
+<p>
+Link to the response from the ND4J folks and the second part is already on my blog: <a href="./Neanderthal-vs-ND4J-vol2">Neanderthal vs. ND4J – Vol 2 – The Same Native MKL Backend, 1000 X Speedup</a>
 </p>
 
 <p>
