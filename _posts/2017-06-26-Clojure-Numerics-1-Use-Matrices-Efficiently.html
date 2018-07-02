@@ -155,7 +155,7 @@ The other option is row orientation:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #a71d5d;">(</span>dge 3 2 <span style="color: #795da3;">[</span>1 2 3 4 5 6<span style="color: #795da3;">]</span> <span style="color: #795da3;">{</span><span style="color: #a71d5d;">:order</span> <span style="color: #a71d5d;">:row</span><span style="color: #795da3;">}</span><span style="color: #a71d5d;">)</span>
+<pre class="src src-clojure"><span style="color: #a71d5d;">(</span>dge 3 2 <span style="color: #795da3;">[</span>1 2 3 4 5 6<span style="color: #795da3;">]</span> <span style="color: #795da3;">{</span><span style="color: #a71d5d;">:layout</span> <span style="color: #a71d5d;">:row</span><span style="color: #795da3;">}</span><span style="color: #a71d5d;">)</span>
 </pre>
 </div>
 
@@ -389,7 +389,7 @@ Or, the other way, from a native matrix to a Java array:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #a71d5d;">(</span><span style="color: #a71d5d;">let</span> <span style="color: #795da3;">[</span>a <span style="color: #183691;">(</span>dge 3 2 <span style="color: #183691;">(</span>range 6<span style="color: #183691;">)</span> <span style="color: #183691;">{</span><span style="color: #a71d5d;">:order</span> <span style="color: #a71d5d;">:row</span><span style="color: #183691;">}</span><span style="color: #183691;">)</span><span style="color: #795da3;">]</span>
+<pre class="src src-clojure"><span style="color: #a71d5d;">(</span><span style="color: #a71d5d;">let</span> <span style="color: #795da3;">[</span>a <span style="color: #183691;">(</span>dge 3 2 <span style="color: #183691;">(</span>range 6<span style="color: #183691;">)</span> <span style="color: #183691;">{</span><span style="color: #a71d5d;">:layout</span> <span style="color: #a71d5d;">:row</span><span style="color: #183691;">}</span><span style="color: #183691;">)</span><span style="color: #795da3;">]</span>
   <span style="color: #795da3;">(</span>seq <span style="color: #183691;">(</span>transfer! a <span style="color: #183691;">(</span>double-array <span style="color: #795da3;">(</span>* <span style="color: #0086b3;">(</span>mrows a<span style="color: #0086b3;">)</span> <span style="color: #0086b3;">(</span>ncols a<span style="color: #0086b3;">)</span><span style="color: #795da3;">)</span><span style="color: #183691;">)</span><span style="color: #183691;">)</span><span style="color: #795da3;">)</span><span style="color: #a71d5d;">)</span>
 </pre>
 </div>
@@ -576,7 +576,7 @@ and has ones on the diagonal. Then I multiply it with a dense matrix.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #a71d5d;">(</span>with-release <span style="color: #795da3;">[</span>a <span style="color: #183691;">(</span>dtr 3 <span style="color: #183691;">(</span>range 1 7<span style="color: #183691;">)</span> <span style="color: #183691;">{</span><span style="color: #a71d5d;">:order</span> <span style="color: #a71d5d;">:row</span> <span style="color: #a71d5d;">:diag</span> <span style="color: #a71d5d;">:unit</span> <span style="color: #a71d5d;">:uplo</span> <span style="color: #a71d5d;">:lower</span><span style="color: #183691;">}</span><span style="color: #183691;">)</span>
+    <pre class="src src-clojure"><span style="color: #a71d5d;">(</span>with-release <span style="color: #795da3;">[</span>a <span style="color: #183691;">(</span>dtr 3 <span style="color: #183691;">(</span>range 1 7<span style="color: #183691;">)</span> <span style="color: #183691;">{</span><span style="color: #a71d5d;">:layout</span> <span style="color: #a71d5d;">:row</span> <span style="color: #a71d5d;">:diag</span> <span style="color: #a71d5d;">:unit</span> <span style="color: #a71d5d;">:uplo</span> <span style="color: #a71d5d;">:lower</span><span style="color: #183691;">}</span><span style="color: #183691;">)</span>
                b <span style="color: #183691;">(</span>dge 3 4 <span style="color: #183691;">(</span>range 1 13<span style="color: #183691;">)</span><span style="color: #183691;">)</span><span style="color: #795da3;">]</span>
   <span style="color: #795da3;">(</span>mm a b<span style="color: #795da3;">)</span><span style="color: #a71d5d;">)</span>
 </pre>
@@ -602,7 +602,7 @@ Let's print out a triangular matrix:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #a71d5d;">(</span>dtr 3 <span style="color: #795da3;">(</span>range 1 7<span style="color: #795da3;">)</span> <span style="color: #795da3;">{</span><span style="color: #a71d5d;">:order</span> <span style="color: #a71d5d;">:row</span> <span style="color: #a71d5d;">:diag</span> <span style="color: #a71d5d;">:unit</span> <span style="color: #a71d5d;">:uplo</span> <span style="color: #a71d5d;">:lower</span><span style="color: #795da3;">}</span><span style="color: #a71d5d;">)</span>
+    <pre class="src src-clojure"><span style="color: #a71d5d;">(</span>dtr 3 <span style="color: #795da3;">(</span>range 1 7<span style="color: #795da3;">)</span> <span style="color: #795da3;">{</span><span style="color: #a71d5d;">:layout</span> <span style="color: #a71d5d;">:row</span> <span style="color: #a71d5d;">:diag</span> <span style="color: #a71d5d;">:unit</span> <span style="color: #a71d5d;">:uplo</span> <span style="color: #a71d5d;">:lower</span><span style="color: #795da3;">}</span><span style="color: #a71d5d;">)</span>
 </pre>
 </div>
 
@@ -638,7 +638,7 @@ other tasks. In Clojure, we can use the <a href="https://neanderthal.uncomplicat
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #a71d5d;">(</span><span style="color: #a71d5d;">def</span> <span style="color: #ed6a43;">lu</span> <span style="color: #795da3;">(</span>trf <span style="color: #183691;">(</span>dge 3 3 <span style="color: #183691;">[</span>1 0 -1 3 -2 3 4 1 1<span style="color: #183691;">]</span> <span style="color: #183691;">{</span><span style="color: #a71d5d;">:order</span> <span style="color: #a71d5d;">:row</span><span style="color: #183691;">}</span><span style="color: #183691;">)</span><span style="color: #795da3;">)</span><span style="color: #a71d5d;">)</span>
+    <pre class="src src-clojure"><span style="color: #a71d5d;">(</span><span style="color: #a71d5d;">def</span> <span style="color: #ed6a43;">lu</span> <span style="color: #795da3;">(</span>trf <span style="color: #183691;">(</span>dge 3 3 <span style="color: #183691;">[</span>1 0 -1 3 -2 3 4 1 1<span style="color: #183691;">]</span> <span style="color: #183691;">{</span><span style="color: #a71d5d;">:layout</span> <span style="color: #a71d5d;">:row</span><span style="color: #183691;">}</span><span style="color: #183691;">)</span><span style="color: #795da3;">)</span><span style="color: #a71d5d;">)</span>
 </pre>
 </div>
 
@@ -722,7 +722,7 @@ greatly discounted computation price:
 </pre>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #a71d5d;">(</span>mm  <span style="color: #795da3;">(</span>tri lu<span style="color: #795da3;">)</span> <span style="color: #795da3;">(</span>dge 3 3 <span style="color: #183691;">[</span>1 0 -1 3 -2 3 4 1 1<span style="color: #183691;">]</span> <span style="color: #183691;">{</span><span style="color: #a71d5d;">:order</span> <span style="color: #a71d5d;">:row</span><span style="color: #183691;">}</span><span style="color: #795da3;">)</span><span style="color: #a71d5d;">)</span>
+    <pre class="src src-clojure"><span style="color: #a71d5d;">(</span>mm  <span style="color: #795da3;">(</span>tri lu<span style="color: #795da3;">)</span> <span style="color: #795da3;">(</span>dge 3 3 <span style="color: #183691;">[</span>1 0 -1 3 -2 3 4 1 1<span style="color: #183691;">]</span> <span style="color: #183691;">{</span><span style="color: #a71d5d;">:layout</span> <span style="color: #a71d5d;">:row</span><span style="color: #183691;">}</span><span style="color: #795da3;">)</span><span style="color: #a71d5d;">)</span>
 </pre>
 </div>
 
