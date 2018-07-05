@@ -1,0 +1,411 @@
+---
+date: 2018-07-05
+tags:
+- Fluokitten
+- monadic
+- primitive arrays
+- map
+- reduce
+- fold
+author: dragan
+layout: post
+title: Map and Reduce Primitive Arrays Without Clojure Macros
+excerpt: Fluokitten 0.7.0 just got released. Now it supports Java arrays. A brief walktrough.
+categories:
+- Fluokitten
+- monadic
+- primitive arrays
+- map
+- reduce
+- fold
+---
+<p>
+I've just released a new version of <a href="https://fluokitten.uncomplicate.org">Fluokitten</a> (<iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=fluokitten&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>),
+a library that enables "monadic" programming in Clojure. It sounds abstract, but it is really the opposite.
+I'll show you how you can use its <a href="https://fluokitten.uncomplicate.org/codox/uncomplicate.fluokitten.core.html#var-fmap">fmap</a> and <a href="https://fluokitten.uncomplicate.org/codox/uncomplicate.fluokitten.core.html#var-fold">fold</a> functions as universal replacement for Clojure's <code>map</code> and <code>reduce</code>.
+Not only that <a href="https://fluokitten.uncomplicate.org/codox/uncomplicate.fluokitten.core.html#var-fmap">fmap</a> and <a href="https://fluokitten.uncomplicate.org/codox/uncomplicate.fluokitten.core.html#var-fold">fold</a> offer more functionality than <code>map</code> and <code>reduce</code>, they even support primitive
+Java arrays, and are as fast as Clojure's macros <code>amap</code> and <code>areduce</code>. There are much more cool functions
+there - be sure to check documentation and articles at <a href="https://fluokitten.uncomplicate.org">Flukitten's website.</a>
+</p>
+
+<div id="outline-container-org0351a0b" class="outline-2">
+<h2 id="org0351a0b">What <code>map</code> and <code>reduce</code> lack</h2>
+<div class="outline-text-2" id="text-org0351a0b">
+<p>
+Clojure's <code>map</code> and <code>reduce</code> work with anything sequential, so they work with arrays too. However,
+the problems are:
+</p>
+
+<ol class="org-ol">
+<li>They turn everything into sequences and return sequence.</li>
+<li>They turn elements into objects. It impact performance of primitive arrays an order of magnitude.</li>
+<li>They do not support in-place, mutable changes of source Java array.</li>
+<li>They work only with sequential things.</li>
+</ol>
+</div>
+</div>
+
+<div id="outline-container-org154ce62" class="outline-2">
+<h2 id="org154ce62">Fluokitten's elegance at full speed!</h2>
+<div class="outline-text-2" id="text-org154ce62">
+<p>
+I'll just show you Fluokitten's <code>map</code> and <code>reduce</code> equivalents, although it has much more to offer.
+</p>
+
+<p>
+<a href="https://fluokitten.uncomplicate.org/codox/uncomplicate.fluokitten.core.html#var-fmap">fmap</a> is, roughly, a <b>polymorphic</b> alternative to <code>map</code>. Instead of converting data to a specific type,
+it calls specialized implementation for each data type. <a href="https://fluokitten.uncomplicate.org/codox/uncomplicate.fluokitten.core.html#var-fmap.21">fmap!</a> is a destructive, in-place version of <a href="https://fluokitten.uncomplicate.org/codox/uncomplicate.fluokitten.core.html#var-fmap">fmap</a>. <a href="https://fluokitten.uncomplicate.org/codox/uncomplicate.fluokitten.core.html#var-fold">fold</a> is
+a polymorphic alternative to <code>reduce</code>. <a href="https://fluokitten.uncomplicate.org/codox/uncomplicate.fluokitten.core.html#var-foldmap">foldmap</a> is a combination of map and reduce, that first maps over
+source arguments, and then reduces the results of mapping in the same pass.
+</p>
+
+<p>
+In contrast to <code>map</code> and <code>reduce</code>, they:
+</p>
+
+<ol class="org-ol">
+<li>They keep the type of the object/container they work on.</li>
+<li>They can work with primitives without boxing.</li>
+<li><a href="https://fluokitten.uncomplicate.org/codox/uncomplicate.fluokitten.core.html#var-fmap.21">fmap!</a> supports in-place, mutable changes (if applicable for the object's type).</li>
+<li>They work with any Clojure or Java object!</li>
+</ol>
+</div>
+</div>
+
+<div id="outline-container-org328d870" class="outline-2">
+<h2 id="org328d870">What's wrong with <code>amap</code> and <code>areduce</code> macros</h2>
+<div class="outline-text-2" id="text-org328d870">
+<p>
+Let's demonstrate problems with <code>map</code>, <code>reduce</code>, <code>amap</code>, and <code>areduce</code>.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span>uncomplicate.commons.core <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>double-fn<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>uncomplicate.fluokitten.core <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>fmap! fmap fold foldmap<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">arr</span> <span style="color: #7388d6;">(</span>double-array <span style="color: #909183;">[</span>1 2 3<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+<code>map</code> returns a sequence:
+</p>
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>map inc arr<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+</colgroup>
+<tbody>
+<tr>
+<td class="org-right">2.0</td>
+<td class="org-right">3.0</td>
+<td class="org-right">4.0</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+The array is unchanged. This is normally desired in Clojure, but primitive arrays are explicitly built
+for mutability and speed, and sometimes we need to mutate them.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>get arr 0<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+1.0
+
+</pre>
+
+<p>
+As for the speed, let's measure mapping and reduction of an array of 100.000 elements with criterium.
+The canonical example is dot product:
+</p>
+
+\begin{gather*}
+\vec{x} = [x_1, x_2,\ldots, x_n]\\
+\vec{y} = [y_1, y_2,\ldots, y_n]\\
+\vec{x} \cdot \vec{y} = \sum_{i=1}^n x_i y_i
+\end{gather*}
+
+<p>
+So, create two large arrays and create a function for dot product:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">arr-a</span> <span style="color: #7388d6;">(</span>double-array <span style="color: #909183;">(</span>range 100000<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">arr-b</span> <span style="color: #7388d6;">(</span>double-array <span style="color: #909183;">(</span>range 100000<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">dot-seq</span> <span style="color: #7388d6;">[</span>xs ys<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>reduce + <span style="color: #909183;">(</span>map * xs ys<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #204A87;">;;</span><span style="color: #204A87;">(quick-bench (dot-seq arr-a arr-b))</span>
+<span style="color: #707183;">(</span>dot-seq arr-a arr-b<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+3.3332833335E14
+
+</pre>
+
+<pre class="example">
+Execution time mean : 10.074604 ms
+</pre>
+
+<p>
+It's not that fast&#x2026;
+</p>
+
+<p>
+Rich Hickey knew that this is a problem, and he created macros <code>amap</code> and <code>areduce</code> to help us with that:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">dot-areduce</span> <span style="color: #7388d6;">[</span>xs ys<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>areduce ^doubles xs idx res 0.0
+           <span style="color: #909183;">(</span>+ res <span style="color: #709870;">(</span>* <span style="color: #907373;">(</span>aget ^doubles xs idx<span style="color: #907373;">)</span>
+                     <span style="color: #907373;">(</span>aget ^doubles ys idx<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #204A87;">;;</span><span style="color: #204A87;">(quick-bench (dot-areduce arr-a arr-b))</span>
+<span style="color: #707183;">(</span>dot-areduce arr-a arr-b<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+3.3332833335E14
+
+</pre>
+
+<p>
+100 times faster than the seq way!
+</p>
+
+<pre class="example">
+Execution time mean : 94.521934 µs
+</pre>
+
+<p>
+Much faster, but more verbose. To avoid reflection penalty, we had to sprinkle the code with the <code>^doubles</code> typehints.
+This means that our function can work only with doubles, and we will have to create a separate version for
+floats, longs, ints etc. <code>areduce</code> and <code>map</code> had to be macros, since working with primitives is explicit.
+</p>
+
+<p>
+Even in Java, there are special methods for each type of primitive arrays: <code>getFloat</code>, <code>getDouble</code>, <code>getLong</code>,
+<code>setDouble</code> etc. If <code>amap</code> and <code>areduce</code> were functions instead of macros, they would have to work with all
+types of data, and would have to box and unbox numbers on every call instead of keeping them primitive.
+This incures performance penalty of roughly an order of magnitude.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org57b9a0b" class="outline-2">
+<h2 id="org57b9a0b">Now, Fluokitten!</h2>
+<div class="outline-text-2" id="text-org57b9a0b">
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">p+</span> ^double <span style="color: #7388d6;">[</span>^double x ^double y<span style="color: #7388d6;">]</span> <span style="color: #7388d6;">(</span>+ x y<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">p*</span> ^double <span style="color: #7388d6;">[</span>^double x ^double y<span style="color: #7388d6;">]</span> <span style="color: #7388d6;">(</span>* x y<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">dot-fluokitten</span> <span style="color: #7388d6;">[</span>xs ys<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>foldmap p+ 0.0 p* xs ys<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #204A87;">;;</span><span style="color: #204A87;">(quick-bench (dot-fluokitten arr-a arr-b))</span>
+<span style="color: #707183;">(</span>dot-fluokitten arr-a arr-b<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+3.3332833335E14
+
+</pre>
+
+<pre class="example">
+Execution time mean : 78.358088 µs
+</pre>
+
+<p>
+Yesss! Even slightly faster than <code>areduce</code>! (your mileage may vary, though!).
+</p>
+
+<p>
+Faster than <code>map</code> / <code>reduce</code>, and often at the same speed as <code>amap</code> / <code>areduce</code>. If you're not careful you
+might be hit by boxing. HotSpot is an unpredictable beast when it comes to hese things. It is always
+safer to provide primitive typehinted functions as arguments. <code>+</code> and * work, but the arguments will be boxed.
+There are helper functions in Uncomplicate commons library that can wrap any function into a primitive version.
+</p>
+
+<p>
+Where it really shows its convenience is when we work with something a bit more sophisticated than
+mere <code>+</code> and *:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">pointless-id</span> ^double <span style="color: #7388d6;">[</span>^double x<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span><span style="color: #2F8B58; font-weight: bold;">Math</span>/exp <span style="color: #909183;">(</span><span style="color: #2F8B58; font-weight: bold;">Math</span>/log x<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">demo-amap</span> <span style="color: #7388d6;">[</span>xs<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>amap ^doubles xs idx xs
+        <span style="color: #909183;">(</span>pointless-id <span style="color: #709870;">(</span>aget ^doubles xs idx<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #204A87;">;;</span><span style="color: #204A87;">(quick-bench (demo-amap arr-a))</span>
+<span style="color: #707183;">(</span>take 3 <span style="color: #7388d6;">(</span>demo-amap arr-a<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+</colgroup>
+<tbody>
+<tr>
+<td class="org-right">0.0</td>
+<td class="org-right">1.0</td>
+<td class="org-right">2.0</td>
+</tr>
+</tbody>
+</table>
+
+<pre class="example">
+Execution time mean : 5.186906 ms
+</pre>
+
+<p>
+Now, Fluokitten:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #204A87;">;;</span><span style="color: #204A87;">(quick-bench (fmap! pointless-id arr-b))</span>
+<span style="color: #707183;">(</span>take 3 <span style="color: #7388d6;">(</span>fmap! pointless-id arr-b<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+</colgroup>
+<tbody>
+<tr>
+<td class="org-right">0.0</td>
+<td class="org-right">1.0</td>
+<td class="org-right">2.0</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+The same speed as <code>amap</code>!
+</p>
+
+<pre class="example">
+Execution time mean : 5.006114 ms
+</pre>
+
+<p>
+While, if you'd used ordinary <code>map</code>:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #204A87;">;;</span><span style="color: #204A87;">(quick-bench (doall (map pointless-id arr-b)))</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">doall</span> <span style="color: #7388d6;">(</span>map pointless-id arr-b<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+Execution time mean : 14.845975 ms
+</pre>
+
+<p>
+Three times slower. JVM spent 5 ms on actual computations, and twice as that on messing up with objects.
+Sometimes it is the cost that is not important, but in some applications, it is.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orge2eeb76" class="outline-2">
+<h2 id="orge2eeb76">And a honorary mention of Neanderthal</h2>
+<div class="outline-text-2" id="text-orge2eeb76">
+<p>
+Of course, if you really need the speed, there is no better helper with that than
+<a href="https://neanderthal.uncomplicate.org">Neanderthal</a> (<iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=neanderthal&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>):
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span>uncomplicate.neanderthal
+           <span style="color: #909183;">[</span>native <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>dv<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>vect-math <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>log! exp!<span style="color: #709870;">]</span><span style="color: #909183;">]</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">v</span> <span style="color: #7388d6;">(</span>dv <span style="color: #909183;">(</span>range 100000<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #204A87;">;;</span><span style="color: #204A87;">(quick-bench (take 3 (exp! (log! v))))</span>
+<span style="color: #707183;">(</span>take 3 <span style="color: #7388d6;">(</span>exp! <span style="color: #909183;">(</span>log! v<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#'user/v(0.0 1.0 2.0)
+
+</pre>
+
+<pre class="example">
+Execution time mean : 110.770416 µs
+</pre>
+
+<p>
+50 times faster than arrays is quite all right. Keep in mind that it used four cores instead of just
+one&#x2026;
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgc876922" class="outline-2">
+<h2 id="orgc876922">Conclusions</h2>
+<div class="outline-text-2" id="text-orgc876922">
+<p>
+<a href="https://fluokitten.uncomplicate.org">Fluokitten</a> helps me a lot. I use it in <a href="https://neanderthal.uncomplicate.org">Neanderthal</a> and other high-performance code to get the
+elegance of Clojure's higher order map and reduce, while keeping the speed of native and GPU
+backends. Check it out&#x2026;
+</p>
+</div>
+</div>
