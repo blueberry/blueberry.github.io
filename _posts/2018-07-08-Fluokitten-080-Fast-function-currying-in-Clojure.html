@@ -1,0 +1,486 @@
+---
+date: 2018-07-08
+tags:
+- Fluokitten
+- monadic
+- currying
+author: dragan
+layout: post
+title: Fast Function Currying in Clojure (Without Macros)
+excerpt: Fluokitten 0.8.0 just got released. I significantly improved the performance of existing currying functionality. Here's a walkthrough.
+categories:
+- Fluokitten
+- monadic
+- currying
+---
+<p>
+Yet another version of <a href="https://fluokitten.uncomplicate.org">Fluokitten</a> (<iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=fluokitten&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>),
+a library that enables "monadic" programming in Clojure, has been released. The highlight of the release
+is a vastly improved <a href="https://en.wikipedia.org/wiki/Currying">function currying</a> performance. Now, curried functions have the same performance as
+the ordinary, uncurried ones! Here's a short introduction, demo, and a bit of benchmarking to convince
+you that you can use this <code>partial</code> on steroids without worrying about the performance overhead.
+</p>
+
+<p>
+There are much more cool functions there - be sure to check documentation and articles at <a href="https://fluokitten.uncomplicate.org">Flukitten's website, </a>and
+this blog.
+</p>
+
+<div id="outline-container-org4ef5994" class="outline-2">
+<h2 id="org4ef5994">What Clojure's <code>partial</code> lack</h2>
+<div class="outline-text-2" id="text-org4ef5994">
+<p>
+The closest thing to currying in Clojure is the <code>partial</code> function. It is so similar on the surface that,
+when the topic comes up in online discussions, the answer is usually that Clojure supports currying, and
+you can do this using <code>partial</code>.
+</p>
+
+<p>
+The idea of both currying and <code>partial</code> is that when you apply a function with fewer arguments than it requires,
+instead of throwing an error, the function closes over what's there and creates a new function that
+awaits for the remaining arguments. The main difference is that <code>partial</code> is a higher order function that
+has to be called explicitly, while currying is automatic.
+</p>
+
+<p>
+This function takes exactly 4 arguments.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">add4</span> <span style="color: #7388d6;">[</span>x y z w<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>+ x y z w<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+If we call it with exactly four, it adds them.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>add4 1 2 3 4<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+10
+
+</pre>
+
+<p>
+However, if we call it with only two, it throws an <code>ArrityException</code>.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>add4 1 2<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+class clojure.lang.ArityExceptionclass clojure.lang.ArityExceptionArityException Wrong number of args (2) passed to: user/add4  clojure.lang.AFn.throwArity (AFn.java:429)
+
+</pre>
+
+<p>
+Often, only some arguments are known at some point in time. Later they are repeated. Instead of
+keeping track of them all the time, we would like to somehow fill them in, and be able to supply the
+rest at an appropriate time in future. <code>partial</code> is just what we need. An example would be supplying
+a database connection to a function that generates queries.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">add2</span> <span style="color: #7388d6;">(</span>partial add4 1 2<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+The resulting function <code>add2</code> does the same thing as <code>add4</code>, but it "remembers" arguments <code>1</code> and <code>2</code>,
+and can return the answer once the remaining arguments are known.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>add2 3 4<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+10
+
+</pre>
+
+<p>
+This works well and is used often in Clojure. There is one issue that may not be important until you
+are working on code that needs to be general: you have to know the details of the function at hand, how
+many arguments it requires, and to decide explicitly, on a case by case basis whether you'll apply it,
+or you need to call <code>partial</code>. When you are writing a specific application, this might
+not be an issue, but when you are writing general code (say, a library) this makes things complicated.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org5921463" class="outline-2">
+<h2 id="org5921463">How currying is different and why it is tricky in Clojure</h2>
+<div class="outline-text-2" id="text-org5921463">
+<p>
+With currying, this process is automatic. If a function received enough arguments, it can be applied.
+If it received less than necessary, it will return a function that expects the remaining arguments.
+This is easier than having to do it manually on a case by case basis.
+</p>
+
+<p>
+Why Clojure's functions don't do it then? Because it clashes with Clojure's support for multi-arity
+functions. Take function <code>+</code> as an example. The basic use case is that it expects two arguments to add,
+but it can receive 0, 1, 2, 3, or any other number of arguments, and it will add them together.
+With currying, how is it supposed to know whether <code>(+ 3)</code> should return <code>3</code>, or wait for more arguments? And if
+it has to wait, should it wait for one more, or more, an how many, before it adds them and returns
+a number?
+</p>
+
+<p>
+In languages such as Haskell, which support automatic currying, it is straightforward. Each function
+expect an exact number of arguments. If it receives less, currying applies. (Technically, each function
+there expects one argument, but let's not lose ourselves in the details that are not important here).
+So, function + expects exactly two arguments. If called with 0 or 1, it will produce a function that
+waits for the rest.
+</p>
+
+<p>
+So, currying as the default is not possible in Clojure. That was bad news.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgaa0725b" class="outline-2">
+<h2 id="orgaa0725b">Fluokitten brings automatic currying to Clojure</h2>
+<div class="outline-text-2" id="text-orgaa0725b">
+<p>
+The good news, though, is that automatic currying is possible in Clojure, together with multiple arities,
+when needed! Fluokitten supported that from the beginning, many years ago, since I needed real currying to
+implement monadic concepts that Fluokitten implements for Clojure.
+</p>
+
+<p>
+Here's how it works. The only thing we need is the <a href="https://fluokitten.uncomplicate.org/codox/uncomplicate.fluokitten.core.html#var-curry">curry</a> function. It turns any ordinary Clojure
+function into a function that is capable of automatic currying! The result is also a fully
+capable Clojure function. No macros or special environment is required. It can turn <i>any</i> existing
+ordinary function into a currying one; there's no need for special concepts such as <code>defcurry</code>. There's
+not even the pressure to decide about currying support at the time of function definition.
+It's also rather fast, but let's first see how it's used.
+</p>
+
+<p>
+<i>Please take into account that I'll use arithmetic functions as a simple example. In real</i>
+<i>life, you'll see more benefits from currying when you work with higher order functions that</i>
+<i>need extra flexibility. Don't attach too much to the arithmetic functionality when</i>
+<i>thinking about when currying could be useful to you.</i>
+</p>
+
+<p>
+I'll now curry the existing <code>add4</code> function.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span>uncomplicate.fluokitten.core <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>curry<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">curried-add4</span> <span style="color: #7388d6;">(</span>curry add4<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#curried-function[arity: 4, user$add4@3b26db86]
+
+</pre>
+
+
+<p>
+Now, when I call <code>curried-add4</code> with fewer arguments than it can work with:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>curried-add4 1 2<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#curried-function[arity: 2, clojure.core$partial$fn__4761@16f07d1f]
+
+</pre>
+
+<p>
+It created a curried function automatically! If we call it with enough arguments (it's now cached in the REPL as <code>*1</code>) it will
+compute the final result.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A020F0;">*1</span> 3 4<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+10
+
+</pre>
+
+<p>
+But if we don't have both missing arguments, but only one, it will continue with currying.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A020F0;">*2</span> 3<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#curried-function[arity: 1, clojure.core$partial$fn__4759@3eb6c63b]
+
+</pre>
+
+<p>
+One more argument to go.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A020F0;">*1</span> 4<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+10
+
+</pre>
+
+<p>
+Fine. <code>add4</code> was straightforward, though. It asks for exactly 4 arguments, so currying was unambigous.
+What happens with variadic functions? <code>+</code> can work with any number of arguments. In this case,  <a href="https://fluokitten.uncomplicate.org/codox/uncomplicate.fluokitten.core.html#var-curry">curry</a>  defaults to 2, since
+there is not much point in currying a function with 0 or 1 arguments anyway.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>curry +<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#curried-function[arity: 2, clojure.core$_PLUS_@67e63820]
+
+</pre>
+
+<p>
+You see in the report that the arity of this curried function is 2 and that the original function is <code>+</code>.
+</p>
+
+<p>
+But still, what if I didn't want it to be 2? What if I wanted to select a specific arity among many
+that <code>+</code> supports? <a href="https://fluokitten.uncomplicate.org/codox/uncomplicate.fluokitten.core.html#var-curry">curry</a> accepts an explicit arity, of course!
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">curried-+3</span> <span style="color: #7388d6;">(</span>curry + 3<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#'user/curried-+3
+
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-clojure">curried-+3
+</pre>
+</div>
+
+<pre class="example">
+#curried-function[arity: 3, clojure.core$_PLUS_@67e63820]
+
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>curried-+3 1<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#curried-function[arity: 2, clojure.core$partial$fn__4759@66047ca2]
+
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A020F0;">*1</span> 1 2 3 4 5 6<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+22
+
+</pre>
+
+<p>
+See? Fluokitten's <a href="https://fluokitten.uncomplicate.org/codox/uncomplicate.fluokitten.core.html#var-curry">curry</a> adapts to everything!
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgb36f58f" class="outline-2">
+<h2 id="orgb36f58f">What about performance? Overhead?</h2>
+<div class="outline-text-2" id="text-orgb36f58f">
+<p>
+In short, curried functions <b>do not introduce any call overhead</b> (other than an additional simple
+function call in the order of a nanosecond or two)!
+</p>
+
+<p>
+The <a href="https://fluokitten.uncomplicate.org/codox/uncomplicate.fluokitten.core.html#var-curry">curry</a> itself takes <i>a dozen nanoseconds</i> if you supply the arity explicitly, or a couple hundreds
+of <i>nanoseconds</i> if it has to infer it by inspecting the function you supply).
+</p>
+
+<p>
+Let's check it with a few Criterium benchmarks.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>use 'criterium.core<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #204A87;">;;</span><span style="color: #204A87;">(quick-bench (curry + 3))</span>
+<span style="color: #707183;">(</span>curry + 3<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+Execution time mean : 13.494292 ns
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #204A87;">;;</span><span style="color: #204A87;">(quick-bench (curry +))</span>
+<span style="color: #707183;">(</span>curry +<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+Execution time mean : 261.490270 ns
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #204A87;">;;</span><span style="color: #204A87;">(quick-bench (curry hash-map))</span>
+<span style="color: #707183;">(</span>curry hash-map<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+Execution time mean : 176.784642 ns
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #204A87;">;;</span><span style="color: #204A87;">(quick-bench (curry add4))</span>
+<span style="color: #707183;">(</span>curry add4<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+Execution time mean : 100.917388 ns
+</pre>
+
+<p>
+OK, the initial currying is fast. How about application?
+</p>
+
+<p>
+Let's compare it with some fast functions to see whether currying slows them down:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #204A87;">;;</span><span style="color: #204A87;">(quick-bench (add4 1 2 3 4))</span>
+<span style="color: #707183;">(</span>add4 1 2 3 4<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+Execution time mean : 11.144205 ns
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #204A87;">;;</span><span style="color: #204A87;">(quick-bench (curried-add4 1 2 3 4))</span>
+<span style="color: #707183;">(</span>curried-add4 1 2 3 4<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+Execution time mean : 18.412679 ns
+</pre>
+
+<p>
+Admittedly, in this case there is an overhead of 7 <i>nanoseconds</i>. That's very little. But, we can make it even less.
+<code>add4</code> works with numbers, but the arguments are objects. That means we weren't particularly concerned
+with shaving every nanosecond off the execution speed. Let's see what happens when we typehint it.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">primitive-add4</span> ^double <span style="color: #7388d6;">[</span>^double x ^double y ^double z ^double w<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>+ x y z w<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">curried-primitive-add4</span> <span style="color: #7388d6;">(</span>curry primitive-add4<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #204A87;">;;</span><span style="color: #204A87;">(quick-bench (primitive-add4 1 2 3 4))</span>
+<span style="color: #707183;">(</span>primitive-add4 1 2 3 4<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+Execution time mean : 4.674149 ns
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #204A87;">;;</span><span style="color: #204A87;">(quick-bench (curried-primitive-add4 1 2 3 4))</span>
+<span style="color: #707183;">(</span>curried-primitive-add4 1 2 3 4<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+Execution time mean : 6.099554 ns
+</pre>
+
+<p>
+That was the whopping overhead of 1.5 <i>nanoseconds</i>!
+</p>
+
+<p>
+The last thing to check out: what is the overhead in the case when there are not enough arguments,
+so the function has to curry?
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #204A87;">;;</span><span style="color: #204A87;">(quick-bench (curried-primitive-add4 1 2 3))</span>
+<span style="color: #707183;">(</span>curried-primitive-add4 1 2 3<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+Execution time mean : 12.670900 ns
+</pre>
+
+<p>
+Yes, even when it has to return the new curried function, it is still only a dozen <i>nanoseconds</i>!
+</p>
+</div>
+</div>
+
+<div id="outline-container-org0eac10d" class="outline-2">
+<h2 id="org0eac10d">Conclusions</h2>
+<div class="outline-text-2" id="text-org0eac10d">
+<p>
+Currying is great, especially when combined with other functional programming concepts that Fluokitten
+enriches Clojure with. However, don't rush now and embellish all your functions with <a href="https://fluokitten.uncomplicate.org/codox/uncomplicate.fluokitten.core.html#var-curry">curry</a>! When it's
+needed, it will serve you well, but don't abuse it for no reason.
+</p>
+
+<p>
+<a href="https://fluokitten.uncomplicate.org">Fluokitten</a> helps me a lot. I use it in <a href="https://neanderthal.uncomplicate.org">Neanderthal</a> and other high-performance code to get the
+elegance of Clojure's higher order map and reduce, while keeping the speed of native and GPU
+backends. Check it out&#x2026;
+</p>
+</div>
+</div>
