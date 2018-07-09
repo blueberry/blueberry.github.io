@@ -5,7 +5,7 @@ title: Dragan Djuric
 
 My name is Dragan Djuric. Here's a few words about me and what you can expect to find on this blog.
 
-When I'm not running, working out, dancing, reading, and pleasantly wasting time, I'm working on [Uncomplicate Clojure libraries](http://uncomplicate.org). What time is left, I spend it as [a professor of software engineering](http://www.fon.bg.ac.rs/eng/about-fos/academic-staff/dragan-djuric/) at [University of Belgrade](http://bg.ac.rs/en/index.php). I am a member of [Good Old AI Network](http://goodoldai.org/people), a group of researchers that share a similar passion for intelligent systems.
+When I'm not running, working out, dancing, reading, and pleasantly wasting time, I'm working on [Uncomplicate Clojure libraries](http://uncomplicate.org). What time is left, I spend it as [a professor of software engineering](http://www.fon.bg.ac.rs/eng/about-fos/academic-staff/dragan-djuric/) at [University of Belgrade](http://bg.ac.rs/en/index.php). I am a member of [Good Old AI Network](http://goodoldai.org), a group of researchers that share a similar passion for intelligent systems.
 
 I live in [Belgrade](https://en.wikipedia.org/wiki/Belgrade), [Serbia](https://en.wikipedia.org/wiki/Serbia); if you are curious, it's in the southern part of Europe, just across the Adriatic Sea from Italy, to the North-East.
 
