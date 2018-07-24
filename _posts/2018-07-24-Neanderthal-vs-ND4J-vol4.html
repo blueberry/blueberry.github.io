@@ -1,0 +1,483 @@
+---
+date: 2018-07-24
+tags:
+- Neanderthal
+- MKL
+- Clojure
+- Java
+- ND4J
+- Deeplearning4J
+author: dragan
+layout: post
+title: Neanderthal vs ND4J - vol 4 - Fast Vector Broadcasting in Java, CPU and GPU
+excerpt: In which we implement our own vector broadcasting function that matches the performance of Nd4j's optimized one and even surpasses it on the GPU.
+categories:
+- Neanderthal
+- MKL
+- Clojure
+- Java
+- ND4J
+- Deeplearning4J
+---
+<p>
+In <a href="./Neanderthal-vs-ND4J-vol1">Part 1</a>, 2, and 3, of this series, we examined general dense matrix multiplications.
+I demonstrated just one important feature of
+<a href="https://neanderthal.uncomplicate.org">Neanderthal</a> (<iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=neanderthal&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>) (the library I develop),
+and any other matrix library. GEMM and its sugared wrappers are probably the most useful operation in this space.
+However, any curious programmer will think, "Why the hell everybody only cares and talk about GEMM?
+There are plenty of other functions that I need. Being good at GEMM is just one microbenchmark."
+</p>
+
+<p>
+I agree. What's more, now I'll show to you that with <b>other</b> functions, Neanderthal's performance stays strong,
+even for the things you have to implement yourself. GEMM is usually well optimized in all decent libraries.
+The further away we move <b>from</b> GEMM, libraries start to be sloppy.
+</p>
+
+<p>
+I wanted to cover several vectorized operations on large arrays in this article: broadcasting,
+typical mappings, reductions, and math functions. When I finished writing, the article ended up a lot longer
+than I hoped. That's why here we are only going to cover broadcasting.
+</p>
+
+<p>
+If you're impatient to hear the results of other operations, here is the summary: Neanderthal is faster for
+gigantic arrays, several times to an order of magnitude faster for large-ish arrays, and a couple orders of
+magnitude faster for tiny arrays. The exact difference varies across operations, of course, but whereas with
+GEMM Neanderthal was from just a bit faster to a several times faster, now the performance multipliers are much larger.
+That's the theme of the next article, though.
+</p>
+
+<p>
+But, broadcasting is more interesting since it doesn't come as a built-in in Neanderthal, so we can learn
+a lot trying to write an implementation that would be on par with the optimized one that comes with Nd4j.
+</p>
+
+<p>
+First, the imports.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span>uncomplicate.commons.core <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>with-release release<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>uncomplicate.fluokitten.core <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>fmap!<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>uncomplicate.clojurecuda.core
+             <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>init context device current-context current-context! synchronize!<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>uncomplicate.neanderthal
+           <span style="color: #909183;">[</span>core <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>dot raw row col entry! mrows rows asum axpy! vctr rk!<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>native <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>fge fv<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>cuda <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>cuge cuv set-engine!<span style="color: #709870;">]</span><span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>criterium.core <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>quick-bench<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>import org.nd4j.linalg.factory.Nd4j
+        org.nd4j.linalg.api.ndarray.INDArray<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div id="outline-container-orgbc61cea" class="outline-2">
+<h2 id="orgbc61cea">Vector broadcasting</h2>
+<div class="outline-text-2" id="text-orgbc61cea">
+<p>
+Broadcasting is a stock operation in deep learning.
+It figures prominently in Nd4J's documentation, and is one of the first top features that programmers
+ask when evaluating matrix libraries. So, Nd4j has it in the form of <code>addiRowVector</code> and <code>addiColumnVector</code>
+methods. Don't mistakenly use non-destructive <code>addRowVector</code> and <code>addColumnVector</code>,
+if you don't want to pay 5-10&times; performance penalty. Nd4j does not handle large allocations very gracefully.
+</p>
+
+<p>
+Broadcasting is not a linear algebra operation, and is a bit loosely defined mathematically, and I deliberately
+refused to add it to Neanderthal. I think it belongs to a machine learning library built on top of Neanderthal.
+What a handicap for Neanderthal! Shouldn't such grave omission be a deal breaker?
+</p>
+
+<p>
+Instead of crying, I'll demonstrate how awesome Neanderthal is: I'll implement broadcasting with a
+Neanderthal one-liner, and that one-liner will be competitive with Nd4j's optimized broadcasting!
+</p>
+
+<p>
+Here's how Nd4j's broadcasting works: we have a matrix <code>a</code> and want to add a lower-dimension structure, vector <code>x</code>, to it, but since the dimensions
+do not match, we would like to "upgrade" it by "broadcasting" it to each row (or column) of <code>a</code>.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #7388d6;">[</span>a <span style="color: #909183;">(</span><span style="color: #2F8B58; font-weight: bold;">Nd4j</span>/ones 2 3<span style="color: #909183;">)</span>
+      x <span style="color: #909183;">(</span><span style="color: #2F8B58; font-weight: bold;">Nd4j</span>/ones 3<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>.addiRowVector ^INDArray a ^INDArray x<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#object[org.nd4j.linalg.jcublas.JCublasNDArray 0x572aafeb "[[    2.0000,    2.0000,    2.0000], \n [    2.0000,    2.0000,    2.0000]]"]
+
+</pre>
+
+
+<p>
+Let's measure Nd4j's performance for various sizes:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">bench-nd4j-addiRowVector</span> <span style="color: #7388d6;">[</span>^long m ^long n<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #909183;">[</span>a <span style="color: #709870;">(</span><span style="color: #2F8B58; font-weight: bold;">Nd4j</span>/ones m n<span style="color: #709870;">)</span>
+        x <span style="color: #709870;">(</span><span style="color: #2F8B58; font-weight: bold;">Nd4j</span>/ones n<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>quick-bench
+     <span style="color: #709870;">(</span><span style="color: #A52A2A; font-weight: bold;">do</span> <span style="color: #907373;">(</span>.addiRowVector ^INDArray a ^INDArray x<span style="color: #907373;">)</span>
+         <span style="color: #F5666D;">true</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Here's how to call it
+</p>
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #204A87;">;;</span><span style="color: #204A87;">(bench-nd4j-addiRowVector 100 100)</span>
+</pre>
+</div>
+
+<p>
+And the results for some representative dimensions:
+</p>
+<pre class="example">
+;; 10x15: 1.687800 µs
+;; 100x100: 7.704195 µs
+;; 1000x1000: 67.836326 µs
+;; 100x10000: 67.930071 µs
+;; 10000x100: 83.789454 µs
+;; 10000x10000: 29.833284 ms
+</pre>
+</div>
+
+<div id="outline-container-orgad6ceaf" class="outline-3">
+<h3 id="orgad6ceaf">A very naive broadcasting implementation in Neanderthal</h3>
+<div class="outline-text-3" id="text-orgad6ceaf">
+<p>
+Even if I didn't know anything about linear algebra, I could employ a stock tool from the programmer's
+toolbox, iteration. I'll naively ask Neanderthal's matrix <code>a</code> to give me a sequence of its rows,
+which are vectors, and add <code>x</code> to those vectors one by one.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">naive-add-row-vector!</span> <span style="color: #7388d6;">[</span>a x<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">doseq</span> <span style="color: #909183;">[</span>rw <span style="color: #709870;">(</span>rows a<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>axpy! x rw<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  a<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Let's test it briefly:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #7388d6;">[</span>a <span style="color: #909183;">(</span>fge 2 3 <span style="color: #709870;">[</span>1 2 3 4 5 6<span style="color: #709870;">]</span><span style="color: #909183;">)</span>
+      x <span style="color: #909183;">(</span>entry! <span style="color: #709870;">(</span>fv 3<span style="color: #709870;">)</span> 1<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>naive-add-row-vector! a x<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealGEMatrix[float, mxn:2x3, layout:column, offset:0]
+   ▥       ↓       ↓       ↓       ┓
+   →       2.00    4.00    6.00
+   →       3.00    5.00    7.00
+   ┗                               ┛
+
+</pre>
+
+<p>
+As the phrase goes, you can "convince yourself that this is equivalent functionality" to Nd4j's. Neanderthal
+has somewhat prettier printing, but that is not of major concern right now.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org55233be" class="outline-3">
+<h3 id="org55233be">Performance of a very naive Neanderthal broadcasting</h3>
+<div class="outline-text-3" id="text-org55233be">
+<p>
+Since we started with the most naive implementation, I expected Nd4j to take a giant lead here.
+<b>I have been so naive</b>! Neanderthal was not that much behind!
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">bench-neanderthal-naive-add-row-vector</span> <span style="color: #7388d6;">[</span>m n<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>with-release <span style="color: #909183;">[</span>a <span style="color: #709870;">(</span>entry! <span style="color: #907373;">(</span>fge m n <span style="color: #6276ba;">{</span><span style="color: #F5666D;">:layout</span> <span style="color: #F5666D;">:row</span><span style="color: #6276ba;">}</span><span style="color: #907373;">)</span> 1<span style="color: #709870;">)</span>
+                 x <span style="color: #709870;">(</span>entry! <span style="color: #907373;">(</span>fv n<span style="color: #907373;">)</span> 1<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>quick-bench
+     <span style="color: #709870;">(</span><span style="color: #A52A2A; font-weight: bold;">do</span> <span style="color: #907373;">(</span>naive-add-row-vector! a x<span style="color: #907373;">)</span>
+         <span style="color: #F5666D;">true</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #204A87;">;;</span><span style="color: #204A87;">(bench-neanderthal-naive-add-row-vector 100 100)</span>
+</pre>
+</div>
+
+<p>
+Here are the results:
+</p>
+
+<pre class="example">
+;; 10x15: 1.379596 µs
+;; 100x100: 11.467549 µs
+;; 1000x1000: 216.736544 µs
+;; 100x10000: 140.238912 µs
+;; 10000x100: 1.163332 ms
+;; 10000x10000: 31.391642 ms
+</pre>
+</div>
+</div>
+
+<div id="outline-container-orga7c320c" class="outline-3">
+<h3 id="orga7c320c">A less naive broadcasting in Neanderthal</h3>
+<div class="outline-text-3" id="text-orga7c320c">
+<p>
+But why stop here? We can improve this naive implementation and make it less naive, to show you
+that with a good tool in your toolbox, and a little knowledge of textbook math you can make wonders.
+</p>
+
+<p>
+So, what caught my eye in the previous measurements, is that cases when the matrix is "flat" require
+a lot of looping iterations, each calling native operation and wasting its time by not giving it enough
+work to do. What I would prefer is, of course, to call fewer more demanding operations, preferably just one :)
+</p>
+
+<p>
+Take a look at the diagram on the <a href="https://nd4j.org/userguide#opsbroadcast">Nd4j user guide</a> that explains what broadcasting does, and
+recall a bit of basic linear algebra. If you imagine the vector to be broadcast to be a \(1 \times{} n\) matrix,
+and imagine a \(m \times{} 1\) matrix of ones, you may recognize that their product places the
+elements exactly at the places where they need to end up.
+</p>
+
+<p>
+This might sound a bit messy. Whaaat? I'd have to convert the vector to a matrix and whatnot?
+Although it would be easy in Neanderthal, and it would be hidden inside a function, there
+is something even simpler. Yep, whatever I end up needing for these kinds of tasks, Neanderthal just
+end up already having a convenient function to use!
+</p>
+
+<p>
+In this case, it is the <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-rk.21">rk!</a> function, which can multiply each combination of elements of two orthogonal
+vectors resulting in a matrix that can be summed element-by-element with another matrix.
+</p>
+
+<p>
+Here is a less naive broadcasting implementation in Neanderthal. This time, a two-liner:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">less-naive-add-row-vector!</span> <span style="color: #7388d6;">[</span>a x<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>with-release <span style="color: #909183;">[</span>y <span style="color: #709870;">(</span>entry! <span style="color: #907373;">(</span>raw <span style="color: #6276ba;">(</span>col a 0<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span> 1<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>rk! y x a<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #7388d6;">[</span>a <span style="color: #909183;">(</span>fge 2 3 <span style="color: #709870;">[</span>1 2 3 4 5 6<span style="color: #709870;">]</span><span style="color: #909183;">)</span>
+      x <span style="color: #909183;">(</span>entry! <span style="color: #709870;">(</span>fv 3<span style="color: #709870;">)</span> 1<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>less-naive-add-row-vector! a x<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealGEMatrix[float, mxn:2x3, layout:column, offset:0]
+   ▥       ↓       ↓       ↓       ┓
+   →       2.00    4.00    6.00
+   →       3.00    5.00    7.00
+   ┗                               ┛
+
+</pre>
+
+<p>
+It works correctly; what about the performance?
+</p>
+</div>
+</div>
+
+<div id="outline-container-org204f6a0" class="outline-3">
+<h3 id="org204f6a0">Performance of a less naive Neanderthal broadcasting</h3>
+<div class="outline-text-3" id="text-org204f6a0">
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">bench-neanderthal-less-naive-add-row-vector</span> <span style="color: #7388d6;">[</span>m n<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>with-release <span style="color: #909183;">[</span>a <span style="color: #709870;">(</span>entry! <span style="color: #907373;">(</span>fge m n <span style="color: #6276ba;">{</span><span style="color: #F5666D;">:layout</span> <span style="color: #F5666D;">:row</span><span style="color: #6276ba;">}</span><span style="color: #907373;">)</span> 1<span style="color: #709870;">)</span>
+                 x <span style="color: #709870;">(</span>entry! <span style="color: #907373;">(</span>fv n<span style="color: #907373;">)</span> 1<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>quick-bench
+     <span style="color: #709870;">(</span><span style="color: #A52A2A; font-weight: bold;">do</span> <span style="color: #907373;">(</span>less-naive-add-row-vector! a x<span style="color: #907373;">)</span>
+         <span style="color: #F5666D;">true</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+;; 10x15: 506.063330 ns
+;; 100x100: 1.768599 µs
+;; 1000x1000: 61.031548 µs
+;; 100x10000: 155.047204 µs
+;; 10000x100: 66.700431 µs
+;; 10000x10000: 26.320592 ms
+</pre>
+<p>
+Now Neanderthal even took the lead!
+</p>
+
+<p>
+With small-ish matrices it is 3-4 &times; faster, while with large and huge matrices it is on par with Nd4J.
+The only slip is with "flat" matrices, it is almost 3&times; slower here, and that's because it has to create
+a huge vector of 10000 ones for each invocation of the function. That's something that can be improved, but
+this is a makeshift implementation anyway. In "real" code, I use optimized broadcasting (sorry, I hasn't released
+that library as open source), and it works faster.
+</p>
+
+<p>
+When we have large arrays and need speed, the real saver is GPU computing anyway. So why not try that instead?
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org00d6913" class="outline-2">
+<h2 id="org00d6913">Broadcasting on the GPU</h2>
+<div class="outline-text-2" id="text-org00d6913">
+<p>
+Both libraries support CUDA, so let's see how those compare on Nvidia's GPUs. Neanderthal also supports
+OpenCL, so it can run on AMD's and Intel's cards, but Nd4j doesn't, so I won't be able to do any comparisons
+on my fine AMD GPUs. The most powerful GPU in my desktop is currently Nvidia GTX 1080 Ti, if you need the reference
+for the following numbers.
+</p>
+
+<p>
+Nd4J can't use CPU and GPU concurrently (or at least that's what the documentation suggests). I had to
+kill my REPL session, change the Nd4j dependency to use CUDA backend, and start new JVM. On top of that,
+Nd4j's documentation does not talk about how to control the actual GPU device regarding explicit stream
+synchronization, which is the key point in this benchmark since GPU operations are asynchronous.
+With Neanderthal, I could call ClojureCL's <code>synchronize</code>, but with Nd4j I had to call a small summing
+to force it to complete the whole broadcasting instead of measuring just the work queuing into the stream.
+I wanted this comparison to be fair, so I did the same thing in Neanderthal, although it is not necessary,
+and on top of that Neanderthal's broadcasting is already being synchronized by the creation of the
+vector of ones (which is also not necessary but I wanted this blog to be simple, so I won't cry over
+these minor points).
+</p>
+</div>
+
+<div id="outline-container-org78df918" class="outline-3">
+<h3 id="org78df918">Nd4j broadcasting on the GPU</h3>
+<div class="outline-text-3" id="text-org78df918">
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">bench-nd4j-addiRowVector-cuda</span> <span style="color: #7388d6;">[</span>^long m ^long n<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #909183;">[</span>a <span style="color: #709870;">(</span><span style="color: #2F8B58; font-weight: bold;">Nd4j</span>/ones m n<span style="color: #709870;">)</span>
+        x <span style="color: #709870;">(</span><span style="color: #2F8B58; font-weight: bold;">Nd4j</span>/ones n<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>quick-bench
+     <span style="color: #709870;">(</span><span style="color: #A52A2A; font-weight: bold;">do</span> <span style="color: #907373;">(</span>.addiRowVector ^INDArray a ^INDArray x<span style="color: #907373;">)</span>
+         <span style="color: #907373;">(</span>.sumNumber ^INDArray x<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+
+<span style="color: #204A87;">;;</span><span style="color: #204A87;">(bench-nd4j-addiRowVector-cuda 10000 10000)</span>
+</pre>
+</div>
+
+<pre class="example">
+;; 10x15: 241.076577 µs
+;; 100x100: 138.564805 µs
+;; 1000x1000: 223.194717 µs
+;; 100x10000: 289.878918 µs
+;; 10000x100: 211.342593 µs
+;; 10000x10000: 7.895556 ms
+</pre>
+
+<p>
+Except for the largest dimension, Nd4j's broadcasting runs not only slower than Nd4j's CPU implementation,
+not only slower that a less naive Neanderthal broadcasting on the CPU; it is slower than the most naive
+broadcasting implementation on the CPU.
+</p>
+
+<p>
+That's not only Nd4j's fault, since broadcasting is simply not demanding enough to squeeze the juice out of
+the GPU. I mentioned that more as a warning to inexperienced readers to not expect the magic words GPU
+and CUDA to magically speed up the code.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org15f4e15" class="outline-3">
+<h3 id="org15f4e15">A less naive Neanderthal broadcasting on the GPU</h3>
+<div class="outline-text-3" id="text-org15f4e15">
+<p>
+Let's see Neanderthal.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">bench-neanderthal-less-naive-add-row-vector-cuda</span> <span style="color: #7388d6;">[</span>m n<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>with-release <span style="color: #909183;">[</span>a <span style="color: #709870;">(</span>entry! <span style="color: #907373;">(</span>cuge m n<span style="color: #907373;">)</span> 1<span style="color: #709870;">)</span>
+                 x <span style="color: #709870;">(</span>entry! <span style="color: #907373;">(</span>cuv n<span style="color: #907373;">)</span> 1<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>quick-bench
+     <span style="color: #709870;">(</span><span style="color: #A52A2A; font-weight: bold;">do</span> <span style="color: #907373;">(</span>less-naive-add-row-vector! a x<span style="color: #907373;">)</span>
+         <span style="color: #907373;">(</span>asum x<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+
+<span style="color: #707183;">(</span>init<span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>current-context! <span style="color: #7388d6;">(</span>context <span style="color: #909183;">(</span>device 0<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>set-engine!<span style="color: #707183;">)</span>
+<span style="color: #204A87;">;;</span><span style="color: #204A87;">(bench-neanderthal-less-naive-add-row-vector-cuda 10000 10000)</span>
+<span style="color: #707183;">(</span>release <span style="color: #7388d6;">(</span>current-context<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+;; 10x15: 52.111330 µs
+;; 100x100: 52.281520 µs
+;; 1000x1000: 81.112859 µs
+;; 100x10000: 80.279229 µs
+;; 10000x100: 74.671313 µs
+;; 10000x10000: 2.601956 ms
+</pre>
+
+<p>
+As I mentioned, on top of Nd4j's summing synchronization handicap, it has its own
+array creating and populating with ones handicap. Interestingly, a less naive broadcasting implementation
+turned out to be 3 &times; faster than Nd4j's CUDA code! Most of that is in GPU communication.
+</p>
+
+<p>
+Without asum, and with explicit ClojureCL <code>synchronize!</code>, all these 50s turn into 28 microseconds. That's
+exactly why those not-so-demanding operations are not (much) faster on the GPU: the actual computation
+is just a small part of the time. GPU's have huge throughput, but have much higher latency than the CPU code,
+even when there is not any data transfer.
+</p>
+
+<p>
+The real puzzle here is where Nd4j wasted these 150 microseconds that it is slower than Neanderthal in most
+cases, or how the hell it lost 5 milliseconds compared to Neanderthal in that 100M matrix&#x2026;
+</p>
+
+<p>
+I don't know, and it's none of my business.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org958c435" class="outline-2">
+<h2 id="org958c435">Conclusions</h2>
+<div class="outline-text-2" id="text-org958c435">
+<p>
+I hope this post has helped you to learn a few things about linear algebra, and that it helped you
+gain some confidence in the code you write compared to the magical code from the popular libraries.
+Usually, optimized code is much better than what you'd write, but don't underestimate your own
+abilities. Also, although cuBLAS and MKL have amazing computational routines, higher level
+libraries are not always examples of how to use them properly; don't trust them blindly.
+</p>
+
+<p>
+You can find Neanderthal's source code here: <iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=neanderthal&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>
+</p>
+
+<p>
+Documentation can be reached via <a href="https://neanderthal.uncomplicate.org">Neanderthal's homepage</a>, while there's a bunch of tutorials at the blog you're reading right now. If you need
+more theory-oriented textbook style linear algebra code, you can start with
+<a href="../17/Clojure-Linear-Algebra-Refresher-Vector-Spaces">Clojure Linear Algebra Refresher (1) - Vector Spaces</a>, while if you remember your matrix-fu, you might
+need some numerical computation tutorials; start with <a href="../17/Clojure-Numerics-1-Use-Matrices-Efficiently">Clojure Numerics - Part 1 - Use Matrices Efficiently</a>.
+</p>
+</div>
+</div>
