@@ -174,13 +174,11 @@ through Maven (or a nicer Clojure build "mavens" Leiningen or Boot). Many reader
 <div class="outline-text-2" id="text-org6019409">
 <p>
 At the beginning, we'll require the namespaces that contain functions for GPU programming. Functions that work with CUDA
-are in the <a href="https://clojurecuda.uncomplicate.org/codox/uncomplicate.clojurecuda.core.html">uncomplicate.clojurecuda.core</a> namespace of the <a href="https://clojurecuda.uncomplicate.org">ClojureCUDA</a> library, while a few interactive compilation
-functions that we'll need are in the <a href="https://clojurecuda.uncomplicate.org/codox/uncomplicate.clojurecuda.nvrtc.html">uncomplicate.clojurecuda.nvrtc</a> namespace.
+are in the <a href="https://clojurecuda.uncomplicate.org/codox/uncomplicate.clojurecuda.core.html">uncomplicate.clojurecuda.core</a> namespace of the <a href="https://clojurecuda.uncomplicate.org">ClojureCUDA</a> library.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span><span style="color: #2F8B58; font-weight: bold;">uncomplicate.clojurecuda.core</span> <span style="color: #F5666D;">:refer</span> <span style="color: #F5666D;">:all</span><span style="color: #7388d6;">]</span>
-         '<span style="color: #7388d6;">[</span><span style="color: #2F8B58; font-weight: bold;">uncomplicate.clojurecuda.nvrtc</span> <span style="color: #F5666D;">:refer</span> <span style="color: #F5666D;">:all</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span><span style="color: #2F8B58; font-weight: bold;">uncomplicate.clojurecuda.core</span> <span style="color: #F5666D;">:refer</span> <span style="color: #F5666D;">:all</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
