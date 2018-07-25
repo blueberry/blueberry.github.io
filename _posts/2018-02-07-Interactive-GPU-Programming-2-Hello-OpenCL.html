@@ -59,7 +59,7 @@ Long story short, on recent (4 years) GPU's, you should end up with OpenCL 1.2 o
 <h3 id="org6eae9bf">Clojure and Java</h3>
 <div class="outline-text-3" id="text-org6eae9bf">
 <p>
-Same as in <a href="./Interactive-GPU-Programming-1-Hello-CUDA">Part 1 - Hello CUDA</a>, here we are using <a href="https://clojurecl.uncomplicate.org/articles/getting_started.html#installation">ClojureCL</a> <iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=clojurecl&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>. Visit ClojureCL's page for more
+Same as in <a href="./Interactive-GPU-Programming-1-Hello-CUDA">Part 1 - Hello CUDA</a>, here we are using <a href="http://clojurecl.uncomplicate.org/articles/getting_started.html#installation">ClojureCL</a>. Visit ClojureCL's page for more
 installation instructions.
 </p>
 </div>
@@ -71,14 +71,19 @@ installation instructions.
 <div class="outline-text-2" id="text-orge2badb0">
 <p>
 At the beginning, we'll require the namespaces that contain functions for GPU programming.
-Functions that work with OpenCL are in the <a href="https://clojurecl.uncomplicate.org/codox/uncomplicate.clojurecl.core.html">uncomplicate.clojurecl.core</a> namespace of the <a href="https://clojurecl.uncomplicate.org">ClojureCL</a> library.
+Functions that work with OpenCL are in the <a href="http://clojurecl.uncomplicate.org/codox/uncomplicate.clojurecl.core.html">uncomplicate.clojurecl.core</a> namespace of the <a href="http://clojurecl.uncomplicate.org">ClojureCL</a> library.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>require '<span style="color: #006400;">[</span><span style="color: #2F8B58; font-weight: bold;">uncomplicate.clojurecl.core</span> <span style="color: #F5666D;">:refer</span> <span style="color: #F5666D;">:all</span><span style="color: #006400;">]</span>
-         '<span style="color: #006400;">[</span><span style="color: #2F8B58; font-weight: bold;">uncomplicate.clojurecl.info</span> <span style="color: #F5666D;">:refer</span> <span style="color: #F5666D;">:all</span><span style="color: #006400;">]</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span>uncomplicate.clojurecl.core <span style="color: #F5666D;">:refer</span> <span style="color: #F5666D;">:all</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>uncomplicate.clojurecl.info <span style="color: #F5666D;">:refer</span> <span style="color: #F5666D;">:all</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
 </pre>
 </div>
+
+<pre class="example">
+nil
+
+</pre>
 
 <p>
 Although most concepts of OpenCL are similar to what we've seen with CUDA, the environment setup is a bit more
@@ -87,11 +92,11 @@ devices from multiple vendors. It has to offer a choice of drivers and supported
 </p>
 
 <p>
-The entry point is the concept of <i>platform</i>. The <a href="https://clojurecl.uncomplicate.org/codox/uncomplicate.clojurecl.core.html#var-platforms">platforms</a> function returns a sequence of platforms available on the system:
+The entry point is the concept of <i>platform</i>. The <a href="http://clojurecl.uncomplicate.org/codox/uncomplicate.clojurecl.core.html#var-platforms">platforms</a> function returns a sequence of platforms available on the system:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>map name-info <span style="color: #006400;">(</span>platforms<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>map name-info <span style="color: #7388d6;">(</span>platforms<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -100,23 +105,20 @@ The entry point is the concept of <i>platform</i>. The <a href="https://clojurec
 
 <colgroup>
 <col  class="org-left" />
-
-<col  class="org-left" />
 </colgroup>
 <tbody>
 <tr>
-<td class="org-left">NVIDIA CUDA</td>
 <td class="org-left">AMD Accelerated Parallel Processing</td>
 </tr>
 </tbody>
 </table>
 
 <p>
-My machine reports two platforms: Nvidia and AMD. I'll use AMD platform for this session:
+My machine reports one platform: AMD.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">amd-platform</span> <span style="color: #006400;">(</span>second <span style="color: #ff1493;">(</span>platforms<span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">amd-platform</span> <span style="color: #7388d6;">(</span>first <span style="color: #909183;">(</span>platforms<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -131,7 +133,7 @@ Each platform can be used to access the appropriate hardware. What devices do I 
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>map name-info <span style="color: #006400;">(</span>devices amd-platform<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>map name-info <span style="color: #7388d6;">(</span>devices amd-platform<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -142,12 +144,9 @@ Each platform can be used to access the appropriate hardware. What devices do I 
 <col  class="org-left" />
 
 <col  class="org-left" />
-
-<col  class="org-left" />
 </colgroup>
 <tbody>
 <tr>
-<td class="org-left">Hawaii</td>
 <td class="org-left">Hawaii</td>
 <td class="org-left">Intel(R) Core(TM) i7-4790K CPU @ 4.00GHz</td>
 </tr>
@@ -155,12 +154,12 @@ Each platform can be used to access the appropriate hardware. What devices do I 
 </table>
 
 <p>
-Now I know that there are two Hawaii GPU's (R9 290X) and one CPU that can be accessed through AMD's platform.
+Now I know that there is one Hawaii GPU's (R9 290X) and one CPU that can be accessed through AMD's platform.
 Let's grab the handle of the first device:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">my-amd-gpu</span> <span style="color: #006400;">(</span>first <span style="color: #ff1493;">(</span>devices amd-platform<span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">my-amd-gpu</span> <span style="color: #7388d6;">(</span>first <span style="color: #909183;">(</span>devices amd-platform<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -174,7 +173,7 @@ What is the type of this object and how does it look like?
 </div>
 
 <pre class="example">
-#object[org.jocl.cl_device_id 0x30af1ea4 "cl_device_id[0x7f6ffc71fc30]"]
+#object[uncomplicate.clojurecl.internal.impl.CLDevice 0x3f393c1e "#CLDevice[0x7f34a472bfb0]"]
 
 </pre>
 
@@ -192,7 +191,7 @@ The default context setup can be easily created with ClojureCL:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">ctx</span> <span style="color: #006400;">(</span>context <span style="color: #ff1493;">[</span>my-amd-gpu<span style="color: #ff1493;">]</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">ctx</span> <span style="color: #7388d6;">(</span>context <span style="color: #909183;">[</span>my-amd-gpu<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -202,7 +201,7 @@ The default context setup can be easily created with ClojureCL:
 </div>
 
 <pre class="example">
-#object[org.jocl.cl_context 0x5a773a7a "cl_context[0x7f6ffc3b7310]"]
+#object[uncomplicate.clojurecl.internal.impl.CLContext 0x56ba4c21 "#CLContext[0x0]"]
 
 </pre>
 
@@ -221,7 +220,7 @@ Memory in OpenCL is created in the explicitly supplied context:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">gpu-array</span> <span style="color: #006400;">(</span>cl-buffer ctx 1024 <span style="color: #F5666D;">:read-write</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">gpu-array</span> <span style="color: #7388d6;">(</span>cl-buffer ctx 1024 <span style="color: #F5666D;">:read-write</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -231,7 +230,7 @@ Memory in OpenCL is created in the explicitly supplied context:
 </div>
 
 <pre class="example">
-#object[uncomplicate.clojurecl.core.CLBuffer 0xad4e84b "uncomplicate.clojurecl.core.CLBuffer@ad4e84b"]
+#object[uncomplicate.clojurecl.internal.impl.CLBuffer 0x3ea1bac2 "#CLBuffer[0x0]"]
 
 </pre>
 </div>
@@ -245,12 +244,12 @@ Create the data:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">main-array</span> <span style="color: #006400;">(</span>float-array <span style="color: #ff1493;">(</span>range 256<span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">main-array</span> <span style="color: #7388d6;">(</span>float-array <span style="color: #909183;">(</span>range 256<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>take 10 main-array<span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>take 10 main-array<span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -304,13 +303,14 @@ that will process the tasks (that is a good thing!).
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">queue</span> <span style="color: #006400;">(</span>command-queue ctx my-amd-gpu<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
-<span style="color: #8b0000;">(</span>enq-write! queue gpu-array main-array<span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">queue</span> <span style="color: #7388d6;">(</span>command-queue ctx my-amd-gpu<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>enq-write! queue gpu-array main-array<span style="color: #707183;">)</span>
 </pre>
 </div>
 
 <pre class="example">
-#'user/queue#object[org.jocl.cl_command_queue 0x4821e434 "cl_command_queue[0x7f6ffcf166e0]"]
+class clojure.lang.Compiler$CompilerExceptionclass clojure.lang.ExceptionInfoclass clojure.lang.Compiler$CompilerExceptionclass clojure.lang.ExceptionInfoCompilerException clojure.lang.ExceptionInfo: OpenCL error: CL_INVALID_CONTEXT. {:name "CL_INVALID_CONTEXT", :code -34, :type :opencl-error, :details {:device #uncomplicate.clojurecl.info.DeviceInfo{:address-bits 64, :available true, :built-in-kernels #{}, :compiler-available true, :double-fp-config #{:round-to-zero :inf-nan :denorm :round-to-inf :round-to-nearest :fma}, :endian-little true, :error-correction-support false, :execution-capabilities #{:kernel}, :extensions #{"cl_amd_printf" "cl_khr_spir" "cl_amd_device_attribute_query" "cl_khr_local_int32_base_atomics" "cl_khr_local_int32_extended_atomics" "cl_amd_popcnt" "cl_khr_gl_depth_images" "cl_khr_global_int32_base_atomics" "cl_amd_fp64" "cl_khr_mipmap_image_writes" "cl_khr_subgroups" "cl_khr_global_int32_extended_atomics" "cl_khr_fp64" "cl_amd_media_ops" "cl_amd_media_ops2" "cl_khr_depth_images" "cl_ext_atomic_counters_32" "cl_khr_gl_sharing" "cl_khr_3d_image_writes" "cl_khr_image2d_from_buffer" "cl_khr_mipmap_image" "cl_khr_byte_addressable_store" "cl_khr_gl_event" "cl_khr_int64_extended_atomics" "cl_khr_int64_base_atomics" "cl_amd_vec3"}, :global-mem-cache-size 16384, :global-mem-cache-type :read-write, :global-mem-cacheline-size 64, :global-mem-size 4063047488, :global-variable-preferred-total-size 4063047488, :image2d-max-height 16384, :image2d-max-width 16384, :image3d-max-depth 2048, :image3d-max-height 2048, :image3d-max-width 2048, :image-base-address-alignment 256, :image-max-array-size 2048, :image-max-buffer-size 65536, :image-pitch-alignment 256, :image-support true, :linker-available true, :local-mem-size 32768, :local-mem-type :local, :max-clock-frequency 1040, :max-compute-units 44, :max-constant-args 8, :max-constant-buffer-size 65536, :max-global-variable-size 2642637312, :max-mem-aloc-size 2936263680, :max-on-device-events 1024, :max-on-device-queues 1, :max-parameter-size 1024, :max-pipe-args 16, :max-read-image-args 128, :max-read-write-image-args 64, :max-samplers 16, :max-work-group-size 256, :max-work-item-dimensions 3, :max-work-item-sizes [256 256 256], :max-write-image-args 64, :mem-base-addr-align 2048, :name "Hawaii", :native-vector-width-char 4, :native-vector-width-short 2, :native-vector-width-int 1, :native-vector-width-long 1, :native-vector-width-double 1, :native-vector-width-float 1, :native-vector-width-half 1, :opencl-c-version {:version 2.0, :vendor-specific-info nil}, :parent-device nil, :partition-affinity-domain #{}, :partition-max-sub-devices 44, :partition-properties (), :partition-type (), :pipe-max-active-reservations 16, :pipe-max-packet-size 2936263680, :platform #object[org.jocl.cl_platform_id 0x52ebe789 "cl_platform_id[0x7f350fedba18]"], :preferred-global-atomic-alignment 0, :preferred-interop-user-sync true, :preferred-local-atomic-alignment 0, :preferred-platform-atomic-alignment 0, :preferred-vector-width-char 4, :preferred-vector-width-short 2, :preferred-vector-width-int 1, :preferred-vector-width-long 1, :preferred-vector-width-double 1, :preferred-vector-width-float 1, :preferred-vector-width-half 1, :printf-buffer-size 1048576, :profile "FULL_PROFILE", :profiling-timer-resolution 1, :queue-on-device-max-size 8388608, :queue-on-device-preferred-size 262144, :queue-on-device-properties #{:out-of-order-exec-mode :profiling}, :queue-on-host-properties #{:profiling}, :reference-count 1, :single-fp-config #{:correctly-rounded-divide-sqrt :round-to-zero :inf-nan :round-to-inf :round-to-nearest :fma}, :spir-versions #{1.2}, :svm-capabilities #{:coarse-grain-buffer :fine-grain-buffer}, :device-type :gpu, :vendor "Advanced Micro Devices, Inc.", :vendor-id 4098, :device-version "OpenCL 2.0 AMD-APP (1912.5)", :driver-version "1912.5 (VM)"}}}, compiling:(form-init7666750429595232756.clj:1:12)
+ExceptionInfo OpenCL error: CL_INVALID_COMMAND_QUEUE.  clojure.core/ex-info (core.clj:4739)
 
 </pre>
 
@@ -320,13 +320,13 @@ a new empty float-array:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">roundtrip-array</span> <span style="color: #006400;">(</span>float-array 256<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
-<span style="color: #8b0000;">(</span>enq-read! queue gpu-array roundtrip-array<span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">roundtrip-array</span> <span style="color: #7388d6;">(</span>float-array 256<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>enq-read! queue gpu-array roundtrip-array<span style="color: #707183;">)</span>
 </pre>
 </div>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>take 12 roundtrip-array<span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>take 12 roundtrip-array<span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -403,24 +403,24 @@ The host code:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">kernel-source</span>
-      <span style="color: #FBDE2D;">"__kernel void mul10(__global float *a) {</span>
-<span style="color: #FBDE2D;">         int i = get_global_id(0);</span>
-<span style="color: #FBDE2D;">         a[i] = a[i] * 10.0f;</span>
-<span style="color: #FBDE2D;">       };"</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">kernel-source</span>
+      <span style="color: #4E9A06;">"__kernel void mul10(__global float *a) {</span>
+<span style="color: #4E9A06;">         int i = get_global_id(0);</span>
+<span style="color: #4E9A06;">         a[i] = a[i] * 10.0f;</span>
+<span style="color: #4E9A06;">       };"</span><span style="color: #707183;">)</span>
 
 
-<span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">hello-program</span> <span style="color: #006400;">(</span>build-program! <span style="color: #ff1493;">(</span>program-with-source ctx <span style="color: #ffff00;">[</span>kernel-source<span style="color: #ffff00;">]</span><span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
-<span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">mul10</span> <span style="color: #006400;">(</span>kernel hello-program <span style="color: #4E9A06;">"mul10"</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
-<span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">result</span> <span style="color: #006400;">(</span>float-array 256<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
-<span style="color: #8b0000;">(</span>set-arg! mul10 0 gpu-array<span style="color: #8b0000;">)</span>
-<span style="color: #8b0000;">(</span>enq-nd! queue mul10 <span style="color: #006400;">(</span>work-size-1d 256<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
-<span style="color: #8b0000;">(</span>enq-read! queue gpu-array result<span style="color: #8b0000;">)</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">hello-program</span> <span style="color: #7388d6;">(</span>build-program! <span style="color: #909183;">(</span>program-with-source ctx <span style="color: #709870;">[</span>kernel-source<span style="color: #709870;">]</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">mul10</span> <span style="color: #7388d6;">(</span>kernel hello-program <span style="color: #4E9A06;">"mul10"</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">result</span> <span style="color: #7388d6;">(</span>float-array 256<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>set-arg! mul10 0 gpu-array<span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>enq-kernel! queue mul10 <span style="color: #7388d6;">(</span>work-size-1d 256<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>enq-read! queue gpu-array result<span style="color: #707183;">)</span>
 </pre>
 </div>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>take 12 result<span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>take 12 result<span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -485,15 +485,15 @@ OpenCL also requires that we take care of the loose ends:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>require '<span style="color: #006400;">[</span><span style="color: #2F8B58; font-weight: bold;">uncomplicate.commons.core</span> <span style="color: #F5666D;">:refer</span> <span style="color: #F5666D;">:all</span><span style="color: #006400;">]</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span>uncomplicate.commons.core <span style="color: #F5666D;">:refer</span> <span style="color: #F5666D;">:all</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>release gpu-array<span style="color: #8b0000;">)</span>
-<span style="color: #8b0000;">(</span>release hello-program<span style="color: #8b0000;">)</span>
-<span style="color: #8b0000;">(</span>release queue<span style="color: #8b0000;">)</span>
-<span style="color: #8b0000;">(</span>release ctx<span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>release gpu-array<span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>release hello-program<span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>release queue<span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>release ctx<span style="color: #707183;">)</span>
 </pre>
 </div>
 </div>

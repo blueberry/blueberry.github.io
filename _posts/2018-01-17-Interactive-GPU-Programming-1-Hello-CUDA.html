@@ -32,7 +32,7 @@ also like an <a href="https://en.wikipedia.org/wiki/Interactive_programming">int
 <p>
 Listening to <a href="https://www.tensorflow.org/extend/architecture">hunting stories of Google engineers</a> is the furthest most programmers who work with
 higher-level platforms such as Java, .Net, Ruby, Python, Javascript, etc. will go. Except for the Pythonistas.
-They will get a bit further despite not knowing how to write any GPU-aware code, since there are DL libraries such as <a href="https://www.tensorflow.org/">TensorFlow</a>, <a href="https://caffe.berkeleyvision.org/">Caffe</a>, or <a href="https://pytorch.org/">PyTorch</a>,
+They will get a bit further despite not knowing how to write any GPU-aware code, since there are DL libraries such as <a href="https://www.tensorflow.org/">TensorFlow</a>, <a href="http://caffe.berkeleyvision.org/">Caffe</a>, or <a href="http://pytorch.org/">PyTorch</a>,
 which <i>run</i> on GPUs under the hood. However, even that depends on the other people writing the code that solves your problem. Sometimes there is such code, but
 more often there isn't any, and <b>you</b> are the one to write it.
 </p>
@@ -125,9 +125,9 @@ On top of that we need the actual GPU computing tools:
 <h3 id="org9c12e0f">Clojure and Java</h3>
 <div class="outline-text-3" id="text-org9c12e0f">
 <p>
-I assume that you already have a recent <a href="https://www.oracle.com/technetwork/java/javase/downloads/jdk8-downloads-2133151.html">Java Development Kit (JDK)</a>. I also assume you like or are
-willing to try the fantastic <a href="https://www.clojure.org">Clojure programming language</a> that compiles directly to the Java bytecode.
-There are many <a href="https://clojure.org/community/books">books</a>, <a href="https://www.clojurenewbieguide.com/">newbie tutorials</a>, and <a href="https://www.youtube.com/channel/UCaLlzGqiPE2QRj6sSOawJRg">conference talks</a> that can help you quickly learning enough Clojure
+I assume that you already have a recent <a href="http://www.oracle.com/technetwork/java/javase/downloads/jdk8-downloads-2133151.html">Java Development Kit (JDK)</a>. I also assume you like or are
+willing to try the fantastic <a href="http://www.clojure.org">Clojure programming language</a> that compiles directly to the Java bytecode.
+There are many <a href="https://clojure.org/community/books">books</a>, <a href="http://www.clojurenewbieguide.com/">newbie tutorials</a>, and <a href="https://www.youtube.com/channel/UCaLlzGqiPE2QRj6sSOawJRg">conference talks</a> that can help you quickly learning enough Clojure
 to be dangerous. I thing the <i>free</i> book <a href="https://www.braveclojure.com/">Clojure for the Brave and True</a> is very approachable and fun. You'll need
 to know at least basic Clojure to <i>run</i> this code yourself. If you do not have time to learn it right now,
 though, you'll still be able to <i>read</i> and understand examples, since Clojure has trivially simple syntax.
@@ -139,15 +139,13 @@ library for GPU computing that I am talking about:
 </p>
 
 <ul class="org-ul">
-<li><a href="https://clojurecuda.uncomplicate.org/articles/getting_started.html#installation">ClojureCUDA</a> for Nvidia with CUDA <iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=clojurecuda&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe></li>
-<li><a href="https://clojurecl.uncomplicate.org/articles/getting_started.html#installation">ClojureCL</a> for AMD, Intel, and Nvidia with OpenCL <iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=clojurecl&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe></li>
+<li><a href="http://clojurecuda.uncomplicate.org/articles/getting_started.html#installation">ClojureCUDA</a> for Nvidia with CUDA</li>
+<li><a href="http://clojurecl.uncomplicate.org/articles/getting_started.html#installation">ClojureCL</a> for AMD, Intel, and Nvidia with OpenCL</li>
 </ul>
-
-
 
 <p>
 You can use any Java IDE, or any text editor + a Java environment that you like that has Clojure support (most do).
-I recommend the fantastic (if a bit unusual in Java community) <a href="https://www.gnu.org/software/emacs/">Emacs</a> + <a href="https://cider.readthedocs.io/en/latest/">CIDER</a>, with a <i>convenient easy setup</i> via <a href="https://batsov.com/prelude/">Prelude</a>.
+I recommend the fantastic (if a bit unusual in Java community) <a href="https://www.gnu.org/software/emacs/">Emacs</a> + <a href="http://cider.readthedocs.io/en/latest/">CIDER</a>, with a <i>convenient easy setup</i> via <a href="http://batsov.com/prelude/">Prelude</a>.
 </p>
 </div>
 </div>
@@ -173,12 +171,12 @@ through Maven (or a nicer Clojure build "mavens" Leiningen or Boot). Many reader
 <h2 id="org6019409">Handle the GPU device(s)</h2>
 <div class="outline-text-2" id="text-org6019409">
 <p>
-At the beginning, we'll require the namespaces that contain functions for GPU programming. Functions that work with CUDA
-are in the <a href="https://clojurecuda.uncomplicate.org/codox/uncomplicate.clojurecuda.core.html">uncomplicate.clojurecuda.core</a> namespace of the <a href="https://clojurecuda.uncomplicate.org">ClojureCUDA</a> library.
+At the beginning, we'll require the namespaces that contain functions for CUDA GPU programming:
+ <a href="http://clojurecuda.uncomplicate.org/codox/uncomplicate.clojurecuda.core.html">uncomplicate.clojurecuda.core</a> namespace from the <a href="http://clojurecuda.uncomplicate.org">ClojureCUDA</a> library.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span><span style="color: #2F8B58; font-weight: bold;">uncomplicate.clojurecuda.core</span> <span style="color: #F5666D;">:refer</span> <span style="color: #F5666D;">:all</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span>uncomplicate.clojurecuda.core <span style="color: #F5666D;">:refer</span> <span style="color: #F5666D;">:all</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -198,12 +196,12 @@ Nvidia GPU cards I have:
 </div>
 
 <pre class="example">
-1
+2
 
 </pre>
 
 <p>
-Now that I know that there is a CUDA-capable GPU device in my computer, I can grab it by the handle:
+Now that I know that there are two CUDA-capable GPU devices in my computer, I can grab one by the handle:
 </p>
 
 <div class="org-src-container">
@@ -227,18 +225,18 @@ What is the type of this object and how does it look like?
 </div>
 
 <pre class="example">
-#object[jcuda.driver.CUdevice 0x460cb871 "CUdevice[nativePointer=0x0]"]
+#object[jcuda.driver.CUdevice 0x3e31f727 "CUdevice[nativePointer=0x0]"]
 
 </pre>
 
 <p>
-It's an instance of <code>jcuda.driver.CUdevice</code>, which itself stores a reference to a
+It's an instance of <code>CUDevice</code>, which itself stores a reference to a
 <code>CUdevice</code> native pointer. This is not something you should concern yourself with most of the time,
  but there is a reason why I'm showing it here:
 </p>
 
 <ul class="org-ul">
-<li>ClojureCUDA shields you from the low-level details and lets you concentrate on the things that does matter;</li>
+<li>ClojureCUDA shields you from the low-level details and lets you concentrate on the things that matter;</li>
 <li>Sometimes what matters is low-level, and you should be able to control it for full effectiveness;</li>
 <li>You should be able to use existing CUDA-based books, articles, and documentation to learn and properly use GPU programming.</li>
 </ul>
@@ -290,12 +288,12 @@ The default context setup can be easily created with ClojureCUDA:
 </div>
 
 <pre class="example">
-#object[jcuda.driver.CUcontext 0x32f800ef "CUcontext[nativePointer=0x7f40800902e0]"]
+#object[uncomplicate.clojurecuda.internal.impl.CUContext 0x367f6baa "#CUContext[0x7f09ec014a70]"]
 
 </pre>
 
 <p>
-As with <code>CUdevice</code>, when you need a specific information about how to use contexts, there is a convenient
+As with <code>CUDevice</code>, when you need a specific information about how to use contexts, there is a convenient
 fallback to the official literature; just look for <code>CUcontext</code>.
 </p>
 </div>
@@ -318,7 +316,7 @@ number of parallel workers, and taking care that each worker work on the appropr
 </p>
 
 <p>
-When thinking about CUDA memory, think about huge raw byte arrays. Additional libraries such as <a href="https://neanderthal.uncomplicate.org">Neanderthal</a> <iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=neanderthal&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>
+When thinking about CUDA memory, think about huge raw byte arrays. Additional libraries such as <a href="http://neanderthal.uncomplicate.org">Neanderthal</a>
 would add more structure on top of this, but CUDA API typically manages raw bytes of memory. Here's how:
 </p>
 
@@ -340,7 +338,7 @@ opposed to graphics-oriented 2D, 3D, and texture memory.
 </div>
 
 <pre class="example">
-#object[uncomplicate.clojurecuda.core.CULinearMemory 0x3b8c8905 "uncomplicate.clojurecuda.core.CULinearMemory@3b8c8905"]
+#object[uncomplicate.clojurecuda.internal.impl.CULinearMemory 0x60ad688a "uncomplicate.clojurecuda.internal.impl.CULinearMemory@60ad688a"]
 
 </pre>
 </div>
@@ -428,7 +426,7 @@ Let's do the transfer!
 </div>
 
 <pre class="example">
-#object[jcuda.driver.CUcontext 0x32f800ef "CUcontext[nativePointer=0x7f40800902e0]"]#object[uncomplicate.clojurecuda.core.CULinearMemory 0x3b8c8905 "uncomplicate.clojurecuda.core.CULinearMemory@3b8c8905"]
+#object[uncomplicate.clojurecuda.internal.impl.CUContext 0x367f6baa "#CUContext[0x7f09ec014a70]"]#object[uncomplicate.clojurecuda.internal.impl.CULinearMemory 0x60ad688a "uncomplicate.clojurecuda.internal.impl.CULinearMemory@60ad688a"]
 
 </pre>
 
@@ -641,7 +639,7 @@ are avilable for this task, and we can uniformly access them with the <code>rele
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span><span style="color: #2F8B58; font-weight: bold;">uncomplicate.commons.core</span> <span style="color: #F5666D;">:refer</span> <span style="color: #F5666D;">:all</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span>uncomplicate.commons.core <span style="color: #F5666D;">:refer</span> <span style="color: #F5666D;">:all</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -662,7 +660,7 @@ are avilable for this task, and we can uniformly access them with the <code>rele
 Now that we have broken the ice by creating and running a complete CUDA program from scratch interactively
 in the REPL, I'll take time to get into the details of how to handle memory, kernels, transfer, contexts,
 and all these specialized CUDA topics. We'll also see how to integrate the custom low-level CUDA code we write with
-some powerful Clojure number crunching libraries such as <a href="https://github.com/uncomplicate/neanderthal">Neanderthal</a> <iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=neanderhtal&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>.
+some powerful Clojure number crunching libraries such as <a href="https://github.com/uncomplicate/neanderthal">Neanderthal</a>.
 </p>
 
 <p>

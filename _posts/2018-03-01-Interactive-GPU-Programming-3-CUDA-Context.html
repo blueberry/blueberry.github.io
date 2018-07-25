@@ -66,8 +66,7 @@ not a good idea. The recommended usage is to have one and only one context opera
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span><span style="color: #2F8B58; font-weight: bold;">uncomplicate.clojurecuda.core</span> <span style="color: #F5666D;">:refer</span> <span style="color: #F5666D;">:all</span><span style="color: #7388d6;">]</span>
-         '<span style="color: #7388d6;">[</span><span style="color: #2F8B58; font-weight: bold;">uncomplicate.clojurecuda.nvrtc</span> <span style="color: #F5666D;">:refer</span> <span style="color: #F5666D;">:all</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span>uncomplicate.clojurecuda.core <span style="color: #F5666D;">:refer</span> <span style="color: #F5666D;">:all</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
 <span style="color: #707183;">(</span>init<span style="color: #707183;">)</span>
 <span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">ctx</span> <span style="color: #7388d6;">(</span>context <span style="color: #909183;">(</span>device 0<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
@@ -85,7 +84,7 @@ operate. Check this with the <a href="http://clojurecuda.uncomplicate.org/codox/
 </div>
 
 <pre class="example">
-#object[jcuda.driver.CUcontext 0x3a0f3a6e "CUcontext[nativePointer=0x0]"]
+#object[uncomplicate.clojurecuda.internal.impl.CUContext 0x6677dfba "#CUContext[0x7fb2248a1020]"]
 
 </pre>
 
@@ -102,12 +101,12 @@ with a pause of several dozens of seconds.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A020F0;">.getId</span> <span style="color: #7388d6;">(</span><span style="color: #2F8B58; font-weight: bold;">Thread</span><span style="color: #2E3436; background-color: #EDEDED;">/</span><span style="color: #A020F0;">currentThread</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>.getId <span style="color: #7388d6;">(</span><span style="color: #2F8B58; font-weight: bold;">Thread</span>/currentThread<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
 <pre class="example">
-81
+39
 
 </pre>
 
@@ -237,13 +236,17 @@ If you need information about the hardware and software environment that your co
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span><span style="color: #2F8B58; font-weight: bold;">uncomplicate.clojurecuda.info</span> <span style="color: #F5666D;">:refer</span> <span style="color: #F5666D;">:all</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span>uncomplicate.clojurecuda.info <span style="color: #F5666D;">:refer</span> <span style="color: #F5666D;">:all</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
 <p>
 Most of the information is related to the device.
 </p>
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span>uncomplicate.commons.core <span style="color: #F5666D;">:refer</span> <span style="color: #F5666D;">:all</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+</pre>
+</div>
 
 <div class="org-src-container">
 <pre class="src src-clojure"><span style="color: #707183;">(</span>info <span style="color: #7388d6;">(</span>device 0<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
@@ -352,11 +355,6 @@ one-to-one to the device. Otherwise, I hate CUDA contexts :)
 <div id="outline-container-orga95536b" class="outline-2">
 <h2 id="orga95536b">Clean up what's left</h2>
 <div class="outline-text-2" id="text-orga95536b">
-<div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span><span style="color: #2F8B58; font-weight: bold;">uncomplicate.commons.core</span> <span style="color: #F5666D;">:refer</span> <span style="color: #F5666D;">:all</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
-</pre>
-</div>
-
 <div class="org-src-container">
 <pre class="src src-clojure"><span style="color: #707183;">(</span>release ctx<span style="color: #707183;">)</span>
 <span style="color: #707183;">(</span>release new-ctx<span style="color: #707183;">)</span>
