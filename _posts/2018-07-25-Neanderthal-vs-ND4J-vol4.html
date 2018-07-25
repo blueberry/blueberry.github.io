@@ -1,5 +1,5 @@
 ---
-date: 2018-07-24
+date: 2018-07-25
 tags:
 - Neanderthal
 - MKL
@@ -9,7 +9,7 @@ tags:
 - Deeplearning4J
 author: dragan
 layout: post
-title: Neanderthal vs ND4J - vol 4 - Fast Vector Broadcasting in Java, CPU and GPU
+title: Neanderthal vs ND4J - vol 4 - Fast Vector Broadcasting in Java, CPU and CUDA
 excerpt: In which we implement our own vector broadcasting function that matches the performance of Nd4j's optimized one and even surpasses it on the GPU.
 categories:
 - Neanderthal
@@ -76,11 +76,11 @@ First, the imports.
 </pre>
 </div>
 
-<div id="outline-container-orgbc61cea" class="outline-2">
-<h2 id="orgbc61cea">Vector broadcasting</h2>
-<div class="outline-text-2" id="text-orgbc61cea">
+<div id="outline-container-orgd87bb91" class="outline-2">
+<h2 id="orgd87bb91">Vector broadcasting</h2>
+<div class="outline-text-2" id="text-orgd87bb91">
 <p>
-Broadcasting is a stock operation in deep learning.
+Broadcasting is a staple operation in deep learning.
 It figures prominently in Nd4J's documentation, and is one of the first top features that programmers
 ask when evaluating matrix libraries. So, Nd4j has it in the form of <code>addiRowVector</code> and <code>addiColumnVector</code>
 methods. Don't mistakenly use non-destructive <code>addRowVector</code> and <code>addColumnVector</code>,
@@ -111,10 +111,9 @@ do not match, we would like to "upgrade" it by "broadcasting" it to each row (or
 </div>
 
 <pre class="example">
-#object[org.nd4j.linalg.jcublas.JCublasNDArray 0x572aafeb "[[    2.0000,    2.0000,    2.0000], \n [    2.0000,    2.0000,    2.0000]]"]
+#object[org.nd4j.linalg.cpu.nativecpu.NDArray 0x7e850238 "[[    2.0000,    2.0000,    2.0000], \n [    2.0000,    2.0000,    2.0000]]"]
 
 </pre>
-
 
 <p>
 Let's measure Nd4j's performance for various sizes:
@@ -151,9 +150,9 @@ And the results for some representative dimensions:
 </pre>
 </div>
 
-<div id="outline-container-orgad6ceaf" class="outline-3">
-<h3 id="orgad6ceaf">A very naive broadcasting implementation in Neanderthal</h3>
-<div class="outline-text-3" id="text-orgad6ceaf">
+<div id="outline-container-orgaf7b39e" class="outline-3">
+<h3 id="orgaf7b39e">A very naive broadcasting implementation in Neanderthal</h3>
+<div class="outline-text-3" id="text-orgaf7b39e">
 <p>
 Even if I didn't know anything about linear algebra, I could employ a stock tool from the programmer's
 toolbox, iteration. I'll naively ask Neanderthal's matrix <code>a</code> to give me a sequence of its rows,
@@ -195,9 +194,9 @@ has somewhat prettier printing, but that is not of major concern right now.
 </div>
 </div>
 
-<div id="outline-container-org55233be" class="outline-3">
-<h3 id="org55233be">Performance of a very naive Neanderthal broadcasting</h3>
-<div class="outline-text-3" id="text-org55233be">
+<div id="outline-container-orgc60a123" class="outline-3">
+<h3 id="orgc60a123">Performance of a very naive Neanderthal broadcasting</h3>
+<div class="outline-text-3" id="text-orgc60a123">
 <p>
 Since we started with the most naive implementation, I expected Nd4j to take a giant lead here.
 <b>I have been so naive</b>! Neanderthal was not that much behind!
@@ -233,9 +232,9 @@ Here are the results:
 </div>
 </div>
 
-<div id="outline-container-orga7c320c" class="outline-3">
-<h3 id="orga7c320c">A less naive broadcasting in Neanderthal</h3>
-<div class="outline-text-3" id="text-orga7c320c">
+<div id="outline-container-org0178694" class="outline-3">
+<h3 id="org0178694">A less naive broadcasting in Neanderthal</h3>
+<div class="outline-text-3" id="text-org0178694">
 <p>
 But why stop here? We can improve this naive implementation and make it less naive, to show you
 that with a good tool in your toolbox, and a little knowledge of textbook math you can make wonders.
@@ -299,9 +298,9 @@ It works correctly; what about the performance?
 </div>
 </div>
 
-<div id="outline-container-org204f6a0" class="outline-3">
-<h3 id="org204f6a0">Performance of a less naive Neanderthal broadcasting</h3>
-<div class="outline-text-3" id="text-org204f6a0">
+<div id="outline-container-org71d681b" class="outline-3">
+<h3 id="org71d681b">Performance of a less naive Neanderthal broadcasting</h3>
+<div class="outline-text-3" id="text-org71d681b">
 <div class="org-src-container">
 <pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">bench-neanderthal-less-naive-add-row-vector</span> <span style="color: #7388d6;">[</span>m n<span style="color: #7388d6;">]</span>
   <span style="color: #7388d6;">(</span>with-release <span style="color: #909183;">[</span>a <span style="color: #709870;">(</span>entry! <span style="color: #907373;">(</span>fge m n <span style="color: #6276ba;">{</span><span style="color: #F5666D;">:layout</span> <span style="color: #F5666D;">:row</span><span style="color: #6276ba;">}</span><span style="color: #907373;">)</span> 1<span style="color: #709870;">)</span>
@@ -339,9 +338,9 @@ When we have large arrays and need speed, the real saver is GPU computing anyway
 </div>
 </div>
 
-<div id="outline-container-org00d6913" class="outline-2">
-<h2 id="org00d6913">Broadcasting on the GPU</h2>
-<div class="outline-text-2" id="text-org00d6913">
+<div id="outline-container-orge6a0531" class="outline-2">
+<h2 id="orge6a0531">Broadcasting on the GPU</h2>
+<div class="outline-text-2" id="text-orge6a0531">
 <p>
 Both libraries support CUDA, so let's see how those compare on Nvidia's GPUs. Neanderthal also supports
 OpenCL, so it can run on AMD's and Intel's cards, but Nd4j doesn't, so I won't be able to do any comparisons
@@ -363,9 +362,9 @@ these minor points).
 </p>
 </div>
 
-<div id="outline-container-org78df918" class="outline-3">
-<h3 id="org78df918">Nd4j broadcasting on the GPU</h3>
-<div class="outline-text-3" id="text-org78df918">
+<div id="outline-container-org0cbf331" class="outline-3">
+<h3 id="org0cbf331">Nd4j broadcasting on the GPU</h3>
+<div class="outline-text-3" id="text-org0cbf331">
 <div class="org-src-container">
 <pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">bench-nd4j-addiRowVector-cuda</span> <span style="color: #7388d6;">[</span>^long m ^long n<span style="color: #7388d6;">]</span>
   <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #909183;">[</span>a <span style="color: #709870;">(</span><span style="color: #2F8B58; font-weight: bold;">Nd4j</span>/ones m n<span style="color: #709870;">)</span>
@@ -401,9 +400,9 @@ and CUDA to magically speed up the code.
 </div>
 </div>
 
-<div id="outline-container-org15f4e15" class="outline-3">
-<h3 id="org15f4e15">A less naive Neanderthal broadcasting on the GPU</h3>
-<div class="outline-text-3" id="text-org15f4e15">
+<div id="outline-container-org915b925" class="outline-3">
+<h3 id="org915b925">A less naive Neanderthal broadcasting on the GPU</h3>
+<div class="outline-text-3" id="text-org915b925">
 <p>
 Let's see Neanderthal.
 </p>
@@ -448,23 +447,19 @@ even when there is not any data transfer.
 
 <p>
 The real puzzle here is where Nd4j wasted these 150 microseconds that it is slower than Neanderthal in most
-cases, or how the hell it lost 5 milliseconds compared to Neanderthal in that 100M matrix&#x2026;
-</p>
-
-<p>
-I don't know, and it's none of my business.
+cases, or why it stashed 5 milliseconds compared to Neanderthal in that 100M matrix&#x2026;
 </p>
 </div>
 </div>
 </div>
 
-<div id="outline-container-org958c435" class="outline-2">
-<h2 id="org958c435">Conclusions</h2>
-<div class="outline-text-2" id="text-org958c435">
+<div id="outline-container-orgf2fb875" class="outline-2">
+<h2 id="orgf2fb875">Conclusions</h2>
+<div class="outline-text-2" id="text-orgf2fb875">
 <p>
-I hope this post has helped you to learn a few things about linear algebra, and that it helped you
-gain some confidence in the code you write compared to the magical code from the popular libraries.
-Usually, optimized code is much better than what you'd write, but don't underestimate your own
+I hope this post has helped you learn a few things about linear algebra, and
+gain some confidence in the code you write compared to the magical libraries.
+Usually, optimized library code is much better than what you'd write, but don't underestimate your own
 abilities. Also, although cuBLAS and MKL have amazing computational routines, higher level
 libraries are not always examples of how to use them properly; don't trust them blindly.
 </p>
