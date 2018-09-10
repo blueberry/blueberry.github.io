@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Interactive, Functional, <br> GPU Accelerated <br> Programming in Clojure</title>
+<meta name="author" content="(Dragan Djuric)"/>
+<style type="text/css">
+.underline { text-decoration: underline; }
+</style>
+<link rel="stylesheet" href="./reveal.js-3.7.0/css/reveal.css"/>
+
+<link rel="stylesheet" href="./reveal.js-3.7.0/css/theme/black.css" id="theme"/>
+
+<link rel="stylesheet" href="noborder.css"/>
+
+<!-- If the query includes 'print-pdf', include the PDF print sheet -->
+<script>
+    if( window.location.search.match( /print-pdf/gi ) ) {
+        var link = document.createElement( 'link' );
+        link.rel = 'stylesheet';
+        link.type = 'text/css';
+        link.href = './reveal.js-3.7.0/css/print/pdf.css';
+        document.getElementsByTagName( 'head' )[0].appendChild( link );
+    }
+</script>
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+<section id="sec-title-slide"><h2>Interactive, Functional, <br> GPU Accelerated <br> Programming in Clojure</h2><h3>Dragan Djuric</h3><strong><a href="mailto:dragandj@gmail.com">dragandj@gmail.com</a></strong>
+</section>
+
+<section>
+<section id="slide-org6149c69">
+<h2 id="org6149c69">Dragan Djuric</h2>
+<ul>
+<li>blog <a href="http://dragan.rocks">http://dragan.rocks</a></li>
+<li>twitter <a href="https://twitter.com/draganrocks">@draganrocks</a></li>
+<li>Professor of Software Engineering</li>
+<li>University of Belgrade</li>
+<li>Clojure as a primary language since <b>2009</b></li>
+<li>Teach Clojure since 2010</li>
+<li>dragandj@gmail.com</li>
+<li>github: blueberry / uncomplicate</li>
+<li><a href="http://uncomplicate.org">http://uncomplicate.org</a></li>
+
+</ul>
+
+
+<aside class="notes">
+<p>
+My name is Dragan Djuric, I am a professor of software engineering at
+the University of Belgrade. I've been using Clojure as my primary programming language since 2009,
+teach it since 2010. You can find me on github, and you can find lots of related Clojure articles on my blog.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgfe55324">
+<h3 id="orgfe55324">Clojure and FP are great!</h3>
+<ul>
+<li>Dynamic <b>and</b> fast</li>
+<li>First-class functions</li>
+<li>Great abstractions and data structures</li>
+<li>Many useful libraries</li>
+<li>Even more experimental libraries</li>
+<li>Access to Java and the JVM</li>
+<li>Hey, the community is amazing!</li>
+
+</ul>
+
+<aside class="notes">
+<p>
+Clojure is great! I'm sure no one here needs to be reminded of that.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-org1b845d1">
+<h3 id="org1b845d1">Number crunching?</h3>
+<blockquote nil>
+<p>
+only thinking about the money and the fame and attention. &#x2013;Urban Dictionary
+</p>
+</blockquote>
+
+<aside class="notes">
+<p>
+I assume you've already sold on FP. I won't assume you have experience with number crunching.
+</p>
+
+<p>
+What is number crunching? According to Urban Dictionary, it is&#x2026;
+</p>
+
+<p>
+All right, the numbers being crunched often represent financial data&#x2026;
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orge43ed33">
+<h3 id="orge43ed33">Number cruncher?</h3>
+<blockquote nil>
+<p>
+a computer that can solve many problems at a fast rate &#x2013;Urban Dictionary
+</p>
+</blockquote>
+
+<ul>
+<li>How fast is fast?</li>
+
+</ul>
+
+<aside class="notes">
+<p>
+This makes more sense. But, how fast is fast rate?
+</p>
+
+<p>
+To a human eye, (almost) anything is fast, in high-frequency trading a microsecond matters, and, on the level
+of individual operations, a couple of nanoseconds can be a considerable slowdown.
+</p>
+
+<p>
+Lots of nanoseconds add up to megaseconds&#x2026;
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgfc44570">
+<h3 id="orgfc44570">What I'll talk about?</h3>
+<ul>
+<li>Not (necessarily) Big Data</li>
+<li><b><b>Lots of computations</b></b> regardless of data size</li>
+<li>numerical data</li>
+<li>numerical algorithms</li>
+
+</ul>
+
+<aside class="notes">
+<p>
+Many problems do not necessarily have to be due to having lots of data, but due to having to
+perform lots of computations.
+</p>
+
+<p>
+We are talking specifically about numerical data, and algorithms that work with numbers.
+</p>
+
+<p>
+Algorithms usually have to perform lots of cycles of numerical operation on arrays containing
+floating point numbers.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgbdbd652">
+<h3 id="orgbdbd652">Is FP good at number crunching?</h3>
+<ul>
+<li>Good? sometimes.</li>
+<li>Great? NO!</li>
+<li>Poor access to hardware-specific optimizations.</li>
+
+<li>Some FP ideas are very useful!</li>
+
+</ul>
+
+
+<aside class="notes">
+<p>
+But, is FP good at number crunching?
+It is certainly not bad, but compared to what's available elsewhere, it is not great either.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgd47de83">
+<h3 id="orgd47de83">CPU is not so great either!</h3>
+<ul>
+<li>R, Python? Even worse than Java or Hasekell.</li>
+<li>C? complicated, verbose platform-specific optimizations.</li>
+<li>CPU? too beefed-up!</li>
+
+</ul>
+
+<aside class="notes">
+<p>
+Other managed platforms? Those are even worse than JVM when it comes
+to number crunching. It is true that they have rich libraries that fall back
+to native code, but&#x2026; when you need to write some of that native code you're out of luck.
+And CPU itself is not so great either! CPUs have rich instruction sets, but
+that requires lots of transistors that devours energy.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgccf32e0">
+<h3 id="orgccf32e0">GPU has a lot to offer &#x2026;at a price</h3>
+<ul>
+<li>many dumb computing units</li>
+<li>but, power-efficient for number crunching</li>
+<li>hardware support for massive parallelism</li>
+<li>faster and cheaper each year</li>
+<li><b>notoriously difficult to program</b></li>
+
+</ul>
+
+<aside class="notes">
+<p>
+&#x2026;which brings us to GPUs. GPUs contain very simple computing units, but it is
+possible to pack many of those on one chip!
+The features that are provided are exactly the numerical operations and parallelization
+support that we need! They are more powerful and cheaper each year.
+It's a shame that the programming platforms are from the stone age!
+</p>
+
+</aside>
+
+</section>
+<section id="slide-org7d50701">
+<h3 id="org7d50701">Uncomplicate</h3>
+<dl>
+<dt><font color = "green">ClojureCL</font></dt><dd>take control of the GPU, CPU, and accelerators from Clojure</dd>
+<dt><font color = "green">ClojureCUDA</font></dt><dd>take control of the Nvidia GPU</dd>
+<dt><font color = "indigo">Neanderthal</font></dt><dd>vectors and matrices, but optimized for CPU and GPU</dd>
+<dt><font color = "OrangeRed">Bayadera</font></dt><dd>high performance Bayesian statistics and data analysis on the GPU</dd>
+
+</dl>
+
+<aside class="notes">
+<p>
+Uncomplicate is a family of open-source Clojure libraries for scientific and high-performance computing.
+ClojureCL is a Clojure library for taking <b>full</b> control of the GPU with minimal overhead.
+Neanderthal leverages battle-tested native linear algebra libraries for the CPU and latest GPU libraries
+to provide the full-speed matrix support tailored to Clojure with almost no overhead.
+Bayadera goes beyond that - a library for Bayesian statistics on the GPU that is much faster than
+the fastest available mainstream offerings!
+</p>
+
+</aside>
+
+</section>
+</section>
+<section>
+<section id="slide-orga4669b8">
+<h2 id="orga4669b8">Hello world: dot product</h2>
+<ul>
+<li>One of the simplest linear algebra functions</li>
+<li>Consists of two familiar FP building blocks:
+<ul>
+<li>map</li>
+<li>reduce</li>
+
+</ul></li>
+<li>Multiply each corresponding element of two arrays (vectors) and add them up.</li>
+
+</ul>
+
+<aside class="notes">
+<p>
+Let's first see how fast these things can get.
+</p>
+
+<p>
+Dot product is one of the simplest numerical algorithms.
+</p>
+
+<p>
+It is representative because it uses two basic functional programming idioms:
+</p>
+<ul>
+<li>map</li>
+<li>reduce</li>
+
+</ul>
+
+<p>
+The input consists of two arrays of numbers of the same size. Their dot product is computed by
+multiplying each corresponding element, and adding up these product. The result is a number.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-org1dde2d5">
+<h3 id="org1dde2d5">Idiomatic Clojure</h3>
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #4c83ff;">let</span> <span style="color: #006400;">[</span>dot-product <span style="color: #ff1493;">(</span><span style="color: #4c83ff;">fn</span> <span style="color: #ffff00;">[</span>xs ys<span style="color: #ffff00;">]</span>
+                    <span style="color: #ffff00;">(</span>reduce + <span style="color: #00ff00;">(</span>map * xs ys<span style="color: #00ff00;">)</span><span style="color: #ffff00;">)</span><span style="color: #ff1493;">)</span>
+
+      x-vec <span style="color: #ff1493;">(</span>vec <span style="color: #ffff00;">(</span>range 100000<span style="color: #ffff00;">)</span><span style="color: #ff1493;">)</span>
+      y-vec <span style="color: #ff1493;">(</span>vec <span style="color: #ffff00;">(</span>range 100000<span style="color: #ffff00;">)</span><span style="color: #ff1493;">)</span><span style="color: #006400;">]</span>
+
+  <span style="color: #006400;">(</span>dot-product x-vec y-vec<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+333328333350000
+
+</pre>
+
+<p class="fragment (appear)">
+Execution time: 14 ms
+</p>
+
+<aside class="notes">
+<p>
+In idiomatic Clojure, anyone can write a map/reduce one-liner dot-product function.
+</p>
+
+<p>
+For 100,000 element vectors, Clojure map/reduce took 14 ms.
+</p>
+
+<p>
+Doesn't seem so slow, but keep in mind that the dot product is a basic building block,
+not a goal in itself.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgb2cc963">
+<h3 id="orgb2cc963"><font color = "indigo">Neanderthal</font>: using optimized library</h3>
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><span style="color: #8b0000;">(</span>require '<span style="color: #006400;">(</span>uncomplicate.neanderthal
+           <span style="color: #ff1493;">[</span>core <span style="color: #96CBFE;">:refer</span> <span style="color: #96CBFE;">:all</span><span style="color: #ff1493;">]</span>
+           <span style="color: #ff1493;">[</span>native <span style="color: #96CBFE;">:refer</span> <span style="color: #96CBFE;">:all</span><span style="color: #ff1493;">]</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #4c83ff;">let</span> <span style="color: #006400;">[</span>x <span style="color: #ff1493;">(</span>fv <span style="color: #ffff00;">(</span>range 100000<span style="color: #ffff00;">)</span><span style="color: #ff1493;">)</span>
+      y <span style="color: #ff1493;">(</span>copy x<span style="color: #ff1493;">)</span><span style="color: #006400;">]</span>
+
+  <span style="color: #006400;">(</span>dot x y<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+3.33328352E14
+
+</pre>
+
+<ul>
+<li class="fragment appear">Execution time: 6 &mu;s</li>
+
+</ul>
+
+<aside class="notes">
+<p>
+What can we expect from an optimized matrix library - Neanderthal?
+</p>
+
+<p>
+The speed-up of three orders of magnitude.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgb616d52">
+<h3 id="orgb616d52"><font color = "indigo">Neanderthal</font>: a taste of GPU</h3>
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><span style="color: #8b0000;">(</span>require '<span style="color: #006400;">[</span>uncomplicate.clojurecuda.core <span style="color: #96CBFE;">:refer</span> <span style="color: #96CBFE;">:all</span><span style="color: #006400;">]</span>
+         '<span style="color: #006400;">[</span>uncomplicate.neanderthal.cuda <span style="color: #96CBFE;">:refer</span> <span style="color: #96CBFE;">:all</span><span style="color: #006400;">]</span>
+         '<span style="color: #006400;">[</span>uncomplicate.commons.core <span style="color: #96CBFE;">:refer</span> <span style="color: #96CBFE;">:all</span><span style="color: #006400;">]</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><span style="color: #8b0000;">(</span>with-default
+  <span style="color: #006400;">(</span>with-default-engine
+    <span style="color: #ff1493;">(</span>with-release <span style="color: #ffff00;">[</span>gpu-x <span style="color: #00ff00;">(</span>cuv <span style="color: #add8e6;">(</span>range 100000<span style="color: #add8e6;">)</span><span style="color: #00ff00;">)</span>
+                   gpu-y <span style="color: #00ff00;">(</span>copy gpu-x<span style="color: #00ff00;">)</span><span style="color: #ffff00;">]</span>
+
+      <span style="color: #ffff00;">(</span>dot gpu-x gpu-y<span style="color: #ffff00;">)</span><span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+3.33328352E14
+
+</pre>
+
+<ul>
+<li class="fragment appear">Execution time: <font color = "red">26</font> &mu;s</li>
+<li class="fragment appear">Not faster than the CPU at all! Why?</li>
+
+</ul>
+
+<aside class="notes">
+<p>
+Let's try Neanderthal's support for GPUs.  Neanderthal's API supports pluggable engines,
+and the GPU engine has already been provided.
+The API stays the same, while we use ClojureCUDA to set up our hardware.
+</p>
+
+<p>
+Not faster than the CPU! Hmmm&#x2026;
+</p>
+
+</aside>
+
+</section>
+<section id="slide-org339f110">
+<h3 id="org339f110">A million dot products on the GPU</h3>
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><span style="color: #8b0000;">(</span>with-default
+  <span style="color: #006400;">(</span>with-default-engine
+    <span style="color: #ff1493;">(</span>with-release <span style="color: #ffff00;">[</span>gpu-x <span style="color: #00ff00;">(</span>entry! <span style="color: #add8e6;">(</span>cuge 1000 100000<span style="color: #add8e6;">)</span> 0.01<span style="color: #00ff00;">)</span>
+                   gpu-y <span style="color: #00ff00;">(</span>copy <span style="color: #add8e6;">(</span>trans gpu-x<span style="color: #add8e6;">)</span><span style="color: #00ff00;">)</span>
+                   cpu-c <span style="color: #00ff00;">(</span>cuge 1000 1000<span style="color: #00ff00;">)</span><span style="color: #ffff00;">]</span>
+
+      <span style="color: #ffff00;">(</span><span style="color: #4c83ff;">do</span> <span style="color: #00ff00;">(</span>mm! 1 gpu-x gpu-y 0 cpu-c<span style="color: #00ff00;">)</span>
+          <span style="color: #00ff00;">(</span>synchronize!<span style="color: #00ff00;">)</span>
+          <span style="color: #96CBFE;">true</span><span style="color: #ffff00;">)</span><span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+true
+
+</pre>
+
+<ul>
+<li class="fragment appear">Execution time: <font color = "red">23</font> ms</li>
+<li class="fragment appear">23 <b><b>nanoseconds</b></b> per a 100000 element dot product!</li>
+<li class="fragment appear">Our Clojure code started from 14 milliseconds (600,000 &times; difference!)</li>
+<li class="fragment appear">1000 &times; faster than a solo dot product!</li>
+
+</ul>
+
+<aside class="notes">
+<p>
+The moral of the story: fuse operations to get the GPU speedup.
+</p>
+
+<p>
+The good news is that we can do this for many algorithms!
+</p>
+
+<p>
+But, we often have to do it ourselves. Good - ClojureCUDA helps with that!
+</p>
+
+</aside>
+
+</section>
+</section>
+<section>
+<section id="slide-orgd519bf4">
+<h2 id="orgd519bf4">A glimpse of ClojureCUDA API</h2>
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><span style="color: #8b0000;">(</span>init<span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="fragment (appear)"><span style="color: #96CBFE;">true</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="fragment (appear)"><span style="color: #8b0000;">(</span>device-count<span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="fragment (appear)">2
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="fragment (appear)"><span style="color: #8b0000;">(</span><span style="color: #4c83ff;">def</span> <span style="color: #ff69b4;">my-nvidia-gpu</span> <span style="color: #006400;">(</span>device 0<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="fragment (appear)">#'<span style="color: #afd8af;">user</span>/my-nvidia-gpu
+</pre>
+</div>
+
+<aside class="notes">
+<p>
+The key thing I hope you'll get from this presentation is that:
+<b>*it is not (that) difficult!</b>
+</p>
+
+<p>
+GPU programming requires some device and context management.
+</p>
+
+<p>
+Luckily, with the REPL, we can play with this in the same way
+we are exploring regular Clojure libraries.
+</p>
+
+<p>
+No need to worry about the C++ toolchain!
+</p>
+
+</aside>
+
+</section>
+<section id="slide-org2664571">
+<h3 id="org2664571">Querying information</h3>
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><span style="color: #8b0000;">(</span>info my-nvidia-gpu<span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="fragment (appear)"><span style="color: #8b0000;">{</span><span style="color: #96CBFE;">:max-grid-dim-y</span> 65535, <span style="color: #96CBFE;">:total-mem</span> 11721506816,
+ <span style="color: #96CBFE;">:name</span> <span style="color: #61CE3C;">"GeForce GTX 1080 Ti"</span>, <span style="color: #96CBFE;">:max-threads-per-multiprocessor</span> 2048,
+ <span style="color: #96CBFE;">:max-shared-memory-per-block</span> 49152, <span style="color: #96CBFE;">:compute-capability-major</span> 6,
+ <span style="color: #96CBFE;">:global-memory-bus-width</span> 352, <span style="color: #96CBFE;">:memory-clock-rate</span> 5505000,
+ <span style="color: #96CBFE;">:max-threads-per-block</span> 1024, <span style="color: #96CBFE;">:multiprocessor-count</span> 28,
+ <span style="color: #96CBFE;">:warp-size</span> 32, <span style="color: #96CBFE;">:max-registers-per-block</span> 65536
+ <span style="color: #8B8989; font-style: italic;">;;</span><span style="color: #8B8989; font-style: italic;">... much more data</span>
+<span style="color: #8b0000;">}</span>
+</pre>
+</div>
+
+<aside class="notes">
+<p>
+We can access the hardware and explore its characteristic information.
+</p>
+
+<p>
+In this case, my device is GTX 1080, with 11GB DRAM, 28 physical cores.
+Each of these cores is capable of executing 1024 parallel threads, mapped onto 32
+physically parallel threads in a warp.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-org481fb0d">
+<h3 id="org481fb0d">Managing Context</h3>
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #4c83ff;">def</span> <span style="color: #ff69b4;">ctx</span> <span style="color: #006400;">(</span>context my-nvidia-gpu<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="fragment (appear)">#'<span style="color: #afd8af;">user</span>/ctx
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="fragment (appear)"><span style="color: #8b0000;">(</span>info ctx<span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="fragment (appear)"><span style="color: #8b0000;">{</span><span style="color: #96CBFE;">:dev-runtime-pending-launch-count</span> 2048  <span style="color: #96CBFE;">:dev-runtime-sync-depth</span> 2
+ <span style="color: #96CBFE;">:malloc-heap-size</span> 8388608  <span style="color: #96CBFE;">:stack-size</span> 1024  <span style="color: #96CBFE;">:api-version</span> 3020
+ <span style="color: #96CBFE;">:stream-priority-range</span> <span style="color: #006400;">(</span>0 -1<span style="color: #006400;">)</span>  <span style="color: #96CBFE;">:cache-config</span> <span style="color: #96CBFE;">:prefer-none</span>  <span style="color: #96CBFE;">:printf-fifo-size</span> 1048576
+ <span style="color: #96CBFE;">:device</span> #object<span style="color: #006400;">(</span>jcuda.driver.CUdevice 0x12be4426 <span style="color: #61CE3C;">"CUdevice[nativePointer=0x0]"</span><span style="color: #006400;">)</span>
+ <span style="color: #96CBFE;">:shared-config</span> <span style="color: #96CBFE;">:four-byte-bank-size</span><span style="color: #8b0000;">}</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="fragment (appear)"><span style="color: #8b0000;">(</span>= ctx <span style="color: #006400;">(</span>current-context<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="fragment (appear)"><span style="color: #96CBFE;">true</span>
+</pre>
+</div>
+
+<aside class="notes">
+<p>
+The entry point to GPU programming is the context.
+</p>
+
+<p>
+It helps in managing the specific way in which we use the device.
+</p>
+
+<p>
+For example, this default context supports CUDA API 3.2 and up, although the device itself
+suports 6.1. This makes our code more portable across older Nvidia GPU's.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-org4a8dd0d">
+<h3 id="org4a8dd0d">Memory</h3>
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #4c83ff;">def</span> <span style="color: #ff69b4;">gpu-array</span> <span style="color: #006400;">(</span>mem-alloc 1024<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="fragment (appear)">#'<span style="color: #afd8af;">user</span>/gpu-array
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="fragment (appear)"><span style="color: #8b0000;">(</span><span style="color: #4c83ff;">def</span> <span style="color: #ff69b4;">main-array</span> <span style="color: #006400;">(</span>float-array <span style="color: #ff1493;">(</span>range 256<span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="fragment (appear)">#'<span style="color: #afd8af;">user</span>/main-array
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="fragment (appear)"><span style="color: #8b0000;">(</span>take 10 main-array<span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="fragment (appear)"><span style="color: #8b0000;">(</span>0 1 2 3 4 5 6 7 8 9<span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<aside class="notes">
+<p>
+Most of the code that we write will actually execute on the CPU, not the GPU.
+</p>
+
+<p>
+This is called the <b>host code</b>, and it manages the setup of data in memory, and how the
+actual computation on the GPU will run.
+</p>
+
+<p>
+In contrast with CPU programs, the GPU usually works with huge arrays of floating point numbers.
+We can't directly access each element from the main host program in an efficient way.
+</p>
+
+<p>
+We start from the data in main memory: 1, 2, 3, etc.
+</p>
+
+</aside>
+</section>
+<section id="slide-org1bc4d13">
+<h3 id="org1bc4d13">Transfer data to GPU memory</h3>
+<div class="org-src-container">
+
+<pre  class="fragment (appear)"><span style="color: #8b0000;">(</span>memcpy-host! main-array gpu-array<span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="fragment (appear)">#object<span style="color: #8b0000;">[</span>uncomplicate.clojurecuda.internal.impl.CULinearMemory 0x38701ca4 <span style="color: #61CE3C;">"uncomplicate.clojurecuda.i</span><span style="color: #dc8cc3; background-color: #383838;">nternal.impl.CULinearMemory@38701ca4"</span><span style="color: #8b0000; background-color: #383838;">]</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="fragment (appear)"><span style="color: #8b0000;">(</span>take 12 <span style="color: #006400;">(</span>memcpy-host! gpu-array <span style="color: #ff1493;">(</span>float-array 256<span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="fragment (appear)"><span style="color: #8b0000;">(</span>0 1 2 3 4 5 6 7 8 9 10 11<span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<aside class="notes">
+<p>
+We treat the arrays in GPU memory as a whole, and load the data from corresponding main memory.
+</p>
+
+<p>
+As we cannot see the elements directly, the only way to see the content is to transfer data back to
+another host memory array and check its contents.
+</p>
+
+<p>
+Note that we are doing this interactively in the REPL all the time.
+</p>
+
+</aside>
+</section>
+</section>
+<section>
+<section id="slide-orgddc335d">
+<h2 id="orgddc335d">Compute something already!</h2>
+<div class="outline-text-2" id="text-orgddc335d">
+</div>
+</section>
+<section id="slide-org2067089">
+<h3 id="org2067089">The kernel</h3>
+<div class="org-src-container">
+
+<pre  class="src src-c"><span style="color: #4c83ff;">extern</span> <span style="color: #61CE3C;">"C"</span>
+__global__ <span style="color: #afd8af;">void</span> <span style="color: #ff1493;">increment</span>(<span style="color: #afd8af;">int</span> <span style="color: #ff69b4;">n</span>, <span style="color: #afd8af;">float</span> *<span style="color: #ff69b4;">a</span>) {
+    <span style="color: #afd8af;">int</span> <span style="color: #ff69b4;">i</span> = blockIdx.x * blockDim.x + threadIdx.x;
+    <span style="color: #4c83ff;">if</span> (i &lt; n) {
+        a[i] = a[i] + 1.0f;
+    }
+};
+</pre>
+</div>
+
+<aside class="notes">
+<p>
+The actual code that the GPU cores run is relatively simple. These functions are called <b><b>kernels</b></b>.
+</p>
+
+<p>
+Kernel can be theoretically written in any language, but a simple subset of C/C++ is a good match
+for the low-level floating point computations that it is required to perform.
+</p>
+
+<p>
+This kernel can be run in parallel by thousands (<b><b>n</b></b>) independent threads. Each of these threads
+will get its coordinates in a grid, and can use these coordinates to locate the part of the array
+that it will work on. Which part of the array? It's up to the programmer!
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgafcc900">
+<h3 id="orgafcc900">The program</h3>
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #4c83ff;">def</span> <span style="color: #ff69b4;">kernel-source</span>
+      <span style="color: #FBDE2D;">"extern \"C\"</span>
+<span style="color: #FBDE2D;">         __global__ void increment (int n, float *a) {</span>
+<span style="color: #FBDE2D;">           int i = blockIdx.x * blockDim.x + threadIdx.x;</span>
+<span style="color: #FBDE2D;">           if (i &lt; n) {</span>
+<span style="color: #FBDE2D;">             a[i] = a[i] + 1.0f;</span>
+<span style="color: #FBDE2D;">        }</span>
+<span style="color: #FBDE2D;">       };"</span><span style="color: #8b0000;">)</span>
+
+<span style="color: #8b0000;">(</span><span style="color: #4c83ff;">def</span> <span style="color: #ff69b4;">hello-program</span> <span style="color: #006400;">(</span>compile! <span style="color: #ff1493;">(</span>program kernel-source<span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#'user/kernel-source#'user/hello-program
+
+</pre>
+
+<aside class="notes">
+<p>
+We load and compile the kernel code through our interactive Clojure REPL.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-org1c907a5">
+<h3 id="org1c907a5">The GPU Function</h3>
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #4c83ff;">def</span> <span style="color: #ff69b4;">hello-module</span> <span style="color: #006400;">(</span>module hello-program<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<span style="color: #8b0000;">(</span><span style="color: #4c83ff;">def</span> <span style="color: #ff69b4;">increment</span> <span style="color: #006400;">(</span>function hello-module <span style="color: #61CE3C;">"increment"</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#'user/hello-module#'user/increment
+
+</pre>
+
+<aside class="notes">
+<p>
+We also further access the objects handles of the stuff inside the program, in this case the
+increment function that we created.
+</p>
+
+<p>
+If we make a mistake, we'll see it immediately in the REPL, and have the opportunity to fix it
+right away.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-org9c24b69">
+<h3 id="org9c24b69">Running the GPU function</h3>
+<div class="org-src-container">
+
+<pre  class="fragment (appear)"><span style="color: #8b0000;">(</span>launch! increment <span style="color: #006400;">(</span>grid-1d 256<span style="color: #006400;">)</span> <span style="color: #006400;">(</span>parameters 256 gpu-array<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="fragment (appear)"><span style="color: #96CBFE;">nil</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="fragment (appear)"><span style="color: #8b0000;">(</span>take 12 <span style="color: #006400;">(</span>memcpy-host! gpu-array <span style="color: #ff1493;">(</span>float-array 256<span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="fragment (appear)"><span style="color: #8b0000;">(</span>1 2 3 4 5 6 7 8 9 10 11 12<span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<aside class="notes">
+<p>
+The function <b><b>as a first-class object</b></b> is now created.
+</p>
+
+<p>
+We <b><b>launch</b></b> it by specifying the number of workers in the grid, and the memory that it operates on.
+</p>
+
+<p>
+It is typically executed asynchroneously.
+</p>
+
+<p>
+To see the result, we transfer the content of the array it wrote to and see that the numbers increased.
+</p>
+
+<p>
+Kernels are typically <b><b>not</b></b> pure. They do their work through effects on memory.
+</p>
+
+<p>
+That is one of the major differences to FP.
+</p>
+
+</aside>
+
+</section>
+</section>
+<section>
+<section id="slide-org82981f4">
+<h2 id="org82981f4">Wrap-up</h2>
+<ul>
+<li>Managing low-level CUDA kernels from <b><b>interactive</b></b> Clojure code</li>
+<li>Managing low-level 3-rd party GPU code (cuBlas, cuDNN etc) (<b><b>also interactively!</b></b>)</li>
+<li>Mixing the two approaches! (<b><b>again, inteactively</b></b>)</li>
+
+</ul>
+
+<p>
+&#x2026;instead of writing everything as a huge, impenetrable C++ codebase and then just calling it with dummy wrappers
+</p>
+
+
+<aside class="notes">
+<p>
+To wrap it up, the main takeaways:
+</p>
+
+<p>
+We can program GPUs interactively in the repl
+</p>
+
+<p>
+We can use some high level libraries - also interactively!
+</p>
+
+<p>
+We can mix two approaches to solve specific problems.
+</p>
+
+<p>
+Lots of these can be done with in a FP-like style, interactively and dynamically.
+</p>
+
+</aside>
+</section>
+</section>
+<section>
+<section id="slide-org5d105e4">
+<h2 id="org5d105e4">Thank You</h2>
+<p>
+The presentation can be accessed on my blog:
+</p>
+<ul>
+<li><a href="http://dragan.rocks">http://dragan.rocks</a></li>
+
+</ul>
+
+<p>
+Find more at:
+</p>
+
+<ul>
+<li><a href="http://neanderthal.uncomplicate.org">http://neanderthal.uncomplicate.org</a></li>
+<li><a href="http://clojurecuda.uncomplicate.org">http://clojurecuda.uncomplicate.org</a></li>
+<li><a href="http://clojurecl.uncomplicate.org">http://clojurecl.uncomplicate.org</a></li>
+
+</ul>
+</section>
+</section>
+</div>
+</div>
+<script src="./reveal.js-3.7.0/lib/js/head.min.js"></script>
+<script src="./reveal.js-3.7.0/js/reveal.js"></script>
+
+<script>
+// Full list of configuration options available here:
+// https://github.com/hakimel/reveal.js#configuration
+Reveal.initialize({
+
+controls: true,
+progress: true,
+history: false,
+center: true,
+slideNumber: 'c',
+rollingLinks: false,
+keyboard: true,
+overview: true,
+
+theme: Reveal.getQueryHash().theme, // available themes are in /css/theme
+transition: Reveal.getQueryHash().transition || 'default', // default/cube/page/concave/zoom/linear/fade/none
+transitionSpeed: 'default',
+multiplex: {
+    secret: '', // null if client
+    id: '', // id, obtained from socket.io server
+    url: '' // Location of socket.io server
+},
+
+// Optional libraries used to extend on reveal.js
+dependencies: [
+ { src: './reveal.js-3.7.0/lib/js/classList.js', condition: function() { return !document.body.classList; } },
+ { src: './reveal.js-3.7.0/plugin/markdown/marked.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
+ { src: './reveal.js-3.7.0/plugin/markdown/markdown.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
+ { src: './reveal.js-3.7.0/plugin/zoom-js/zoom.js', async: true, condition: function() { return !!document.body.classList; } },
+ { src: './reveal.js-3.7.0/plugin/notes/notes.js', async: true, condition: function() { return !!document.body.classList; } }]
+});
+</script>
+</body>
+</html>
