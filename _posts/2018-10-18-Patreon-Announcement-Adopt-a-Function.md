@@ -29,3 +29,5 @@ You can help by going to [a Patreon page for donations](https://patreon.com/drag
 In return, you can [claim a Neanderthal function as your own pet](https://patreon.com/draganrocks)! Think about that, you can be someone who generously support and care about Neanderthal so much that a doc metadata of a function lists you as its patron!
 
 Regardless of the success of this campaign, I pledge to continue delivering high quality high speed open source code to the Clojure community, so do not worry if you can't afford to [donate](https://patreon.com/draganrocks). But it will be really nice if you can :)
+
+**Please share this post and spread the word.**
