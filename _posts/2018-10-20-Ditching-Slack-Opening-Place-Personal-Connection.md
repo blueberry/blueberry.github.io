@@ -2,7 +2,7 @@
 author: dragan
 layout: post
 title:  "I'm ditching Slack and opening a place to foster a more personal interaction"
-date:   2018-10-20 12:00
+date:   2018-10-20 16:40
 categories: Clojure, Discourse, Discussion, Uncomplicate, Patreon
 excerpt: I'm starting a dedicated, more personalized, discussion server about Clojure, machine learning, artificial intelligence, high performance computing, and related themes. Here's how to join.
 ---
