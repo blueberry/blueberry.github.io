@@ -2,7 +2,7 @@
 author: dragan
 layout: post
 title:  "I'm ditching Slack and opening a place to foster a more personal interaction"
-date:   2018-10-20 16:40
+date:   2018-10-20 19:00
 categories: Clojure, Discourse, Discussion, Uncomplicate, Patreon
 excerpt: I'm starting a dedicated, more personalized, discussion server about Clojure, machine learning, artificial intelligence, high performance computing, and related themes. Here's how to join.
 ---
@@ -19,7 +19,7 @@ They enjoy, and are eager to participate, but need a less noisy, more focused pl
 
 I am regularly surprised when people meet me in person, and tell me that they follow my work, and admire what I do. I'm surprised, because they'd never reached out to let me know that online. That's a lot of people I'm talking about. I'm always surprised at how well-known my (un-typical) work has become in the Clojure community. Having a place to foster personal connection can make real difference! We'll discover that there are much more people interested in the same niche area when there is a more relaxed, personalized place, when people don't have to worry about unwanted exposure.
 
-That's why I decided to start a Discord server where (I hope) we'll be able to create such a place for all of us. I'll forward all discussions about Uncomplicate to that place, but I encourage other serious topics as well! Even for topics that are not directly related to Clojure!
+That's why I decided to start a Discord server where (I hope) we'll be able to create such a place for all of us. I'll forward all discussions about [Uncomplicate](https://github.com/uncomplicate) to that place, but I encourage other serious topics as well! Even for topics that are not directly related to Clojure!
 
 All backers of my [Patreon donation campaign](https://patreon.com/draganrocks) should get an automatic invite, but if you can't afford or just do not want to donate, ask me for a free invite!
 
