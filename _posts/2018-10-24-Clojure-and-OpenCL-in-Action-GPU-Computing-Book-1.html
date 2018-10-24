@@ -1,0 +1,318 @@
+---
+date: 2018-10-24
+tags:
+- Clojure
+- ClojureCL
+- Neanderthal
+- OpenCL
+- Nvidia
+- AMD
+- Intel
+author: dragan
+layout: post
+title: Clojure Walk through the OpenCL in Action GPU Computing Book
+description: since its inception, clojurecl tests have been carrying on the walthrough of examples from, in my opinion, the best introductory book for gpu computing, OpenCL in Action by Matthew Scarpino. I've just never had time to write the commentary as proper naration. Thanks to Nikola Milikic, now we have it for Chapter 4.
+categories:
+- CUDA
+- Clojure
+- ClojureCUDA
+- Neanderthal
+- OpenCL
+excerpt: Since its inception, ClojureCL tests have been carrying on the walthrough of examples from the best introductory book for GPU computing - OpenCL in Action by Matthew Scarpino. Thanks to Nikola Milikic, now we have the proper commentary for Chapter 4.
+---
+<p>
+Since its inception, ClojureCL tests have been carrying on the walk-through of examples from, in my opinion,
+the best introductory book for GPU computing: <a href="https://www.manning.com/books/opencl-in-action">OpenCL in Action</a> by Matthew Scarpino. I've just never had time to write the commentary as proper naration. Thanks to Nikola Milikic, now we have it for Chapter 4.
+</p>
+
+<p>
+Please note that this OpenCL book is perfectly suitable as the first CUDA book. I have never seen the introductory
+CUDA book that teaches fundamentals of GPU programming than Matthew's underappreciated text. If it has been written
+for CUDA, or if OpenCL have had more luck, it would probably have been a bestseller!
+</p>
+
+<p>
+Note: the code evaluation was run on my machine when the page was automatically generated, so where
+Nikola says "Apple" and the results show "AMD" don't be confused. Your machine might say "Nvidia".
+</p>
+
+<p>
+Enjoy this article written by <a href="http://nikola.milikic.info/">Nikola Milikic</a>!
+</p>
+
+<div id="outline-container-org40ef806" class="outline-2">
+<h2 id="org40ef806">Basic ClojureCL Examples - Part 1</h2>
+<div class="outline-text-2" id="text-org40ef806">
+<p>
+In the initial post titled <a href="https://dragan.rocks/articles/18/Interactive-GPU-Programming-2-Hello-OpenCL">Interactive GPU Programming - Part 2 - Hello OpenCL</a>, Dragan explained how to
+get started with the <a href="https://clojurecl.uncomplicate.org/">ClojureCL</a> library and its basic use. The idea of this and the following posts in this series
+is to show more examples of how to use ClojureCL and to explain the basic concepts of OpenCL needed
+for understanding of the examples.
+</p>
+
+<p>
+Literature in OpenCL is relatively scarce. I have taken Dragan’s advice and started learning it by going
+through the book <a href="https://www.manning.com/books/opencl-in-action">OpenCL in Action</a>. But instead of doing the examples in C/C++, as in the book,
+I was doing the examples in Clojure (they can be found in the <a href="https://github.com/uncomplicate/clojurecl/tree/master/test/clojure/uncomplicate/clojurecl/examples/openclinaction">ClojureCL repo</a>). It is a good way
+ of learning OpenCL host programming as you can concentrate on the main OpenCL concepts in your favourite language.
+</p>
+</div>
+
+<div id="outline-container-orgf6fce9f" class="outline-3">
+<h3 id="orgf6fce9f">Example 1 (Listing 4.1)</h3>
+<div class="outline-text-3" id="text-orgf6fce9f">
+<p>
+Let’s start with the first example from the Listing 4.1 in the book (p. 69). The example illustrates
+how to run a basic OpenCL program, i.e. a kernel. A kernel is function that can be executed by one
+ or more OpenCL compliant devices. This is an example of a kernel:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure">__kernel void hello_kernel<span style="color: #707183;">(</span>__global char16 *msg<span style="color: #707183;">)</span> <span style="color: #707183;">{</span>
+        *msg = <span style="color: #7388d6;">(</span>char16<span style="color: #7388d6;">)(</span>'H', 'e', 'l', 'l', 'o', ' ',
+                'k', 'e', 'r', 'n', 'e', 'l', '!', '!', '!', '<span style="color: #4E9A06;">\0</span>'<span style="color: #7388d6;">)</span>
+<span style="color: #707183;">}</span>
+</pre>
+</div>
+
+<p>
+We won't go into the details of writing kernels (you should consult the book for this purpose).
+But generally, kernels can accept arguments by value or by reference. If you pass an argument by
+a reference, you are actually providing a pointer that references a memory object. In our example,
+the argument msg references a 16-byte buffer object. And what this kernel does is stores 16 characters
+ ("Hello, kernel!!!) into the argument reference.
+</p>
+
+<p>
+In order to run this kernel, we need to write a host program, i.e. an application on a development system.
+The role of a host program is to build a kernel from its source, set kernel argument data and send
+the kernel to the device’s command queue for execution. Also, the host program is responsible for
+ reading back results from the executed kernel and observing the events coming in during the execution process.
+</p>
+
+<p>
+This is how the host program that executes a kernel, written in Clojure, looks like
+(I have adjusted the <a href="https://github.com/uncomplicate/clojurecl/blob/master/test/clojure/uncomplicate/clojurecl/examples/openclinaction/ch04.clj">test “Section 4.1, Page 69.” from the ClojureCL repo</a> so it is self-contained
+ and is not executed as a test):
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">ns</span> <span style="color: #2F8B58; font-weight: bold;">openclinaction.ch04</span>
+  <span style="color: #7388d6;">(</span><span style="color: #F5666D;">:require</span> <span style="color: #909183;">[</span>clojure.java.io <span style="color: #F5666D;">:as</span> io<span style="color: #909183;">]</span>
+            <span style="color: #909183;">[</span>clojure.core.async <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>chan &lt;!!<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+            <span style="color: #909183;">[</span>uncomplicate.commons
+             <span style="color: #709870;">[</span>core <span style="color: #F5666D;">:refer</span> <span style="color: #907373;">[</span>with-release info<span style="color: #907373;">]</span><span style="color: #709870;">]</span>
+             <span style="color: #709870;">[</span>utils <span style="color: #F5666D;">:refer</span> <span style="color: #907373;">[</span>direct-buffer<span style="color: #907373;">]</span><span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+            <span style="color: #909183;">[</span>uncomplicate.clojurecl
+             <span style="color: #709870;">[</span>core <span style="color: #F5666D;">:refer</span> <span style="color: #F5666D;">:all</span><span style="color: #709870;">]</span>
+             <span style="color: #709870;">[</span>info <span style="color: #F5666D;">:refer</span> <span style="color: #F5666D;">:all</span><span style="color: #709870;">]</span><span style="color: #909183;">]</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #7388d6;">[</span>notifications <span style="color: #909183;">(</span>chan<span style="color: #909183;">)</span>
+      follow <span style="color: #909183;">(</span>register notifications<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+
+  <span style="color: #7388d6;">(</span>with-release <span style="color: #909183;">[</span>dev <span style="color: #709870;">(</span>first <span style="color: #907373;">(</span>devices <span style="color: #6276ba;">(</span>first <span style="color: #858580;">(</span>platforms<span style="color: #858580;">)</span><span style="color: #6276ba;">)</span><span style="color: #907373;">)</span><span style="color: #709870;">)</span>
+                 ctx <span style="color: #709870;">(</span>context <span style="color: #907373;">[</span>dev<span style="color: #907373;">]</span><span style="color: #709870;">)</span>
+                 cqueue <span style="color: #709870;">(</span>command-queue-1 ctx dev<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+
+    <span style="color: #909183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #709870;">[</span>host-msg <span style="color: #907373;">(</span>direct-buffer 16<span style="color: #907373;">)</span>
+          work-sizes <span style="color: #907373;">(</span>work-size <span style="color: #6276ba;">[</span>1<span style="color: #6276ba;">]</span><span style="color: #907373;">)</span>
+          program-source <span style="color: #4E9A06;">"__kernel void hello_kernel(__global char16 *msg) {</span>
+<span style="color: #4E9A06;">                            *msg = (char16)('H', 'e', 'l', 'l', 'o', ' ',</span>
+<span style="color: #4E9A06;">                              'k', 'e', 'r', 'n', 'e', 'l', '!', '!', '!', '</span><span style="color: #4E9A06; font-weight: bold;">\\</span><span style="color: #4E9A06;">0');</span>
+<span style="color: #4E9A06;">                          }"</span><span style="color: #709870;">]</span>
+      <span style="color: #709870;">(</span>with-release <span style="color: #907373;">[</span>cl-msg <span style="color: #6276ba;">(</span>cl-buffer ctx 16 <span style="color: #F5666D;">:write-only</span><span style="color: #6276ba;">)</span>
+                     prog <span style="color: #6276ba;">(</span>build-program! <span style="color: #858580;">(</span>program-with-source ctx <span style="color: #80a880;">[</span>program-source<span style="color: #80a880;">]</span><span style="color: #858580;">)</span><span style="color: #6276ba;">)</span>
+                     hello-kernel <span style="color: #6276ba;">(</span>kernel prog <span style="color: #4E9A06;">"hello_kernel"</span><span style="color: #6276ba;">)</span>
+                     read-complete <span style="color: #6276ba;">(</span>event<span style="color: #6276ba;">)</span><span style="color: #907373;">]</span>
+
+        <span style="color: #907373;">(</span>set-args! hello-kernel cl-msg<span style="color: #907373;">)</span>
+        <span style="color: #907373;">(</span>enq-kernel! cqueue hello-kernel work-sizes<span style="color: #907373;">)</span>
+        <span style="color: #907373;">(</span>enq-read! cqueue cl-msg host-msg read-complete<span style="color: #907373;">)</span>
+        <span style="color: #907373;">(</span>follow read-complete host-msg<span style="color: #907373;">)</span>
+        <span style="color: #907373;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #6276ba;">[</span>data ^java.nio.ByteBuffer <span style="color: #858580;">(</span><span style="color: #F5666D;">:data</span> <span style="color: #80a880;">(</span>&lt;!! notifications<span style="color: #80a880;">)</span><span style="color: #858580;">)</span>
+              res ^bytes <span style="color: #858580;">(</span>make-array <span style="color: #2F8B58; font-weight: bold;">Byte</span>/TYPE 16<span style="color: #858580;">)</span><span style="color: #6276ba;">]</span>
+          <span style="color: #6276ba;">(</span><span style="color: #A52A2A; font-weight: bold;">dotimes</span> <span style="color: #858580;">[</span>i 16<span style="color: #858580;">]</span> <span style="color: #858580;">(</span>aset res i <span style="color: #80a880;">(</span>.get data i<span style="color: #80a880;">)</span><span style="color: #858580;">)</span><span style="color: #6276ba;">)</span>
+          <span style="color: #6276ba;">(</span>apply str <span style="color: #858580;">(</span>map <span style="color: #80a880;">(</span>comp char<span style="color: #80a880;">)</span> res<span style="color: #858580;">)</span><span style="color: #6276ba;">)</span><span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+Hello kernel!!! 
+
+</pre>
+
+
+<p>
+In the remainder of the post I will explain what the code does.
+</p>
+
+<p>
+In a simplified world, every host application performs the following steps in order to execute a kernel:
+</p>
+<ol class="org-ol">
+<li>Select an OpenCL device (or multiple devices),</li>
+<li>Create a context for communicating with the device,</li>
+<li>Create a command queue through which the host tells the device what to do,</li>
+<li>Compile and build a kernel (from the source text where the OpenCL program is written),</li>
+<li>Set arguments to the kernel through which data is passed to the kernel or returned from the kernel
+(actually, kernels can not return a result, but can write it to an argument reference),</li>
+<li>Send a kernel to the command queue for execution,</li>
+<li>After the kernel execution, read the results,</li>
+<li>Release all resources.</li>
+</ol>
+
+<p>
+Note that steps 1-3 should be performed once in an application. Once you obtain a reference to a device,
+ context, command queue, you can reuse them multiple times. Similarly, Step 8 should also be performed once,
+ at the end of interacting with your devices. Step 4 can be performed multiple times, meaning several
+ kernels can be built and used with the same context. And in the Step 5 arguments can be reused for multiple kernels.
+</p>
+
+<p>
+In the previous code, most of these steps are achieved in a single line of code.
+So, let's dissect the code from the previous example and associate it with these steps.
+</p>
+
+<p>
+In lines 11-12, a clojure channel is created called notifications, and we create a function follow
+ that will be used for creating callbacks fro events coming from the command queue. This can be pretty
+ handy as Clojure’s channels can be used for communicating between different threads.
+</p>
+
+<p>
+Next, in line 14, from the available OpenCL platforms (represented by the function platforms)
+ we select the OpenCL platform to be used (Step 1). On my MacBook Pro (mid 2014) I know I have
+ only one OpenCL platform called Apple.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>name-info <span style="color: #7388d6;">(</span>first <span style="color: #909183;">(</span>platforms<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #204A87;">;;</span><span style="color: #204A87;">=&gt; "Apple"</span>
+</pre>
+</div>
+
+<pre class="example">
+AMD Accelerated Parallel Processing
+
+</pre>
+
+<p>
+And on my platform, I have two devices supporting OpenCL, my processor and my graphics card.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>map name-info <span style="color: #7388d6;">(</span>devices <span style="color: #909183;">(</span>first <span style="color: #709870;">(</span>platforms<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #204A87;">;;</span><span style="color: #204A87;">=&gt; ("Intel(R) Core(TM) i5-4278U CPU @ 2.60GHz" "Iris")</span>
+</pre>
+</div>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-left" />
+
+<col  class="org-left" />
+</colgroup>
+<tbody>
+<tr>
+<td class="org-left">Hawaii</td>
+<td class="org-left">Intel(R) Core(TM) i7-4790K CPU @ 4.00GHz</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+In our example we can choose either of them to execute the sample kernel.
+</p>
+
+<p>
+Once the device is set (in my case my CPU), in line 15 we create a context ctx for communicating
+ with the CPU (Step 2) and the command queue cqueue through which we will send the kernel and read
+ the results (Step 3). Note that here I am using a legacy version of the function for creating
+the command queue command-queue-1. The legacy function is intended to be used for devices that do
+ support OpenCL 1.2 or older versions. And since my CPU is supporting only OpenCL 1.2, I need
+to use the legacy version.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>device-version <span style="color: #7388d6;">(</span>first <span style="color: #909183;">(</span>devices <span style="color: #709870;">(</span>first <span style="color: #907373;">(</span>platforms<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #204A87;">; </span><span style="color: #204A87;">=&gt; "OpenCL 1.2 "</span>
+</pre>
+</div>
+
+<pre class="example">
+OpenCL 2.0 AMD-APP (1912.5)
+
+</pre>
+
+<p>
+If your device(s) support OpenCL 2.0, you simply use the regular command-queue function.
+</p>
+
+<p>
+Continuing with our example, in lines 18-20, we are setting up some variables we need later.
+We create a byte buffer of size 16, called host-msg, to store the result returned from the kernel.
+In the following line, we initialize the work-sizes record that will be used later when enqueuing
+ the kernel to the command queue (I will get back to this later). And finally, we define our OpenCL
+ program to be executed. It is preferred to store this program code in a separate file,
+but I wanted to have a self-contained example here.
+</p>
+
+<p>
+Next, in line 24, we call the cl-buffer function. This creates an OpenCL data structure that represents
+ a memory object and can have specific properties. In our case, we create a 16-byte memory object, called cl-msg,
+ that can only be written to by an OpenCL program (hence the :write-only flag).
+</p>
+
+<p>
+In line 25 we compile our OpenCL program and build it so it can be used with all devices
+ (the build-program! function). And finally, in the following line, we create a kernel
+ from the compiled program with a name “hello<sub>kernel</sub>” (Step 4).
+</p>
+
+<p>
+In line 27, we create an instance of the OpenCL’s event that we will use later.
+</p>
+
+<p>
+Next, we come to the line 29 where we set arguments to be passed to the kernel (Step 5).
+We pass the cl-msg memory object to the kernel and in line 30 we enqueue the kernel to the command queue (Step 6).
+ As already mentioned, a kernel can not return a result as in most programming languages.
+But the usual approach is to write the result of an execution (or in our case write the message)
+to an argument reference. In our program, after the kernel is executed, the program enqueues
+ a read operation from the cl-msg (line 31). We are also supplying a read-complete event that
+ will notify us when the read operation completes. After that, we are invoking the follow function
+ that registers a callback to the event read-complete and pass it a also the host-msg as
+ a memory reference where the result should be read from. Finally, in the remainder of the code,
+we are reading from the notifications channel (once there is an event in the channel),
+fetching the result data (that is initially stored in a byte buffer) and storing it to
+ a byte variable res that is more convenient to work with (Step 7).
+</p>
+
+<p>
+What I missed on purposely (so I can explain it here in the end) is that all resources,
+after you finish working with them, should be released, i.e. the memory they occupied should be freed.
+ This includes releasing all references to memory objects, kernels, command queues, programs and contexts.
+We perform this by encapsulating the code with the with-release macro.
+The purpose of this macro is to bind releasable elements to symbols (like we do in let section),
+ evaluate the body, and at the end release the resources.
+</p>
+
+<p>
+In the next post, I’ll continue with dissecting the examples from the OpenCL in Action book.
+I know this post is a bit lengthy since I wanted to introduce the basic OpenCL concepts
+ and the flow of the kernel execution from the host program.
+But hopefully, this text helped you understand these concepts and you can follow the upcoming posts
+ with more advanced examples.
+</p>
+
+<p>
+Guest post by Nikola Milkic
+</p>
+</div>
+</div>
+</div>
