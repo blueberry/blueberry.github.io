@@ -2,20 +2,15 @@
 <header>
     <nav class="group">
 	<a href="{{site.baseurl}}/"><img class="badge" src="{{site.baseurl}}/assets/img/dragan.png" alt="CH"></a>
-        {% for entry in site.data.social %}
-        <a href="{{ entry.link }}"><span class="{{ entry.icon }}"></span></a>
-        {% endfor %}
 	{% for node in site.pages %}
-		{% unless node.nav_exclude %}
-		    {% if page.url == node.url %}
-		      <a class="active" href="{{node.url | prepend: site.baseurl}}" class="active">{{node.title}}</a>
-		    {% else %}
-		      <a href="{{node.url | prepend: site.baseurl}}">{{node.title}}</a>
-		    {% endif %}
-	    {% endunless %}
-  	              {% endfor %}
-
-                          <a href="https://www.patreon.com/bePatron?u=780511" data-patreon-widget-type="become-patron-button">Donate and become a Patron!</a><script async src="https://c6.patreon.com/becomePatronButton.bundle.js"></script>
+	{% unless node.nav_exclude %}
+	{% if page.url == node.url %}
+	<a class="active" href="{{node.url | prepend: site.baseurl}}" class="active">{{node.title}}</a>
+	{% else %}
+	<a href="{{node.url | prepend: site.baseurl}}">{{node.title}}</a>
+	{% endif %}
+	{% endunless %}
+  	{% endfor %}
+        <p><a href="https://www.patreon.com/bePatron?u=780511" data-patreon-widget-type="become-patron-button">Donate and become a Patron!</a><script async src="https://c6.patreon.com/becomePatronButton.bundle.js"></script></p>
     </nav>
-    <a href="https://patreon.com/draganrocks">Please support my work on Patreon</a> by <a href="https://dragan.rocks/articles/18/Patreon-Announcement-Adopt-a-Function">adopting a pet Neanderthal function in your name!</a> I'll intive you to a <a href="https://dragan.rocks/articles/18/Ditching-Slack-Opening-Place-Personal-Interaction">dedicated discussion server</a>. Can't afford to donate? Ask for a free invite.
 </header>

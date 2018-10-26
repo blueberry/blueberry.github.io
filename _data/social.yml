@@ -1,6 +1,9 @@
 - link: //www.twitter.com/draganrocks
   icon: icon-twitter
+  label: draganrocks
 - link: //github.com/uncomplicate
   icon: icon-github
+  label: Uncomplicate on Github
 - link: /feed.xml
   icon: icon-feed
+  label: Feed

@@ -1,14 +1,23 @@
 <footer>
-    <a href="https://patreon.com/draganrocks">Please support my work on Patreon</a> by <a href="https://dragan.rocks/articles/18/Patreon-Announcement-Adopt-a-Function">adopting a pet Neanderthal function in your name!</a> I'll intive you to a <a href="https://dragan.rocks/articles/18/Ditching-Slack-Opening-Place-Personal-Interaction">dedicated discussion server</a>. Can't afford to donate? Ask for a free invite.
+    <p>
+        <a href="https://patreon.com/draganrocks">Please support my work on Patreon</a> by <a href="https://dragan.rocks/articles/18/Patreon-Announcement-Adopt-a-Function">adopting a pet Neanderthal function!</a> I'll intive you to a <a href="https://dragan.rocks/articles/18/Ditching-Slack-Opening-Place-Personal-Interaction">dedicated discussion server</a>. Can't afford to <a href="https://patreon.com/draganrocks">donate</a>? Ask for a free invite.
+        </p>
+    <p>
+        Please spread the word: <a class="twitter-share-button" href="https://twitter.com/intent/tweet" data-size="large"> Please share on Twitter.</a>
+    </p>
+
   <hr class="slender">
   <ul class="footer-links">
       {% for entry in site.data.social %}
       <li>
-        <a href="{{ entry.link }}"><span class="{{ entry.icon }}"></span></a>
+        <a href="{{ entry.link }}"><span class="{{ entry.icon }}"></span> {{entry.label}}</a>
       </li>
     {% endfor %}
   </ul>
 <div class="credits">
-<span>&copy; {{ site.time | date: '%Y' }} &nbsp;&nbsp;{{site.author | upcase }}</span></br> <br>
+    <span>&copy; {{ site.time | date: '%Y' }} &nbsp;&nbsp;{{site.author | upcase }}</span></br> <br>
+    <span>Created with the <a href="//github.com/clayh53/tufte-jekyll">Tufte theme </a>.</span>
+
 </div>
+
 </footer>
