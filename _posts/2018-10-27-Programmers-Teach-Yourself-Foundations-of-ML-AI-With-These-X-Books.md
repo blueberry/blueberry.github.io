@@ -1,7 +1,7 @@
 ---
 author: dragan
 layout: post
-title:  "Programmers, Teach Yourself Foundations of ML and AI with these 6 Books"
+title:  "Programmer, Teach Yourself Foundations of ML and AI with these 6 Books"
 date:   2018-10-27 16:50
 categories: Machine Learning, AI, Programming, Clojure, Bayes, Uncomplicate
 excerpt: Here's what I recommend to programmers if they want to understand machine learning. Six fantastic books that you can work with in your spare time to build yourself a solid foundation for data analysis, deep learning and the likes.
