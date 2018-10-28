@@ -18,7 +18,7 @@ in the shape of a nice formula in which you can plug the data in and get determi
 Few things in the real world are deterministic. Anything can happen, but it does not have to.
 Even when we can't be certain, there are ways to discover how these random things tend to turn out.
 
-## [Ian Hacking - Introduction to probability and Inductive Logic](https://https://www.goodreads.com/book/show/1446899.An_Introduction_to_Probability_and_Inductive_Logic)
+## [Ian Hacking - Introduction to probability and Inductive Logic](https://www.goodreads.com/book/show/1446899.An_Introduction_to_Probability_and_Inductive_Logic)
 
 Probability is (or should be!) always on the "to learn" list of a programmer entering
 any data analysis related field. But how to learn it? Most texts are rather abstract and theory oriented,
