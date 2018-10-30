@@ -229,7 +229,7 @@ and refer you to research articles, but it would be rather difficult to piece to
 understanding of how modern high performance implementations of back propagation work, if you are
 not a researcher working in the field.
 
-This [free online]((http://neuralnetworksanddeeplearning.com/) book by Michael Nielsen is an excellent tutorial that teaches the basics of both
+This [free online](http://neuralnetworksanddeeplearning.com/) book by Michael Nielsen is an excellent tutorial that teaches the basics of both
 how neural networks and deep learning are used *and how back propagation is implemented*, step-by-step.
 Of course, you won't be able to implement TensorFlow, PyTorch, or cuDNN, but you'll have a pretty
 good idea of the main magic behind these.
