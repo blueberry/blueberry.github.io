@@ -127,7 +127,7 @@ that leads to probability \(\frac{1}{2}\).
 </div>
 
 <pre class="example">
-10/21
+class clojure.lang.Compiler$CompilerExceptionclass clojure.lang.Compiler$CompilerExceptionCompilerException java.lang.RuntimeException: Unable to resolve symbol: probability-matching-randy in this context, compiling:(/tmp/form-init2034739014375299246.clj:1:1)
 
 </pre>
 </div>
@@ -149,35 +149,14 @@ the combination.
       b <span style="color: #909183;">(</span>range 100<span style="color: #909183;">)</span>
       <span style="color: #F5666D;">:let</span> <span style="color: #909183;">[</span>p <span style="color: #709870;">(</span>probability-matching-randy r b<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
       <span style="color: #F5666D;">:when</span> <span style="color: #909183;">(</span>= 1/2 p<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
-      <span style="color: #7388d6;">[</span>r b<span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+  <span style="color: #7388d6;">[</span>r b<span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
-<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+<pre class="example">
+class clojure.lang.Compiler$CompilerExceptionclass clojure.lang.Compiler$CompilerExceptionCompilerException java.lang.RuntimeException: Unable to resolve symbol: probability-matching-randy in this context, compiling:(/tmp/form-init2034739014375299246.clj:3:15)
 
-
-<colgroup>
-<col  class="org-right" />
-
-<col  class="org-right" />
-</colgroup>
-<tbody>
-<tr>
-<td class="org-right">3</td>
-<td class="org-right">1</td>
-</tr>
-
-<tr>
-<td class="org-right">15</td>
-<td class="org-right">6</td>
-</tr>
-
-<tr>
-<td class="org-right">85</td>
-<td class="org-right">35</td>
-</tr>
-</tbody>
-</table>
+</pre>
 
 <p>
 Apparently, I either have 3 Randy and 1 Butters socks (and an unmatched pair lost somewhere on travel),
@@ -207,26 +186,10 @@ and the sequences are wasteful, but we'll use some imagination here to pretend t
 </pre>
 </div>
 
-<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+<pre class="example">
+class clojure.lang.Compiler$CompilerExceptionclass clojure.lang.Compiler$CompilerExceptionCompilerException java.lang.RuntimeException: Unable to resolve symbol: probability-matching-randy in this context, compiling:(/tmp/form-init2034739014375299246.clj:6:35)
 
-
-<colgroup>
-<col  class="org-right" />
-
-<col  class="org-right" />
-</colgroup>
-<tbody>
-<tr>
-<td class="org-right">Randy</td>
-<td class="org-right">Butters</td>
-</tr>
-
-<tr>
-<td class="org-right">15</td>
-<td class="org-right">6</td>
-</tr>
-</tbody>
-</table>
+</pre>
 
 <p>
 21 socks. Cool.
@@ -269,7 +232,7 @@ bound of possible \(r\)'s when we decide on \(b\) 's, and only need to test thes
 <div class="org-src-container">
 <pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">smallest-randy</span> <span style="color: #7388d6;">[</span>b<span style="color: #7388d6;">]</span>
   <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">if</span> <span style="color: #909183;">(</span>&lt;= 0 b<span style="color: #909183;">)</span>
-      <span style="color: #909183;">(</span>long <span style="color: #709870;">(</span><span style="color: #2F8B58; font-weight: bold;">Math</span>/ceil <span style="color: #907373;">(</span>* <span style="color: #6276ba;">(</span>inc <span style="color: #858580;">(</span><span style="color: #2F8B58; font-weight: bold;">Math</span>/sqrt 2<span style="color: #858580;">)</span><span style="color: #6276ba;">)</span> b<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span>
+    <span style="color: #909183;">(</span>long <span style="color: #709870;">(</span><span style="color: #2F8B58; font-weight: bold;">Math</span>/ceil <span style="color: #907373;">(</span>* <span style="color: #6276ba;">(</span>inc <span style="color: #858580;">(</span><span style="color: #2F8B58; font-weight: bold;">Math</span>/sqrt 2<span style="color: #858580;">)</span><span style="color: #6276ba;">)</span> b<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span>
     0<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
@@ -280,7 +243,7 @@ bound of possible \(r\)'s when we decide on \(b\) 's, and only need to test thes
 </div>
 
 <pre class="example">
-3
+class clojure.lang.Compiler$CompilerExceptionclass clojure.lang.Compiler$CompilerExceptionCompilerException java.lang.RuntimeException: Unable to resolve symbol: smallest-randy in this context, compiling:(/tmp/form-init2034739014375299246.clj:1:1)
 
 </pre>
 
@@ -294,52 +257,14 @@ What's left is to try a range of \(b\) s and check whether the corresponding \(r
                      <span style="color: #907373;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #6276ba;">[</span>candidate-r <span style="color: #858580;">(</span>smallest-randy b<span style="color: #858580;">)</span>
                            pr-2-r <span style="color: #858580;">(</span>probability-matching-randy candidate-r b<span style="color: #858580;">)</span><span style="color: #6276ba;">]</span>
                        <span style="color: #6276ba;">[</span>b candidate-r pr-2-r <span style="color: #858580;">(</span>= 1/2 pr-2-r<span style="color: #858580;">)</span><span style="color: #6276ba;">]</span><span style="color: #907373;">)</span><span style="color: #709870;">)</span>
-                     <span style="color: #709870;">(</span>range 2 1000 2<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+                   <span style="color: #709870;">(</span>range 2 1000 2<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
-<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+<pre class="example">
+class clojure.lang.Compiler$CompilerExceptionclass clojure.lang.Compiler$CompilerExceptionCompilerException java.lang.RuntimeException: Unable to resolve symbol: smallest-randy in this context, compiling:(/tmp/form-init2034739014375299246.clj:3:40)
 
-
-<colgroup>
-<col  class="org-right" />
-
-<col  class="org-right" />
-
-<col  class="org-left" />
-
-<col  class="org-left" />
-</colgroup>
-<tbody>
-<tr>
-<td class="org-right">Butters</td>
-<td class="org-right">Randy</td>
-<td class="org-left">P(Randy, Randy)</td>
-<td class="org-left">1/2?</td>
-</tr>
-
-<tr>
-<td class="org-right">2</td>
-<td class="org-right">5</td>
-<td class="org-left">10/21</td>
-<td class="org-left">false</td>
-</tr>
-
-<tr>
-<td class="org-right">4</td>
-<td class="org-right">10</td>
-<td class="org-left">45/91</td>
-<td class="org-left">false</td>
-</tr>
-
-<tr>
-<td class="org-right">6</td>
-<td class="org-right">15</td>
-<td class="org-left">1/2</td>
-<td class="org-left">true</td>
-</tr>
-</tbody>
-</table>
+</pre>
 
 <p>
 I should probably not buy more socks. I have at least 7 matching pairs of Randy's, after all.
