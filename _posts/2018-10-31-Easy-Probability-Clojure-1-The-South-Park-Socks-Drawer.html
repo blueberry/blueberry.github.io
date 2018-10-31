@@ -1,0 +1,390 @@
+---
+date: 2018-10-31
+tags:
+- Clojure
+- data analysis
+- probability
+- beginners
+author: dragan
+layout: post
+title: Easy Probability and Clojure - 1 - The South Park Socks Drawer
+excerpt: Beginner friendly Clojure solutions to the 50 Challenging Problems in Probability book. Problem 1, The Sock Drawer.
+categories:
+- Clojure
+- data analysis
+- probability
+- beginners
+---
+
+<div id="outline-container-org0ccc731" class="outline-2">
+<h2 id="org0ccc731">Introduction to the Easy Probability and Clojure series</h2>
+<div class="outline-text-2" id="text-org0ccc731">
+<p>
+Lots of programmers would like to learn to analyze data or "do AI", and the understanding of probability is
+the fundamental skill. There is a lot of assumed knowledge before you can do anything on your own,
+rather than blindly following image classification tutorials for the 17th time. It takes time to grow it, though.
+</p>
+
+<p>
+The pat shouldn't be overwhelming, though, at least its beginning, or you'd quickly drop out.
+It should be a relaxing activity after work, rather than the thing that shows off and convinces you
+that you'd never make it. An easy start.
+</p>
+
+<p>
+This is the first part in a series of Clojure &amp; Probability tutorials, which will be solving interesting
+probability puzzles from the classic book <a href="https://books.google.rs/books?id=8EDCAgAAQBAJ&amp;printsec=frontcover#v=onepage&amp;q&amp;f=false">50 Challenging Problems in Probability</a>. It's a collection of
+exercises similar to <a href="https://mitpress.mit.edu/books/little-schemer-fourth-edition">The Little Schemer</a>, but for probability.
+You may prefer to also read some probability prose; see <a href="./Programmers-Teach-Yourself-Foundations-of-ML-AI-With-These-X-Books">my recommendation</a>.
+</p>
+
+<p>
+This series does not require any fancy high performance library (such as <a href="https://github.com/uncomplicate">Neanderthal, ClojureCUDA, or Bayadera)</a>.
+Even Clojure beginners can follow it and sharpen up their Clojure skills while learning probability.
+An easy first step to kickstart you towards more advanced topics.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org24b9e2b" class="outline-2">
+<h2 id="org24b9e2b"><a href="https://books.google.rs/books?id=8EDCAgAAQBAJ&amp;printsec=frontcover#v=onepage&amp;q&amp;f=false">The Sock Drawer</a></h2>
+<div class="outline-text-2" id="text-org24b9e2b">
+<p>
+I am giving a talk at the <a href="https://codesync.global/conferences/code-mesh-2018/#Schedule">Code Mesh 2018</a>
+conference next week. I noticed long ago that many functional programmers wear cool
+socks and I bought a few pairs for special occasions. In one of my drawers, I keep South Park themed ones.
+I do not wear them regularly, but only when it's on air, and only at programming conferences.
+</p>
+
+<p>
+I am not even sure how many pairs I have. I only remember vaguely that I bought a few with <a href="http://southpark.wikia.com/wiki/Randy_Marsh">Randy Marsh</a>
+and some with <a href="http://southpark.wikia.com/wiki/Butters_Stotch">Butters</a> on them. It's a hard-headed drawer; it does not let me open it and take a peek.
+When I randomly draw a pair, the probability that I get a matching pair of Randy's is \(\frac{1}{2}\).
+</p>
+
+<p>
+I wonder if I'll have enough socks for my trip to London, so I would like to know
+a) how small can the number of socks in that drawer be? b) How small can it be if I know that I've
+never lost a Butters sock without losing its pair? Should I buy more socks?
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgeee04ff" class="outline-2">
+<h2 id="orgeee04ff">Solution</h2>
+<div class="outline-text-2" id="text-orgeee04ff">
+<p>
+The book <a href="https://books.google.rs/books?id=8EDCAgAAQBAJ&amp;printsec=frontcover#v=onepage&amp;q&amp;f=false">50 Challenging Problems in Probability with Solutions by Frederick Mosteller</a>,
+which I've taken this problem from, also discusses the solutions. This nice little book costs
+$6.34, but if it's inconvenient for you to buy, the Google Books preview that I linked to,
+offers most pages for free reading, including page 15, which contains the solution to this problem, The Sock Drawer.
+Therefore, I won't use many words to describe it; <a href="https://books.google.rs/books?id=8EDCAgAAQBAJ&amp;printsec=frontcover#v=onepage&amp;q&amp;f=false">help yourself</a>. It's better to devote time
+to discuss some nice beginner-friendly code that implements it.
+</p>
+
+<p>
+The probability of the first sock that I draw being Randy is \(\frac{r}{r+b}\), and the second \(\frac{r-1}{r+b-1}\),
+since there is one sock less left in the drawer, and that one is mister Marsh.
+The probability of both events occuring is the product of these two, and I know it's \(\frac{1}{2}\):
+</p>
+
+<p>
+Mosteller describes it nicely with this equality
+</p>
+
+<p>
+\(P(R,R) = \frac{r}{r + b} \times \frac{r - 1}{r + b - 1} = \frac{1}{2}\)
+</p>
+
+<p>
+and then tests it for a particular combination of \(r=5\) and \(b=2\).
+</p>
+
+<p>
+This arithmetic is simple to code and fast to execute on the computer, so I wrote a function to do that
+for me for any combination of Randy and Butters socks.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">probability-matching-randy</span> <span style="color: #7388d6;">[</span>r b<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">if</span> <span style="color: #909183;">(</span>&lt;= 2 r<span style="color: #909183;">)</span>
+    <span style="color: #909183;">(</span><span style="color: #A52A2A; font-weight: bold;">if</span> <span style="color: #709870;">(</span>&lt;= 0 b<span style="color: #709870;">)</span>
+      <span style="color: #709870;">(</span>* <span style="color: #907373;">(</span>/ r <span style="color: #6276ba;">(</span>+ r b<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span>
+         <span style="color: #907373;">(</span>/ <span style="color: #6276ba;">(</span>- r 1<span style="color: #6276ba;">)</span> <span style="color: #6276ba;">(</span>+ r b -1<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span><span style="color: #709870;">)</span>
+      1<span style="color: #909183;">)</span>
+    0<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Try it with 5 and 2, and we get the same result as in the book: 5 and 2 is not a combination
+that leads to probability \(\frac{1}{2}\).
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>probability-matching-randy 5 2<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+10/21
+
+</pre>
+</div>
+</div>
+
+<div id="outline-container-orgc298582" class="outline-2">
+<h2 id="orgc298582">Brute force</h2>
+<div class="outline-text-2" id="text-orgc298582">
+<p>
+The naive solution is to try as many combinations as we can construct, and accept those
+that lead to the desired result. Clojure's <a href="https://clojuredocs.org/clojure.core/for">list comprehensions</a> can do that for me.
+For each combination of numbers that <a href="https://clojuredocs.org/clojure.core/for">for</a> gives me, I calculate the probability
+of a matching pair of Randy socks, and when that probability is \(\frac{1}{2}\) I keep
+the combination.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">for</span> <span style="color: #7388d6;">[</span>r <span style="color: #909183;">(</span>range 100<span style="color: #909183;">)</span>
+      b <span style="color: #909183;">(</span>range 100<span style="color: #909183;">)</span>
+      <span style="color: #F5666D;">:let</span> <span style="color: #909183;">[</span>p <span style="color: #709870;">(</span>probability-matching-randy r b<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+      <span style="color: #F5666D;">:when</span> <span style="color: #909183;">(</span>= 1/2 p<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+      <span style="color: #7388d6;">[</span>r b<span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-right" />
+
+<col  class="org-right" />
+</colgroup>
+<tbody>
+<tr>
+<td class="org-right">3</td>
+<td class="org-right">1</td>
+</tr>
+
+<tr>
+<td class="org-right">15</td>
+<td class="org-right">6</td>
+</tr>
+
+<tr>
+<td class="org-right">85</td>
+<td class="org-right">35</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+Apparently, I either have 3 Randy and 1 Butters socks (and an unmatched pair lost somewhere on travel),
+or 15 Randy socks and 3 pairs of Butters, or a whole lotta socks in that drawer.
+</p>
+
+<p>
+But, remember that I am pretty sure that I've never lost a Butters sock! I have to check
+only combinations with even numbers of \(b\) 's! I could have changed the <code>:when</code> clause to
+<code>(and (even? b) (= 1/2 p))</code> but in that case, <code>probability-matching-randy</code> would have been called twice as often.
+It's not an issue in this trivial program which is not optimized anyway, but I'll try to
+introduce some good practices for high performance code on the way, so here it is: don't
+call expensive computations when you don't have to (<code>probability-matching-randy</code> is rather cheap, while <code>for</code>
+and the sequences are wasteful, but we'll use some imagination here to pretend that
+<code>probability-matching-randy</code> is a beast).
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>cons <span style="color: #7388d6;">[</span><span style="color: #4E9A06;">"Randy"</span> <span style="color: #4E9A06;">"Butters"</span><span style="color: #7388d6;">]</span>
+      <span style="color: #7388d6;">(</span>take 1 <span style="color: #909183;">(</span>filter identity
+                      <span style="color: #709870;">(</span><span style="color: #A52A2A; font-weight: bold;">for</span> <span style="color: #907373;">[</span>r <span style="color: #6276ba;">(</span>range 100<span style="color: #6276ba;">)</span>
+                            b <span style="color: #6276ba;">(</span>range 100<span style="color: #6276ba;">)</span><span style="color: #907373;">]</span>
+                        <span style="color: #907373;">(</span><span style="color: #A52A2A; font-weight: bold;">when</span> <span style="color: #6276ba;">(</span>even? b<span style="color: #6276ba;">)</span>
+                          <span style="color: #6276ba;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #858580;">[</span>p <span style="color: #80a880;">(</span>probability-matching-randy r b<span style="color: #80a880;">)</span><span style="color: #858580;">]</span>
+                            <span style="color: #858580;">(</span><span style="color: #A52A2A; font-weight: bold;">when</span> <span style="color: #80a880;">(</span>= 1/2 p<span style="color: #80a880;">)</span>
+                              <span style="color: #80a880;">[</span>r b<span style="color: #80a880;">]</span><span style="color: #858580;">)</span><span style="color: #6276ba;">)</span><span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-right" />
+
+<col  class="org-right" />
+</colgroup>
+<tbody>
+<tr>
+<td class="org-right">Randy</td>
+<td class="org-right">Butters</td>
+</tr>
+
+<tr>
+<td class="org-right">15</td>
+<td class="org-right">6</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+21 socks. Cool.
+</p>
+
+<p>
+We have had to try <b>all</b> combinations to discover the ones that match the condition. As soon as the problems
+start being a little bit more complex, we'd have lots of combinations to check. Real-world problems grow
+beyond what computers can scale rather quickly with naive brute force search. Machine learning, data analysis, and related fields rely on finding
+clever ways to avoid trying out the majority of possible combinations, and only trying those that have
+some chance of being relevant.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgc6ddaae" class="outline-2">
+<h2 id="orgc6ddaae">A little help from analysis</h2>
+<div class="outline-text-2" id="text-orgc6ddaae">
+<p>
+Toy examples are good to showcase simple shortcuts.
+</p>
+
+<p>
+It would be nice if we could do some arithmetic operation on
+\(\frac{r}{r + b} \times \frac{r - 1}{r + b - 1} = \frac{1}{2}\) to get an easy expression such as
+\(r = \alpha b + \beta\). Try yourself and see how it goes. I couldn't get anywhere.
+</p>
+
+<p>
+However, Mosteller cleverly sees that, while we can not establish an easy equality, there is
+a tidy <i>inequality</i> that can help us: \(\frac{r}{r + b} > \frac{r - 1}{r + b - 1}\), for \(b>0\).
+</p>
+
+<p>
+He plugs it in, and gets \({(\frac{r}{r + b})}^2 > \frac{1}{2} > {(\frac{r - 1}{r + b - 1})}^2\), which
+can be worked with to give us \((\sqrt{2} + 1)b + 1 > r > (\sqrt{2} + 1) b\). Now we have a lower and upper
+bound of possible \(r\)'s when we decide on \(b\) 's, and only need to test these, or, in this case, only one:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">smallest-randy</span> <span style="color: #7388d6;">[</span>b<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">if</span> <span style="color: #909183;">(</span>&lt;= 0 b<span style="color: #909183;">)</span>
+      <span style="color: #909183;">(</span>long <span style="color: #709870;">(</span><span style="color: #2F8B58; font-weight: bold;">Math</span>/ceil <span style="color: #907373;">(</span>* <span style="color: #6276ba;">(</span>inc <span style="color: #858580;">(</span><span style="color: #2F8B58; font-weight: bold;">Math</span>/sqrt 2<span style="color: #858580;">)</span><span style="color: #6276ba;">)</span> b<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span>
+    0<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>smallest-randy 1<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+3
+
+</pre>
+
+<p>
+What's left is to try a range of \(b\) s and check whether the corresponding \(r\) gives a match:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>cons <span style="color: #7388d6;">[</span><span style="color: #4E9A06;">"Butters"</span> <span style="color: #4E9A06;">"Randy"</span> <span style="color: #4E9A06;">"P(Randy, Randy)"</span> <span style="color: #4E9A06;">"1/2?"</span><span style="color: #7388d6;">]</span>
+      <span style="color: #7388d6;">(</span>take 3 <span style="color: #909183;">(</span>map <span style="color: #709870;">(</span><span style="color: #A52A2A; font-weight: bold;">fn</span> <span style="color: #907373;">[</span>b<span style="color: #907373;">]</span>
+                     <span style="color: #907373;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #6276ba;">[</span>candidate-r <span style="color: #858580;">(</span>smallest-randy b<span style="color: #858580;">)</span>
+                           pr-2-r <span style="color: #858580;">(</span>probability-matching-randy candidate-r b<span style="color: #858580;">)</span><span style="color: #6276ba;">]</span>
+                       <span style="color: #6276ba;">[</span>b candidate-r pr-2-r <span style="color: #858580;">(</span>= 1/2 pr-2-r<span style="color: #858580;">)</span><span style="color: #6276ba;">]</span><span style="color: #907373;">)</span><span style="color: #709870;">)</span>
+                     <span style="color: #709870;">(</span>range 2 1000 2<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+</colgroup>
+<tbody>
+<tr>
+<td class="org-right">Butters</td>
+<td class="org-right">Randy</td>
+<td class="org-left">P(Randy, Randy)</td>
+<td class="org-left">1/2?</td>
+</tr>
+
+<tr>
+<td class="org-right">2</td>
+<td class="org-right">5</td>
+<td class="org-left">10/21</td>
+<td class="org-left">false</td>
+</tr>
+
+<tr>
+<td class="org-right">4</td>
+<td class="org-right">10</td>
+<td class="org-left">45/91</td>
+<td class="org-left">false</td>
+</tr>
+
+<tr>
+<td class="org-right">6</td>
+<td class="org-right">15</td>
+<td class="org-left">1/2</td>
+<td class="org-left">true</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+I should probably not buy more socks. I have at least 7 matching pairs of Randy's, after all.
+</p>
+
+<p>
+To help Randy socks stay in matching pairs just like Butters, please <a href="https://patreon.com/draganrocks">pledge donations on Patreon</a> to support my work
+on Clojure high performance, data analysis, and ML libraries. If you'd rather like that I keep losing odd
+Randy socks but still continue writing this series at a good pace, then consider <a href="https://patreon.com/draganrocks">pledging donations for my Patreon campaign</a>.
+If you prefer that I stop goofing around with South Park socks and use Bernoulli urns with this kind of problems,
+<a href="https://patreon.com/draganrocks">supporting my work on Patreon</a> is a slam dunk.
+</p>
+
+<p>
+And, since it's Halloween today, I created a <a href="https://patreon.com/draganrocks">special tier on Patreon</a> for 3 Halloween Backers, which is available only today!
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgdc7e06b" class="outline-2">
+<h2 id="orgdc7e06b">What could go wrong?</h2>
+<div class="outline-text-2" id="text-orgdc7e06b">
+<p>
+Nice and easy, right? The greatest help in discovering the minimal number of socks was that <i>I knew</i>
+the probability \(\frac{1}{2}\). In a real world problem, part of the problem would be to <i>estimate</i> that
+from previous data.
+</p>
+
+<p>
+Next, we wouldn't know what's inside the drawer. Maybe there are other socks inside, but there may be
+lions and tigers, too. Additionally, who cares about socks? We would probably have to estimate a more
+subtle thing, such as the expected value of second-hand socks. That changes over time. Not only that,
+but the contents of the drawer would change over time. And nobody would tell you, but things outside
+the drawer would also have influence on the drawer. The drawer would influence them, too.
+</p>
+
+<p>
+Hey, I do not think <i>that</i> kind of problem would be easy to tackle with naive solutions. We would
+probably need lots of higher level math, and then specialized algorithms to enable that math to be
+<del>calculated</del> estimated in a finite amount of time.
+</p>
+
+<p>
+Luckily, we will keep with these nice little puzzles and take a humble path to our understanding of probability,
+at least in this series.
+</p>
+</div>
+</div>
