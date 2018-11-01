@@ -127,7 +127,7 @@ that leads to probability \(\frac{1}{2}\).
 </div>
 
 <pre class="example">
-class clojure.lang.Compiler$CompilerExceptionclass clojure.lang.Compiler$CompilerExceptionCompilerException java.lang.RuntimeException: Unable to resolve symbol: probability-matching-randy in this context, compiling:(/tmp/form-init2034739014375299246.clj:1:1)
+10/21
 
 </pre>
 </div>
@@ -153,10 +153,31 @@ the combination.
 </pre>
 </div>
 
-<pre class="example">
-class clojure.lang.Compiler$CompilerExceptionclass clojure.lang.Compiler$CompilerExceptionCompilerException java.lang.RuntimeException: Unable to resolve symbol: probability-matching-randy in this context, compiling:(/tmp/form-init2034739014375299246.clj:3:15)
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
 
-</pre>
+
+<colgroup>
+<col  class="org-right" />
+
+<col  class="org-right" />
+</colgroup>
+<tbody>
+<tr>
+<td class="org-right">3</td>
+<td class="org-right">1</td>
+</tr>
+
+<tr>
+<td class="org-right">15</td>
+<td class="org-right">6</td>
+</tr>
+
+<tr>
+<td class="org-right">85</td>
+<td class="org-right">35</td>
+</tr>
+</tbody>
+</table>
 
 <p>
 Apparently, I either have 3 Randy and 1 Butters socks (and an unmatched pair lost somewhere on travel),
@@ -186,10 +207,26 @@ and the sequences are wasteful, but we'll use some imagination here to pretend t
 </pre>
 </div>
 
-<pre class="example">
-class clojure.lang.Compiler$CompilerExceptionclass clojure.lang.Compiler$CompilerExceptionCompilerException java.lang.RuntimeException: Unable to resolve symbol: probability-matching-randy in this context, compiling:(/tmp/form-init2034739014375299246.clj:6:35)
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
 
-</pre>
+
+<colgroup>
+<col  class="org-right" />
+
+<col  class="org-right" />
+</colgroup>
+<tbody>
+<tr>
+<td class="org-right">Randy</td>
+<td class="org-right">Butters</td>
+</tr>
+
+<tr>
+<td class="org-right">15</td>
+<td class="org-right">6</td>
+</tr>
+</tbody>
+</table>
 
 <p>
 21 socks. Cool.
@@ -243,7 +280,7 @@ bound of possible \(r\)'s when we decide on \(b\) 's, and only need to test thes
 </div>
 
 <pre class="example">
-class clojure.lang.Compiler$CompilerExceptionclass clojure.lang.Compiler$CompilerExceptionCompilerException java.lang.RuntimeException: Unable to resolve symbol: smallest-randy in this context, compiling:(/tmp/form-init2034739014375299246.clj:1:1)
+3
 
 </pre>
 
@@ -261,10 +298,48 @@ What's left is to try a range of \(b\) s and check whether the corresponding \(r
 </pre>
 </div>
 
-<pre class="example">
-class clojure.lang.Compiler$CompilerExceptionclass clojure.lang.Compiler$CompilerExceptionCompilerException java.lang.RuntimeException: Unable to resolve symbol: smallest-randy in this context, compiling:(/tmp/form-init2034739014375299246.clj:3:40)
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
 
-</pre>
+
+<colgroup>
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+</colgroup>
+<tbody>
+<tr>
+<td class="org-right">Butters</td>
+<td class="org-right">Randy</td>
+<td class="org-left">P(Randy, Randy)</td>
+<td class="org-left">1/2?</td>
+</tr>
+
+<tr>
+<td class="org-right">2</td>
+<td class="org-right">5</td>
+<td class="org-left">10/21</td>
+<td class="org-left">false</td>
+</tr>
+
+<tr>
+<td class="org-right">4</td>
+<td class="org-right">10</td>
+<td class="org-left">45/91</td>
+<td class="org-left">false</td>
+</tr>
+
+<tr>
+<td class="org-right">6</td>
+<td class="org-right">15</td>
+<td class="org-left">1/2</td>
+<td class="org-left">true</td>
+</tr>
+</tbody>
+</table>
 
 <p>
 I should probably not buy more socks. I have at least 7 matching pairs of Randy's, after all.
