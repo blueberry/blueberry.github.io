@@ -1,7 +1,7 @@
 ---
 author: dragan
 layout: post
-title:  "SmallFP & ClojureTRE: Interactive, Functional, GPU Accellerated Programming in Clojure"
+title:  "Code Mesh LDN 2018 - Interactive GPU Programming with ClojureCUDA and ClojureCL"
 date:   2018-11-04 21:00
 categories: conference
 excerpt: I'm presenting a talk at CodeMesh LDN 2018 conference in a few days. Here are the slides.
