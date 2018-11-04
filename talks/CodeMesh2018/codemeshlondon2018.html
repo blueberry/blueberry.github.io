@@ -1,0 +1,1331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Interactive <br><font color = "OrangeRed">GPU Programming</font><br> with <font color = "OrangeRed">ClojureCUDA</font><br> and <font color = "OrangeRed">ClojureCL</font></title>
+<meta name="author" content="(Dragan Djuric)"/>
+<style type="text/css">
+.underline { text-decoration: underline; }
+</style>
+<link rel="stylesheet" href="./reveal.js-3.7.0/css/reveal.css"/>
+
+<link rel="stylesheet" href="./reveal.js-3.7.0/css/theme/beige.css" id="theme"/>
+
+<link rel="stylesheet" href="noborder.css"/>
+
+<!-- If the query includes 'print-pdf', include the PDF print sheet -->
+<script>
+    if( window.location.search.match( /print-pdf/gi ) ) {
+        var link = document.createElement( 'link' );
+        link.rel = 'stylesheet';
+        link.type = 'text/css';
+        link.href = './reveal.js-3.7.0/css/print/pdf.css';
+        document.getElementsByTagName( 'head' )[0].appendChild( link );
+    }
+</script>
+<script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+<section id="sec-title-slide"><h2>Interactive <br><font color = "OrangeRed">GPU Programming</font><br> with <font color = "OrangeRed">ClojureCUDA</font><br> and <font color = "OrangeRed">ClojureCL</font></h2><h3>Dragan Djuric</h3><strong><a href="mailto:dragandj@gmail.com">dragandj@gmail.com</a></strong>
+</section>
+
+<section>
+<section id="slide-orgba61481">
+<h2 id="orgba61481">Dragan Djuric</h2>
+<ul>
+<li>Professor of Software Engineering</li>
+<li>University of Belgrade</li>
+<li>Clojure as a primary language since <b>2009</b></li>
+<li>Teach Clojure since 2010</li>
+<li>github: blueberry / uncomplicate</li>
+
+<li>donations <a href="https://patreon.com/draganrocks">http://patreon.com/draganrocks</a></li>
+
+<li><a href="http://uncomplicate.org">http://uncomplicate.org</a></li>
+<li>blog <a href="http://dragan.rocks">http://dragan.rocks</a></li>
+<li>twitter <a href="https://twitter.com/draganrocks">@draganrocks</a></li>
+
+</ul>
+
+<aside class="notes">
+<p>
+My name is Dragan Djuric, I am a professor of software engineering at
+the University of Belgrade. I've been using Clojure as my primary programming language since 2009,
+teach it since 2010. You can find me on github, and you can find lots of related Clojure articles on my blog.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-org8fa596d">
+<h3 id="org8fa596d">Clojure and FP are great!</h3>
+<ul>
+<li>Dynamic <b>and</b> fast</li>
+<li>First-class functions</li>
+<li>Great abstractions and data structures</li>
+<li>Many useful libraries</li>
+<li>Even more experimental libraries</li>
+<li>Access to Java and the JVM</li>
+<li>Hey, the community is amazing!</li>
+
+</ul>
+
+<aside class="notes">
+<p>
+Clojure is great! I'm sure no one here needs to be reminded of that.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-org3259240">
+<h3 id="org3259240">What I'll talk about?</h3>
+<ul>
+<li>Not (necessarily) Big Data</li>
+<li><b><b>Lots of computations</b></b> regardless of data size</li>
+<li>numerical data</li>
+<li>numerical algorithms</li>
+
+</ul>
+
+<aside class="notes">
+<p>
+Many problems do not necessarily have to be due to having lots of data, but due to having to
+perform lots of computations.
+</p>
+
+<p>
+I am talking specifically about numerical data, and algorithms that work with numbers.
+</p>
+
+<p>
+Algorithms usually have to perform lots of cycles of numerical operations on arrays containing
+floating point numbers.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-org89cbe47">
+<h3 id="org89cbe47">Is FP good at number crunching?</h3>
+<ul>
+<li>Good? sometimes.</li>
+<li>Great? NO!</li>
+<li>Poor access to hardware-specific optimizations.</li>
+
+<li>Some FP ideas are very useful!</li>
+
+</ul>
+
+<aside class="notes">
+<p>
+But, is FP good at number crunching?
+It is certainly not bad, but compared to what's available elsewhere, it is not great either.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgc2764a5">
+<h3 id="orgc2764a5">CPU is not so great either!</h3>
+<ul>
+<li>R, Python? Even worse than Java or Hasekell.</li>
+<li>C? complicated, verbose platform-specific optimizations.</li>
+<li>CPU? too beefed-up!</li>
+
+</ul>
+
+<aside class="notes">
+<p>
+Other managed platforms? Those are even worse than JVM when it comes
+to number crunching. It is true that they have rich libraries that fall back
+to native code, but&#x2026; when you need to write some of that native code you're out of luck.
+And CPU itself is not so great either! CPUs have rich instruction sets, but
+that requires lots of transistors that devours energy.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-org3c6bf49">
+<h3 id="org3c6bf49">GPU has a lot to offer &#x2026;at a price</h3>
+<ul>
+<li>many dumb computing units</li>
+<li>but, power-efficient for number crunching</li>
+<li>hardware support for massive parallelism</li>
+<li>faster and cheaper each year</li>
+<li><b>notoriously difficult to program</b></li>
+
+</ul>
+
+<aside class="notes">
+<p>
+&#x2026;which brings us to GPUs. GPUs contain very simple computing units, but it is
+possible to pack many of those on one chip!
+The features that are provided are exactly the numerical operations and parallelization
+support that we need! They are more powerful and cheaper each year.
+It's a shame that the programming platforms are from the stone age!
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orga5721b3">
+<h3 id="orga5721b3">Uncomplicate</h3>
+<dl>
+<dt><font color = "green">ClojureCL</font></dt><dd>take control of the GPU, CPU, and accelerators from Clojure</dd>
+<dt><font color = "green">ClojureCUDA</font></dt><dd>take control of the Nvidia GPU</dd>
+<dt><font color = "indigo">Neanderthal</font></dt><dd>vectors and matrices, but optimized for CPU and GPU</dd>
+<dt><font color = "OrangeRed">Bayadera</font></dt><dd>high performance Bayesian statistics and data analysis on the GPU</dd>
+
+</dl>
+
+<aside class="notes">
+<p>
+Uncomplicate is a family of open-source Clojure libraries for scientific and high-performance computing.
+ClojureCL is a Clojure library for taking <b>full</b> control of the GPU with minimal overhead.
+Neanderthal leverages battle-tested native linear algebra libraries for the CPU and latest GPU libraries
+to provide the full-speed matrix support tailored to Clojure with almost no overhead.
+Bayadera goes beyond that - a library for Bayesian statistics on the GPU that is much faster than
+the fastest available mainstream offerings!
+</p>
+
+</aside>
+
+</section>
+</section>
+<section>
+<section id="slide-org29a0f2d">
+<h2 id="org29a0f2d">Hello world: dot product</h2>
+<ul>
+<li>One of the simplest linear algebra functions</li>
+<li>Consists of two familiar FP building blocks:
+<ul>
+<li>map</li>
+<li>reduce</li>
+
+</ul></li>
+<li>Multiply each corresponding element of two arrays (vectors) and add them up.</li>
+
+</ul>
+
+<aside class="notes">
+<p>
+Let's first see how fast these things can get.
+</p>
+
+<p>
+Dot product is one of the simplest numerical algorithms.
+</p>
+
+<p>
+It is representative because it uses two basic functional programming idioms:
+</p>
+<ul>
+<li>map</li>
+<li>reduce</li>
+
+</ul>
+
+<p>
+The input consists of two arrays of numbers of the same size. Their dot product is computed by
+multiplying each corresponding element, and adding up these product. The result is a number.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-org3234951">
+<h3 id="org3234951">Idiomatic Clojure</h3>
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #7388d6;">[</span>dot-product <span style="color: #909183;">(</span><span style="color: #A52A2A; font-weight: bold;">fn</span> <span style="color: #709870;">[</span>xs ys<span style="color: #709870;">]</span>
+                    <span style="color: #709870;">(</span>reduce + <span style="color: #907373;">(</span>map * xs ys<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span>
+
+      x-vec <span style="color: #909183;">(</span>vec <span style="color: #709870;">(</span>range 100000<span style="color: #709870;">)</span><span style="color: #909183;">)</span>
+      y-vec <span style="color: #909183;">(</span>vec <span style="color: #709870;">(</span>range 100000<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+
+  <span style="color: #7388d6;">(</span>dot-product x-vec y-vec<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+333328333350000
+
+</pre>
+
+<p class="fragment (appear)">
+Execution time: 14 ms
+</p>
+
+<aside class="notes">
+<p>
+In idiomatic Clojure, anyone can write a map/reduce one-liner dot-product function.
+</p>
+
+<p>
+For 100,000 element vectors, Clojure map/reduce took 14 ms.
+</p>
+
+<p>
+Doesn't seem so slow, but keep in mind that the dot product is a basic building block,
+not a goal on its own.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-org2bd9cc8">
+<h3 id="org2bd9cc8"><font color = "indigo">Neanderthal</font>: using optimized library</h3>
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #7388d6;">[</span>x <span style="color: #909183;">(</span>fv <span style="color: #709870;">(</span>range 100000<span style="color: #709870;">)</span><span style="color: #909183;">)</span>
+      y <span style="color: #909183;">(</span>copy x<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+
+  <span style="color: #7388d6;">(</span>dot x y<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+3.33328352E14
+
+</pre>
+
+<ul>
+<li class="fragment appear">Execution time: 6 &mu;s</li>
+
+</ul>
+
+<aside class="notes">
+<p>
+What can we expect from an optimized matrix library - Neanderthal?
+</p>
+
+<p>
+The speed-up of three orders of magnitude.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-org259c5a5">
+<h3 id="org259c5a5"><font color = "indigo">Neanderthal</font>: a taste of GPU</h3>
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><span style="color: #707183;">(</span>with-default
+  <span style="color: #7388d6;">(</span>with-default-engine
+    <span style="color: #909183;">(</span>with-release <span style="color: #709870;">[</span>gpu-x <span style="color: #907373;">(</span>cuv <span style="color: #6276ba;">(</span>range 100000<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span>
+                   gpu-y <span style="color: #907373;">(</span>copy gpu-x<span style="color: #907373;">)</span><span style="color: #709870;">]</span>
+
+      <span style="color: #709870;">(</span>dot gpu-x gpu-y<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+3.33328352E14
+
+</pre>
+
+<ul>
+<li class="fragment appear">Execution time: <font color = "red">26</font> &mu;s</li>
+<li class="fragment appear">Not faster than the CPU at all! Why?</li>
+
+</ul>
+
+<aside class="notes">
+<p>
+Let's try Neanderthal's support for GPUs. Neanderthal's API supports pluggable engines,
+and the GPU engine has already been provided.
+The API stays the same, while we use ClojureCUDA to set up our hardware.
+</p>
+
+<p>
+Not faster than the CPU! Hmmm&#x2026;
+</p>
+
+</aside>
+
+</section>
+<section id="slide-org5c6e915">
+<h3 id="org5c6e915">A million dot products on the GPU</h3>
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><span style="color: #707183;">(</span>with-default
+  <span style="color: #7388d6;">(</span>with-default-engine
+    <span style="color: #909183;">(</span>with-release <span style="color: #709870;">[</span>gpu-x <span style="color: #907373;">(</span>entry! <span style="color: #6276ba;">(</span>cuge 1000 100000<span style="color: #6276ba;">)</span> 0.01<span style="color: #907373;">)</span>
+                   gpu-y <span style="color: #907373;">(</span>copy <span style="color: #6276ba;">(</span>trans gpu-x<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span>
+                   cpu-c <span style="color: #907373;">(</span>cuge 1000 1000<span style="color: #907373;">)</span><span style="color: #709870;">]</span>
+
+      <span style="color: #709870;">(</span><span style="color: #A52A2A; font-weight: bold;">do</span> <span style="color: #907373;">(</span>mm! 1 gpu-x gpu-y 0 cpu-c<span style="color: #907373;">)</span>
+          <span style="color: #907373;">(</span>synchronize!<span style="color: #907373;">)</span>
+          <span style="color: #F5666D;">true</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+true
+
+</pre>
+
+<ul>
+<li class="fragment appear">Execution time: <font color = "red">23</font> ms</li>
+<li class="fragment appear">23 <b><b>nanoseconds</b></b> per a 100000 element dot product!</li>
+<li class="fragment appear">Our Clojure code started from 14 milliseconds (600,000 &times; difference!)</li>
+<li class="fragment appear">1000 &times; faster than a solo dot product!</li>
+
+</ul>
+
+<aside class="notes">
+<p>
+Another key operation is matrix multiplication. Each element is a result of a dot
+product of a column and a row. In this case, 1000 x 1000 matrix is the result of 1M dot products.
+</p>
+
+<p>
+The moral of the story: fuse operations to get the GPU speedup.
+</p>
+
+<p>
+The good news is that we can do this for many algorithms!
+</p>
+
+<p>
+But, we often have to do it ourselves. Good - ClojureCUDA helps with that!
+</p>
+
+</aside>
+
+</section>
+</section>
+<section>
+<section id="slide-org60d2481">
+<h2 id="org60d2481">A glimpse of ClojureCUDA API</h2>
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><span style="color: #707183;">(</span>init<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="fragment (appear)"><span style="color: #F5666D;">true</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="fragment (appear)"><span style="color: #707183;">(</span>device-count<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="fragment (appear)">2
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="fragment (appear)"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">my-nvidia-gpu</span> <span style="color: #7388d6;">(</span>device 0<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="fragment (appear)">#'<span style="color: #2F8B58; font-weight: bold;">user</span>/my-nvidia-gpu
+</pre>
+</div>
+
+<aside class="notes">
+<p>
+The key thing I hope you'll get from this presentation is that:
+<b>*it is not (that) difficult!</b>
+</p>
+
+<p>
+GPU programming requires some device and context management.
+</p>
+
+<p>
+Luckily, with the REPL, we can play with this in the same way
+we are exploring regular Clojure libraries.
+</p>
+
+<p>
+No need to worry about the C++ toolchain!
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orga6f5ea1">
+<h3 id="orga6f5ea1">Querying information</h3>
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><span style="color: #707183;">(</span>info my-nvidia-gpu<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="fragment (appear)"><span style="color: #707183;">{</span><span style="color: #F5666D;">:max-grid-dim-y</span> 65535, <span style="color: #F5666D;">:total-mem</span> 11721506816,
+ <span style="color: #F5666D;">:name</span> <span style="color: #4E9A06;">"GeForce GTX 1080 Ti"</span>, <span style="color: #F5666D;">:max-threads-per-multiprocessor</span> 2048,
+ <span style="color: #F5666D;">:max-shared-memory-per-block</span> 49152, <span style="color: #F5666D;">:compute-capability-major</span> 6,
+ <span style="color: #F5666D;">:global-memory-bus-width</span> 352, <span style="color: #F5666D;">:memory-clock-rate</span> 5505000,
+ <span style="color: #F5666D;">:max-threads-per-block</span> 1024, <span style="color: #F5666D;">:multiprocessor-count</span> 28,
+ <span style="color: #F5666D;">:warp-size</span> 32, <span style="color: #F5666D;">:max-registers-per-block</span> 65536
+ <span style="color: #204A87;">;;</span><span style="color: #204A87;">... much more data</span>
+<span style="color: #707183;">}</span>
+</pre>
+</div>
+
+<aside class="notes">
+<p>
+We can access the hardware and explore its characteristic information.
+</p>
+
+<p>
+In this case, my device is GTX 1080, with 11GB DRAM, 28 physical cores.
+Each of these cores is capable of executing 1024 parallel threads, mapped onto 32
+physically parallel threads in a warp.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-org53c6aeb">
+<h3 id="org53c6aeb">Managing Context</h3>
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">ctx</span> <span style="color: #7388d6;">(</span>context my-nvidia-gpu<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="fragment (appear)">#'<span style="color: #2F8B58; font-weight: bold;">user</span>/ctx
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="fragment (appear)"><span style="color: #707183;">(</span>info ctx<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="fragment (appear)"><span style="color: #707183;">{</span><span style="color: #F5666D;">:dev-runtime-pending-launch-count</span> 2048  <span style="color: #F5666D;">:dev-runtime-sync-depth</span> 2
+ <span style="color: #F5666D;">:malloc-heap-size</span> 8388608  <span style="color: #F5666D;">:stack-size</span> 1024  <span style="color: #F5666D;">:api-version</span> 3020
+ <span style="color: #F5666D;">:stream-priority-range</span> <span style="color: #7388d6;">(</span>0 -1<span style="color: #7388d6;">)</span>  <span style="color: #F5666D;">:cache-config</span> <span style="color: #F5666D;">:prefer-none</span>  <span style="color: #F5666D;">:printf-fifo-size</span> 1048576
+ <span style="color: #F5666D;">:device</span> #object<span style="color: #7388d6;">(</span>jcuda.driver.CUdevice 0x12be4426 <span style="color: #4E9A06;">"CUdevice[nativePointer=0x0]"</span><span style="color: #7388d6;">)</span>
+ <span style="color: #F5666D;">:shared-config</span> <span style="color: #F5666D;">:four-byte-bank-size</span><span style="color: #707183;">}</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="fragment (appear)"><span style="color: #707183;">(</span>= ctx <span style="color: #7388d6;">(</span>current-context<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="fragment (appear)"><span style="color: #F5666D;">true</span>
+</pre>
+</div>
+
+<aside class="notes">
+<p>
+The entry point to GPU programming is the context.
+</p>
+
+<p>
+It helps in managing the specific way in which we use the device.
+</p>
+
+<p>
+For example, this default context supports CUDA API 3.2 and up, although the device itself
+supports 6.1. This makes our code more portable across older Nvidia GPU's.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-org5714267">
+<h3 id="org5714267">Memory</h3>
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">gpu-array</span> <span style="color: #7388d6;">(</span>mem-alloc 1024<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="fragment (appear)">#'<span style="color: #2F8B58; font-weight: bold;">user</span>/gpu-array
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="fragment (appear)"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">main-array</span> <span style="color: #7388d6;">(</span>float-array <span style="color: #909183;">(</span>range 256<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="fragment (appear)">#'<span style="color: #2F8B58; font-weight: bold;">user</span>/main-array
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="fragment (appear)"><span style="color: #707183;">(</span>take 10 main-array<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="fragment (appear)"><span style="color: #707183;">(</span>0 1 2 3 4 5 6 7 8 9<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<aside class="notes">
+<p>
+The managing code that we write will actually execute on the CPU, not the GPU.
+</p>
+
+<p>
+This is called the <b>host code</b>, and it manages the setup of data in memory, and how the
+actual computation on the GPU will run.
+</p>
+
+<p>
+In contrast with CPU programs, the GPU usually works with huge arrays of floating point numbers.
+We can't directly access each element from the main host program in an efficient way.
+</p>
+
+<p>
+We start from the data in main memory: 1, 2, 3, etc.
+</p>
+
+</aside>
+</section>
+<section id="slide-org9abf6c6">
+<h3 id="org9abf6c6">Transfer data to GPU memory</h3>
+<div class="org-src-container">
+
+<pre  class="fragment (appear)"><span style="color: #707183;">(</span>memcpy-host! main-array gpu-array<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="fragment (appear)">#object<span style="color: #707183;">[</span>uncomplicate.clojurecuda.internal.impl.CULinearMemory 0x38701ca4 <span style="color: #4E9A06;">"uncomplicate.clojurecuda.i</span><span style="color: #ee82ee; background-color: #333333;">nternal.impl.CULinearMemory@38701ca4"</span><span style="color: #707183; background-color: #333333;">]</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="fragment (appear)"><span style="color: #707183;">(</span>take 12 <span style="color: #7388d6;">(</span>memcpy-host! gpu-array <span style="color: #909183;">(</span>float-array 256<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="fragment (appear)"><span style="color: #707183;">(</span>0 1 2 3 4 5 6 7 8 9 10 11<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<aside class="notes">
+<p>
+We treat the arrays in GPU memory as a whole, and load the data from corresponding main memory.
+</p>
+
+<p>
+As we cannot see the elements directly, the only way to see the content is to transfer data back to
+another host memory array and check its contents.
+</p>
+
+<p>
+Note that we are doing this interactively in the REPL all the time.
+</p>
+
+</aside>
+</section>
+</section>
+<section>
+<section id="slide-org2fabe4f">
+<h2 id="org2fabe4f">Compute something already!</h2>
+<div class="outline-text-2" id="text-org2fabe4f">
+</div>
+</section>
+<section id="slide-org8dd32fd">
+<h3 id="org8dd32fd">The kernel</h3>
+<div class="org-src-container">
+
+<pre  class="src src-c"><span style="color: #A52A2A; font-weight: bold;">extern</span> <span style="color: #4E9A06;">"C"</span>
+__global__ <span style="color: #2F8B58; font-weight: bold;">void</span> <span style="color: #00578E; font-weight: bold;">increment</span>(<span style="color: #2F8B58; font-weight: bold;">int</span> <span style="color: #0084C8; font-weight: bold;">n</span>, <span style="color: #2F8B58; font-weight: bold;">float</span> *<span style="color: #0084C8; font-weight: bold;">a</span>) {
+    <span style="color: #2F8B58; font-weight: bold;">int</span> <span style="color: #0084C8; font-weight: bold;">i</span> = blockIdx.x * blockDim.x + threadIdx.x;
+    <span style="color: #A52A2A; font-weight: bold;">if</span> (i &lt; n) {
+        a[i] = a[i] + 1.0f;
+    }
+};
+</pre>
+</div>
+
+<aside class="notes">
+<p>
+The actual code that the GPU cores run is relatively simple. These functions are called <b><b>kernels</b></b>.
+</p>
+
+<p>
+Kernel can be theoretically written in any language, but a simple subset of C/C++ is a good match
+for the low-level floating point computations that it is required to perform.
+</p>
+
+<p>
+This kernel can be run in parallel by thousands (<b><b>n</b></b>) independent threads. Each of these threads
+will get its coordinates in a grid, and can use these coordinates to locate the part of the array
+that it will work on. Which part of the array? It's up to the programmer!
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgf81147c">
+<h3 id="orgf81147c">The program</h3>
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">kernel-source</span>
+      <span style="color: #4E9A06;">"extern \"C\"</span>
+<span style="color: #4E9A06;">         __global__ void increment (int n, float *a) {</span>
+<span style="color: #4E9A06;">           int i = blockIdx.x * blockDim.x + threadIdx.x;</span>
+<span style="color: #4E9A06;">           if (i &lt; n) {</span>
+<span style="color: #4E9A06;">             a[i] = a[i] + 1.0f;</span>
+<span style="color: #4E9A06;">        }</span>
+<span style="color: #4E9A06;">       };"</span><span style="color: #707183;">)</span>
+
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">hello-program</span> <span style="color: #7388d6;">(</span>compile! <span style="color: #909183;">(</span>program kernel-source<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#'user/kernel-source#'user/hello-program
+
+</pre>
+
+<aside class="notes">
+<p>
+We load and compile the kernel code through our interactive Clojure REPL.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orga5122f4">
+<h3 id="orga5122f4">The GPU Function</h3>
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">hello-module</span> <span style="color: #7388d6;">(</span>module hello-program<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">increment</span> <span style="color: #7388d6;">(</span>function hello-module <span style="color: #4E9A06;">"increment"</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#'user/hello-module#'user/increment
+
+</pre>
+
+<aside class="notes">
+<p>
+We also further access the objects handles of the stuff inside the program, in this case the
+increment function that we created.
+</p>
+
+<p>
+If we make a mistake, we'll see it immediately in the REPL, and have the opportunity to fix it
+right away.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-org7b5e8a4">
+<h3 id="org7b5e8a4">Running the GPU function</h3>
+<div class="org-src-container">
+
+<pre  class="fragment (appear)"><span style="color: #707183;">(</span>launch! increment <span style="color: #7388d6;">(</span>grid-1d 256<span style="color: #7388d6;">)</span> <span style="color: #7388d6;">(</span>parameters 256 gpu-array<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="fragment (appear)"><span style="color: #F5666D;">nil</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="fragment (appear)"><span style="color: #707183;">(</span>take 12 <span style="color: #7388d6;">(</span>memcpy-host! gpu-array <span style="color: #909183;">(</span>float-array 256<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="fragment (appear)"><span style="color: #707183;">(</span>1 2 3 4 5 6 7 8 9 10 11 12<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<aside class="notes">
+<p>
+The function <b><b>as a first-class object</b></b> is now created.
+</p>
+
+<p>
+We <b><b>launch</b></b> it by specifying the number of workers in the grid, and the memory that it operates on.
+</p>
+
+<p>
+It is typically executed asynchronously.
+</p>
+
+<p>
+To see the result, we transfer the content of the array it wrote to and see that the numbers increased.
+</p>
+
+<p>
+Kernels are typically <b><b>not</b></b> pure. They do their work through effects on memory.
+</p>
+
+<p>
+That is one of the major differences to FP.
+</p>
+
+</aside>
+
+</section>
+</section>
+<section>
+<section id="slide-orgd1ffd47">
+<h2 id="orgd1ffd47"><font color="OrangeRed">Bayadera</font><br/> Bayesian Data Analysis on the GPU</h2>
+<p>
+How to know something we cannot observe?
+</p>
+
+<ul>
+<li>Probabilities of all answers (<b>prior \(Pr(H)\)</b>)</li>
+<li>Probability of measured data (<b>evidence</b> \(\Pr(D)\) and <b>likelihood</b> \(\Pr(D|H)\))</li>
+<li>Calculate "backwards", using Bayes' rule and get</li>
+<li><b>posterior</b> probabilities of answers \(\Pr(H|D)\)</li>
+
+</ul>
+<p>
+\(\Pr(H|D) = \frac{\Pr(D|H)\times \Pr(H)}{\Pr(D)}\)
+</p>
+
+<aside class="notes">
+<p>
+You can see this approach to programming in Bayadera.
+</p>
+
+<p>
+When could BDA be useful? Whenever we have too little data and too much uncertainty.
+</p>
+
+<p>
+Often we cannot directly measure what we are interested in.
+</p>
+
+<p>
+We can only measure something <b>else</b>, that we think influences it.
+There is <b>rarely</b> one true answer. More likely, possible answers are more or less probable.
+</p>
+
+<p>
+BDA helps us discover the probability of each potential answer by taking into
+account what we knew previously (<b>prior</b>), our knowledge of the random process itself (<b>likelihood</b>),
+and what we measured in the data (<b>evience</b>). We do that calculation using Bayes' rule.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgd23721e">
+<h3 id="orgd23721e">What does all this has to do with Bayes?</h3>
+<ul>
+<li>BDA is conceptually simple</li>
+<li>Real models must be calculated numerically</li>
+<li>MCMC sampling and related methods</li>
+<li>In higher dimensions, requires huge samples</li>
+<li>Analyses typically run in minutes, hours, weeks</li>
+
+</ul>
+<p>
+.
+</p>
+<ul>
+<li>Good: Clojure and GPU FTW</li>
+<li>Challenge: <b>MCMC is sequential</b></li>
+
+</ul>
+
+<aside class="notes">
+<p>
+Bayesian methods are conceptually simple and elegant (although not always easy to learn).
+</p>
+
+<p>
+The main challenge is that <b>real-world</b> models are not possible to solve analytically, and require
+<b>enormous</b> computational resources. Main numerical methods are variants of MCMC simulation, and analyses
+typically run in minutes, hours, days, weeks or even more.
+</p>
+
+<p>
+GPU are an obvious help. Numerical methods can typically be fast on GPU's.
+</p>
+
+<p>
+But there's a challenge: <b>MCMC is inherently sequential</b> so it is difficult to parallelize.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgcf70a67">
+<h3 id="orgcf70a67">Doing Bayesian Data Analysis</h3>
+<ul>
+<li>John Kruschke</li>
+<li>Excellent tutorial, even for beginners</li>
+<li>Real-world examples through the book!</li>
+
+</ul>
+
+
+<div class="figure">
+<p><img src="dbda-book.png" alt="dbda-book.png" height="30%," width="30%" />
+</p>
+</div>
+
+<aside class="notes">
+<p>
+This book is what I would recommend as the best learning resource. It is approachable by (strong) beginners,
+but the examples are still from the real world analysis.
+</p>
+
+</aside>
+
+</section>
+</section>
+<section>
+<section id="slide-orgde8bd46">
+<h2 id="orgde8bd46">Real World <br> Robust Linear Regression</h2>
+
+<div class="figure">
+<p><img src="kruschke-hlr-data.png" alt="kruschke-hlr-data.png" height="50%," width="50%" />
+</p>
+</div>
+<aside class="notes">
+<p>
+This is an example from Kruschke's book. We have a sample data of 300 measures of people's height and weight.
+</p>
+
+<p>
+We would like to know what's correlation between them. Since data obviously does not fall on one line,
+we decide that we'll try to find a <b>distribution</b> of all lines that could approximate this linear correlation.
+</p>
+
+<p>
+Blue lines represent some of the most probable lines, and the noise at each region.
+</p>
+
+</aside>
+</section>
+<section id="slide-orgf953875">
+<h3 id="orgf953875">Hierarchical Model</h3>
+
+<div class="figure">
+<p><img src="kruschke-hlr-model.png" alt="kruschke-hlr-model.png" />
+</p>
+</div>
+
+<aside class="notes">
+<p>
+Here's the model.
+</p>
+
+<ul>
+<li>x(i) is <b>height</b> of person i</li>
+<li>y(i) is <b>weight</b> of person i</li>
+
+</ul>
+
+<p>
+We suppose that there is a connection x -&gt; y, such that y(i) is t-distributed around &beta;<sub>0</sub> + &beta;<sub>1</sub> * x<sub>i</sub>.
+That t distribution <b>also</b> has uncertain parameters &nu; and &sigma;.
+</p>
+
+<p>
+&nu; is exponentially distributed
+&sigma; comes from an uniform distribution
+</p>
+
+<p>
+&beta;<sub>0</sub> and &beta;<sub>1</sub> are themselves uncertain, they are normally distributed
+</p>
+
+<p>
+Practically, this model is *4-dimensional: &beta;<sub>0</sub>, beta<sub>1</sub>, &nu; and &sigma; are the 4 dimensions
+of that joint random variable, while K, M<sub>0</sub>, S<sub>0</sub>, M<sub>1</sub>, S<sub>1</sub>, L and H are parameters of that 4-dimensional distribution.
+</p>
+
+<p>
+Don't forget those 300 data points. We'd have to fit the whole thing with them!
+</p>
+
+</aside>
+
+</section>
+<section id="slide-org049c86c">
+<h3 id="org049c86c">Resulting Posterior</h3>
+
+<div class="figure">
+<p><img src="kruschke-hlr-posterior.png" alt="kruschke-hlr-posterior.png" />
+</p>
+</div>
+
+<aside class="notes">
+<p>
+Kruschke calculates this model using Stan, and gets those quite <b>rough</b> histograms, that show
+the marginal probabilities of the 4 dimensions. Black line denotes the region that contains 95% probability
+(note: NOT the same as confidence intervals).
+</p>
+
+<p>
+We see that &beta;<sub>0</sub> is between -200 and -80, &beta;<sub>1</sub> between 3.5 and 5.3, &sigma; around 24 and &nu; around 5.
+</p>
+
+<p>
+It took Kruschke <b>several hundred seconds</b> to complete this calculation with Stan/JAGS!
+</p>
+
+</aside>
+
+</section>
+<section id="slide-org08e6df3">
+<h3 id="org08e6df3">Create a custom model in Bayadera</h3>
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">rlr-source</span> <span style="color: #7388d6;">(</span>slurp <span style="color: #909183;">(</span><span style="color: #2F8B58; font-weight: bold;">io</span>/file <span style="color: #4E9A06;">"robust-linear-regression.cl"</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">my-prior-model-distribution</span> <span style="color: #7388d6;">[]</span>
+  <span style="color: #7388d6;">(</span><span style="color: #2F8B58; font-weight: bold;">library</span>/distribution-model
+   <span style="color: #909183;">[</span><span style="color: #F5666D;">:gaussian</span> <span style="color: #F5666D;">:uniform</span> <span style="color: #F5666D;">:exponential</span> <span style="color: #F5666D;">:student-t</span> rlr-source<span style="color: #909183;">]</span>
+   <span style="color: #909183;">{</span><span style="color: #F5666D;">:name</span> <span style="color: #4E9A06;">"rlr"</span> <span style="color: #F5666D;">:mcmc-logpdf</span> <span style="color: #4E9A06;">"rlr_mcmc_logpdf"</span>
+    <span style="color: #F5666D;">:params-size</span> 7 <span style="color: #F5666D;">:dimension</span> 4<span style="color: #909183;">}</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<aside class="notes">
+<p>
+We use some Bayadera's built-in models of common distribution and combine them
+into GPU code of this specific hierarchical model.
+</p>
+
+<p>
+Although we use some stock distribution, the actual hierarchy is specific for this model.
+We have to specify that in some <b>straightforward</b> OpenCL C code.
+</p>
+
+</aside>
+
+<pre class="example">
+#'user/rlr-source#'user/rlr-prior#'user/rlr-likelihood
+
+</pre>
+</section>
+<section id="slide-org619c714">
+<h3 id="org619c714">Model's prior function</h3>
+<div class="org-src-container">
+
+<pre  class="src src-c"><span style="color: #2F8B58; font-weight: bold;">REAL</span> <span style="color: #00578E; font-weight: bold;">rlr_logpdf</span>(<span style="color: #A52A2A; font-weight: bold;">const</span> <span style="color: #2F8B58; font-weight: bold;">uint</span> <span style="color: #0084C8; font-weight: bold;">data_len</span>,
+                <span style="color: #A52A2A; font-weight: bold;">const</span> <span style="color: #2F8B58; font-weight: bold;">uint</span> <span style="color: #0084C8; font-weight: bold;">hyperparams_len</span>,
+                <span style="color: #A52A2A; font-weight: bold;">const</span> <span style="color: #2F8B58; font-weight: bold;">REAL</span>* <span style="color: #0084C8; font-weight: bold;">params</span>,
+                <span style="color: #A52A2A; font-weight: bold;">const</span> <span style="color: #2F8B58; font-weight: bold;">uint</span> <span style="color: #0084C8; font-weight: bold;">dim</span>, <span style="color: #2F8B58; font-weight: bold;">REAL</span>* <span style="color: #0084C8; font-weight: bold;">x</span>) {
+    <span style="color: #A52A2A; font-weight: bold;">return</span> exponential_log(params[0], x[0] - 1)
+        + gaussian_log(params[1], params[2], x[1])
+        + gaussian_log(params[3], params[4], x[2])
+        + uniform_log(params[5], params[6], x[3]);
+}
+</pre>
+</div>
+
+<aside class="notes">
+<p>
+You can recognize that distributions from the hierarchical
+diagram are simply combined to compute the probability for any combination of parameters
+that we give it.
+</p>
+
+<p>
+The user does not call those functions explicitly. They are just specific parts of the
+engine that will be automagically compiled into GPU code by Bayadera.
+</p>
+
+<p>
+In the coin model, we did not have to do this step, because we could just reuse stock
+models that are already built in Bayadera. Once we created <b>this</b> model, we can also reuse
+it in a similar way.
+</p>
+
+</aside>
+
+
+</section>
+<section id="slide-orga403793">
+<h3 id="orga403793">Model's likelihood function</h3>
+<div class="org-src-container">
+
+<pre  class="src src-c"><span style="color: #2F8B58; font-weight: bold;">REAL</span> <span style="color: #00578E; font-weight: bold;">rlr_loglik</span>(<span style="color: #A52A2A; font-weight: bold;">const</span> <span style="color: #2F8B58; font-weight: bold;">uint</span> <span style="color: #0084C8; font-weight: bold;">data_len</span>, <span style="color: #A52A2A; font-weight: bold;">const</span> <span style="color: #2F8B58; font-weight: bold;">REAL</span>* <span style="color: #0084C8; font-weight: bold;">data</span>,
+                <span style="color: #A52A2A; font-weight: bold;">const</span> <span style="color: #2F8B58; font-weight: bold;">uint</span> <span style="color: #0084C8; font-weight: bold;">dim</span>, <span style="color: #A52A2A; font-weight: bold;">const</span> <span style="color: #2F8B58; font-weight: bold;">REAL</span>* <span style="color: #0084C8; font-weight: bold;">x</span>) {
+    <span style="color: #A52A2A; font-weight: bold;">const</span> <span style="color: #2F8B58; font-weight: bold;">REAL</span> <span style="color: #0084C8; font-weight: bold;">nu</span> = x[0];
+    <span style="color: #A52A2A; font-weight: bold;">const</span> <span style="color: #2F8B58; font-weight: bold;">REAL</span> <span style="color: #0084C8; font-weight: bold;">b0</span> = x[1];
+    <span style="color: #A52A2A; font-weight: bold;">const</span> <span style="color: #2F8B58; font-weight: bold;">REAL</span> <span style="color: #0084C8; font-weight: bold;">b1</span> = x[2];
+    <span style="color: #A52A2A; font-weight: bold;">const</span> <span style="color: #2F8B58; font-weight: bold;">REAL</span> <span style="color: #0084C8; font-weight: bold;">sigma</span> = x[3];
+    <span style="color: #A52A2A; font-weight: bold;">const</span> <span style="color: #2F8B58; font-weight: bold;">uint</span> <span style="color: #0084C8; font-weight: bold;">n</span> = (<span style="color: #2F8B58; font-weight: bold;">uint</span>)data[0];
+    <span style="color: #A52A2A; font-weight: bold;">const</span> <span style="color: #2F8B58; font-weight: bold;">bool</span> <span style="color: #0084C8; font-weight: bold;">valid</span> = (0.0f &lt; nu) &amp;&amp; (0.0f &lt; sigma);
+    <span style="color: #A52A2A; font-weight: bold;">if</span> (valid) {
+        <span style="color: #A52A2A; font-weight: bold;">const</span> <span style="color: #2F8B58; font-weight: bold;">REAL</span> <span style="color: #0084C8; font-weight: bold;">scale</span> = student_t_log_scale(nu, sigma);
+        <span style="color: #2F8B58; font-weight: bold;">REAL</span> <span style="color: #0084C8; font-weight: bold;">res</span> = 0.0;
+        <span style="color: #A52A2A; font-weight: bold;">for</span> (<span style="color: #2F8B58; font-weight: bold;">uint</span> <span style="color: #0084C8; font-weight: bold;">i</span> = 0; i &lt; n; i = i+2) {
+            res += student_t_log_unscaled(nu, b0 + b1 * data[i+1],
+                                          sigma, data[i+2])
+                + scale;
+        }
+        <span style="color: #A52A2A; font-weight: bold;">return</span> res;
+    }
+    <span style="color: #A52A2A; font-weight: bold;">return</span> NAN;
+}
+</pre>
+</div>
+
+<aside class="notes">
+<p>
+Here is the likelihood function corresponding to the model from the diagrams. We use
+built-in t<sub>log</sub><sub>unscaled</sub> function and feed it the appropriate parameters, and do this in
+the loop for all 300 data points.
+</p>
+
+</aside>
+
+
+</section>
+<section id="slide-org99767ac">
+<h3 id="org99767ac">Running the inference on the GPU</h3>
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">result</span>
+  <span style="color: #7388d6;">(</span>with-default-bayadera
+    <span style="color: #909183;">(</span>with-release
+      <span style="color: #709870;">[</span>rlr-likelihood <span style="color: #907373;">(</span><span style="color: #2F8B58; font-weight: bold;">library</span>/likelihood-model rlr-source <span style="color: #6276ba;">{</span><span style="color: #F5666D;">:name</span> <span style="color: #4E9A06;">"rlr"</span><span style="color: #6276ba;">}</span><span style="color: #907373;">)</span>
+       rlr-prior <span style="color: #907373;">(</span>my-prior-model-distribution<span style="color: #907373;">)</span>
+       prior <span style="color: #907373;">(</span>distribution rlr-prior<span style="color: #907373;">)</span>
+       prior-dist <span style="color: #907373;">(</span>prior <span style="color: #6276ba;">(</span>fv 10 -100 100 5 10 0.001 1000<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span>
+       post <span style="color: #907373;">(</span>distribution <span style="color: #4E9A06;">"rlr"</span> rlr-likelihood prior-dist<span style="color: #907373;">)</span>
+       post-dist <span style="color: #907373;">(</span>post params-300<span style="color: #907373;">)</span>
+       post-sampler<span style="color: #907373;">(</span>sampler post-dist
+                            <span style="color: #6276ba;">{</span><span style="color: #F5666D;">:limits</span> <span style="color: #858580;">(</span>fge 2 4 <span style="color: #80a880;">[</span>1 10 -400 100 0 20 0.01 100<span style="color: #80a880;">]</span><span style="color: #858580;">)</span><span style="color: #6276ba;">}</span><span style="color: #907373;">)</span><span style="color: #709870;">]</span>
+      <span style="color: #709870;">(</span>mix! post-sampler <span style="color: #907373;">{</span><span style="color: #F5666D;">:step</span> 384<span style="color: #907373;">}</span><span style="color: #709870;">)</span>
+      <span style="color: #709870;">(</span>histogram! post-sampler 1000<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<aside class="notes">
+<p>
+Running the inference is a few API calls.
+</p>
+
+<p>
+The new thing is that the sample itself is multidimensional, so we must make histogram to
+calculate marginal probabilities that we are interested in. But, this is something that Bayadera
+can do blazingly fast with its built in functions.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-org0a476e6">
+<h3 id="org0a476e6">Fine grained histograms!</h3>
+<p>
+Posteriors: &beta;<sub>0</sub>, &beta;<sub>1,&sigma;</sub>, and &nu;
+<img src="robust-linear-regression.png" alt="robust-linear-regression.png" />
+</p>
+<aside class="notes">
+<p>
+The diagram.
+</p>
+
+</aside>
+</section>
+</section>
+<section>
+<section id="slide-org4437a54">
+<h2 id="org4437a54">How fast is it?</h2>
+<ul>
+<li>Bayadera
+<ul>
+<li>61,208,576 samples in 267 ms.</li>
+<li>4.36 ns per (computationally heavy) sample</li>
+<li>very precise histogram</li>
+
+</ul></li>
+<li>JAGS/Stan (state-of-the-art bayesian C++ tools)
+<ul>
+<li>20,000 samples in 180/485 seconds</li>
+<li>9 ms per sample</li>
+<li>rough histogram</li>
+
+</ul></li>
+<li><font color = "red">2,000,000 &times;</font> faster per sample</li>
+<li>more precise results, <font color = "red">1000 &times;</font> faster</li>
+
+</ul>
+
+<aside class="notes">
+<p>
+What I really wanted to show you is this: despite <b>MCMC being sequential by nature</b>,
+Bayadera runs circles around the best state of the art Bayesian environments!
+</p>
+
+<p>
+For this particular analysis, Bayadera took 60 M samples during the
+exploration of that complex multi-dimensional space in just 267 ms, which is 4 ns per sample!
+</p>
+
+<p>
+JAGS and Stan, two best popular R/Python tools implemented in C++ spent 180/485 seconds
+to get 20K samples.
+</p>
+
+<p>
+This is 2 million times less per sample. However, it is not fair to compare those
+directly, since Stan tries to spend more time on getting supposedly better convergence.
+</p>
+
+<p>
+But, when we compare the <b>whole analysis</b>, we can see that Bayadera was roughly
+1000 times faster, and yet produced a better result with much more precise histograms
+(not shown here)!
+</p>
+
+</aside>
+
+</section>
+<section id="slide-org51cc9a1">
+<h3 id="org51cc9a1">In real life</h3>
+<ul>
+<li>1 second vs a couple of hours</li>
+<li>1 minute vs several days!</li>
+<li>1 hour vs couple months/ a year</li>
+
+</ul>
+
+<aside class="notes">
+<p>
+Now, you might think - but who cares if something is 1000 times faster or slower?
+So what if it takes a couple of milliseconds instead of a few nanoseconds? Both are
+faster than the blink of an eye.
+</p>
+
+<p>
+Well, considering number of seconds in a day, hours in a month, etc&#x2026;
+This is a difference of having to wait 1 second instead of an hour,
+or 1 minute instead of a few days, or 1 hour instead of months or even a year!
+</p>
+
+</aside>
+
+</section>
+</section>
+<section>
+<section id="slide-org8780523">
+<h2 id="org8780523"><font color = "OrangeRed">Adopt a pet function</font></h2>
+<p>
+Thank you for donations
+<br><strong><font color = "RebeccaPurple"><a href=https://patreon.com/draganrocks>https://patreon.com/draganrocks</a></font></strong>
+</p>
+
+<p>
+<br/>
+</p>
+<ul>
+<li><a href="http://dragan.rocks">http://dragan.rocks</a></li>
+<li><a href="http://neanderthal.uncomplicate.org">http://neanderthal.uncomplicate.org</a></li>
+<li><a href="http://clojurecuda.uncomplicate.org">http://clojurecuda.uncomplicate.org</a></li>
+<li><a href="http://clojurecl.uncomplicate.org">http://clojurecl.uncomplicate.org</a></li>
+
+</ul>
+
+<aside class="notes">
+<p>
+Thank you.
+</p>
+
+<p>
+Before I take questions, I would like to inform you that I have recently started
+accepting donations on Patreon to support these projects.
+</p>
+
+<p>
+The most interesting perk - you can adopt a pet function!
+</p>
+
+<p>
+A function of your choice can become your pet; by supporting my work on
+Patreon you'll make sure that the function is in good shape and free of bugs!
+</p>
+
+</aside>
+</section>
+</section>
+</div>
+</div>
+<script src="./reveal.js-3.7.0/lib/js/head.min.js"></script>
+<script src="./reveal.js-3.7.0/js/reveal.js"></script>
+
+<script>
+// Full list of configuration options available here:
+// https://github.com/hakimel/reveal.js#configuration
+Reveal.initialize({
+
+controls: true,
+progress: true,
+history: false,
+center: true,
+slideNumber: 'c',
+rollingLinks: false,
+keyboard: true,
+overview: true,
+
+theme: Reveal.getQueryHash().theme, // available themes are in /css/theme
+transition: Reveal.getQueryHash().transition || 'default', // default/cube/page/concave/zoom/linear/fade/none
+transitionSpeed: 'default',
+multiplex: {
+    secret: '', // null if client
+    id: '', // id, obtained from socket.io server
+    url: '' // Location of socket.io server
+},
+
+// Optional libraries used to extend on reveal.js
+dependencies: [
+ { src: './reveal.js-3.7.0/lib/js/classList.js', condition: function() { return !document.body.classList; } },
+ { src: './reveal.js-3.7.0/plugin/markdown/marked.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
+ { src: './reveal.js-3.7.0/plugin/markdown/markdown.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
+ { src: './reveal.js-3.7.0/plugin/zoom-js/zoom.js', async: true, condition: function() { return !!document.body.classList; } },
+ { src: './reveal.js-3.7.0/plugin/notes/notes.js', async: true, condition: function() { return !!document.body.classList; } }]
+});
+</script>
+</body>
+</html>
