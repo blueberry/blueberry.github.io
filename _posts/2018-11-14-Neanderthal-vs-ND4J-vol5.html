@@ -1,0 +1,809 @@
+---
+date: 2018-11-14
+tags:
+- Neanderthal
+- MKL
+- Clojure
+- Java
+- ND4J
+- Deeplearning4J
+- CUDA
+author: dragan
+layout: post
+title: Neanderthal vs ND4J - vol 5 - Why are native map and reduce up to 100x faster in Clojure?
+excerpt: In which we compare mapping and reduction functions in Clojure's Neanderthal and Nd4j, on both CPU and CUDA .
+categories:
+- Neanderthal
+- MKL
+- Clojure
+- Java
+- ND4J
+- Deeplearning4J
+- CUDA
+---
+<p>
+See <a href="./Neanderthal-vs-ND4J-vol1">Part 1</a>, <a href="./Neanderthal-vs-ND4J-vol2">2</a>, <a href="./Neanderthal-vs-ND4J-vol3">3</a>, and <a href="./Neanderthal-vs-ND4J-vol4">4</a>, of this series, for comparisons of matrix operations on the CPU and broadcasting on the CPU and GPU.
+Now I demonstrate another common area where <a href="https://neanderthal.uncomplicate.org">Neanderthal</a> (<iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=neanderthal&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>)
+is much faster than Nd4j despite both libraries using optimized native routines and the same hardware.
+</p>
+
+<p>
+When I wrote the last article, I had too much material, and I left comparisons of mapping and reduction functions
+for later. Some months pass, without me finding time to write a proper narrative. But, now I think there is no
+need for much explanation. Here is the code, and I put results that I get on my old Intel i7 4790k processor
+for different sizes of vectors and matrices. What else speaks better than code?
+</p>
+
+<p>
+As examples, I typically use functions that I found in the <a href="https://deeplearning4j.org/docs/latest/nd4j-overview">Nd4j documentation and tutorial</a>.
+</p>
+
+<p>
+TL;DR: <a href="https://neanderthal.uncomplicate.org">Neanderthal</a> (<iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=neanderthal&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>)
+is typically an order of magnitude faster. For small data even more. For very large, Nd4j catches up.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span>uncomplicate.commons.core <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>with-release release<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>uncomplicate.fluokitten.core <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>fmap!<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>uncomplicate.neanderthal
+           <span style="color: #909183;">[</span>core <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>dot raw row col entry! mv! sum mrows asum axpy! vctr rk!<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>native <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>fge fv<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>math <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>sqrt<span style="color: #709870;">]</span><span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>criterium.core <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>quick-bench<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>import org.nd4j.linalg.factory.Nd4j
+        org.nd4j.linalg.api.ndarray.INDArray
+        java.util.SplittableRandom<span style="color: #707183;">)</span>
+
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #7388d6;">[</span>splittable-random <span style="color: #909183;">(</span>SplittableRandom.<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">random</span> ^double <span style="color: #909183;">[</span>^double _<span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>.nextDouble ^SplittableRandom splittable-random<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div id="outline-container-orgfe8dc16" class="outline-2">
+<h2 id="orgfe8dc16">Distance (dot product)</h2>
+<div class="outline-text-2" id="text-orgfe8dc16">
+<p>
+Calculating distance between two vectors or matrices involves both mapping, which is trivially parallelizable,
+and reduction.
+</p>
+</div>
+
+<div id="outline-container-org9785c56" class="outline-3">
+<h3 id="org9785c56">Nd4j</h3>
+<div class="outline-text-3" id="text-org9785c56">
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">bench-nd4j-distance</span>
+  <span style="color: #7388d6;">(</span><span style="color: #909183;">[</span>n<span style="color: #909183;">]</span>
+   <span style="color: #909183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #709870;">[</span>x <span style="color: #907373;">(</span><span style="color: #2F8B58; font-weight: bold;">Nd4j</span>/rand <span style="color: #6276ba;">(</span>int-array <span style="color: #858580;">[</span>n<span style="color: #858580;">]</span><span style="color: #6276ba;">)</span><span style="color: #907373;">)</span>
+         y <span style="color: #907373;">(</span><span style="color: #2F8B58; font-weight: bold;">Nd4j</span>/rand <span style="color: #6276ba;">(</span>int-array <span style="color: #858580;">[</span>n<span style="color: #858580;">]</span><span style="color: #6276ba;">)</span><span style="color: #907373;">)</span><span style="color: #709870;">]</span>
+     <span style="color: #709870;">(</span>quick-bench <span style="color: #907373;">(</span>.distance2 ^INDArray x ^INDArray y<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span><span style="color: #909183;">[</span>m n<span style="color: #909183;">]</span>
+   <span style="color: #909183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #709870;">[</span>x <span style="color: #907373;">(</span><span style="color: #2F8B58; font-weight: bold;">Nd4j</span>/rand <span style="color: #4E9A06;">\f</span> <span style="color: #6276ba;">(</span>int-array <span style="color: #858580;">[</span>m n<span style="color: #858580;">]</span><span style="color: #6276ba;">)</span><span style="color: #907373;">)</span>
+         y <span style="color: #907373;">(</span><span style="color: #2F8B58; font-weight: bold;">Nd4j</span>/rand <span style="color: #4E9A06;">\f</span> <span style="color: #6276ba;">(</span>int-array <span style="color: #858580;">[</span>m n<span style="color: #858580;">]</span><span style="color: #6276ba;">)</span><span style="color: #907373;">)</span><span style="color: #709870;">]</span>
+     <span style="color: #709870;">(</span>quick-bench <span style="color: #907373;">(</span>.distance2 ^INDArray x ^INDArray y<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org219e801" class="outline-3">
+<h3 id="org219e801">Neanderthal</h3>
+<div class="outline-text-3" id="text-org219e801">
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">bench-neanderthal-distance</span>
+  <span style="color: #7388d6;">(</span><span style="color: #909183;">[</span>n<span style="color: #909183;">]</span>
+   <span style="color: #909183;">(</span>with-release <span style="color: #709870;">[</span>x <span style="color: #907373;">(</span>fmap! random <span style="color: #6276ba;">(</span>fv n<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span>
+                  y <span style="color: #907373;">(</span>fmap! random <span style="color: #6276ba;">(</span>fv n<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span><span style="color: #709870;">]</span>
+     <span style="color: #709870;">(</span>quick-bench <span style="color: #907373;">(</span>sqrt <span style="color: #6276ba;">(</span>dot x y<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span><span style="color: #909183;">[</span>m n<span style="color: #909183;">]</span>
+   <span style="color: #909183;">(</span>with-release <span style="color: #709870;">[</span>x <span style="color: #907373;">(</span>fmap! random <span style="color: #6276ba;">(</span>fge m n<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span>
+                  y <span style="color: #907373;">(</span>fmap! random <span style="color: #6276ba;">(</span>fge m n<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span><span style="color: #709870;">]</span>
+     <span style="color: #709870;">(</span>quick-bench <span style="color: #907373;">(</span>sqrt <span style="color: #6276ba;">(</span>dot x y<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org214fef5" class="outline-3">
+<h3 id="org214fef5">Speed</h3>
+<div class="outline-text-3" id="text-org214fef5">
+</div>
+<ul class="org-ul">
+<li><a id="orgf287e88"></a>Distance between vectors<br />
+<div class="outline-text-4" id="text-orgf287e88">
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">dimension</th>
+<th scope="col" class="org-left">Nd4j</th>
+<th scope="col" class="org-left">Neanderthal</th>
+<th scope="col" class="org-left">Neanderthal speedup</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left">2</td>
+<td class="org-left">2.865009 µs</td>
+<td class="org-left">64.005593 ns</td>
+<td class="org-left">\(\times\) 45</td>
+</tr>
+
+<tr>
+<td class="org-left">10</td>
+<td class="org-left">3.055880 µs</td>
+<td class="org-left">62.042329 ns</td>
+<td class="org-left">\(\times\) 49</td>
+</tr>
+
+<tr>
+<td class="org-left">100</td>
+<td class="org-left">3.104767 µs</td>
+<td class="org-left">66.816429 ns</td>
+<td class="org-left">\(\times\) 47</td>
+</tr>
+
+<tr>
+<td class="org-left">1,000</td>
+<td class="org-left">3.712104 µs</td>
+<td class="org-left">92.034678 ns</td>
+<td class="org-left">\(\times\) 40</td>
+</tr>
+
+<tr>
+<td class="org-left">10,000</td>
+<td class="org-left">7.369057 µs</td>
+<td class="org-left">908.968553 ns</td>
+<td class="org-left">\(\times\) 8</td>
+</tr>
+
+<tr>
+<td class="org-left">1 M</td>
+<td class="org-left">369.138225 µs</td>
+<td class="org-left">68.781036 µs</td>
+<td class="org-left">\(\times\) 5</td>
+</tr>
+
+<tr>
+<td class="org-left">100 M</td>
+<td class="org-left">39.677566 ms</td>
+<td class="org-left">25.768197 ms</td>
+<td class="org-left">\(\times\) 1.5</td>
+</tr>
+</tbody>
+</table>
+</div>
+</li>
+
+<li><a id="org7b162e1"></a>Distance between matrices<br />
+<div class="outline-text-4" id="text-org7b162e1">
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">dimensions</th>
+<th scope="col" class="org-left">Nd4j</th>
+<th scope="col" class="org-left">Neanderthal</th>
+<th scope="col" class="org-left">Neanderthal speedup</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left">10 \(\times\) 15</td>
+<td class="org-left">3.313088 µs</td>
+<td class="org-left">278.192235 ns</td>
+<td class="org-left">\(\times\) 12</td>
+</tr>
+
+<tr>
+<td class="org-left">100 \(\times\) 100</td>
+<td class="org-left">7.109816 µs</td>
+<td class="org-left">1.115164 µs</td>
+<td class="org-left">\(\times\) 6</td>
+</tr>
+
+<tr>
+<td class="org-left">1,000 \(\times\) 1,000</td>
+<td class="org-left">357.002435 µs</td>
+<td class="org-left">82.225425 µs</td>
+<td class="org-left">\(\times\) 4</td>
+</tr>
+
+<tr>
+<td class="org-left">100 \(\times\) 10,000</td>
+<td class="org-left">423.156695 µs</td>
+<td class="org-left">76.504216 µs</td>
+<td class="org-left">\(\times\)  5</td>
+</tr>
+
+<tr>
+<td class="org-left">10,000 \(\times\) 100</td>
+<td class="org-left">335.000853 µs</td>
+<td class="org-left">81.241423 µs</td>
+<td class="org-left">\(\times\) 4</td>
+</tr>
+
+<tr>
+<td class="org-left">10,000 \(\times\) 10,000</td>
+<td class="org-left">40.107896 ms</td>
+<td class="org-left">27.167233 ms</td>
+<td class="org-left">\(\times\) 1.5</td>
+</tr>
+</tbody>
+</table>
+</div>
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-org617960a" class="outline-2">
+<h2 id="org617960a">Sum</h2>
+<div class="outline-text-2" id="text-org617960a">
+</div>
+<div id="outline-container-org7d49f1b" class="outline-3">
+<h3 id="org7d49f1b">Nd4j</h3>
+<div class="outline-text-3" id="text-org7d49f1b">
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">bench-nd4j-sum</span>
+  <span style="color: #7388d6;">(</span><span style="color: #909183;">[</span>n<span style="color: #909183;">]</span>
+   <span style="color: #909183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #709870;">[</span>x <span style="color: #907373;">(</span><span style="color: #2F8B58; font-weight: bold;">Nd4j</span>/rand <span style="color: #6276ba;">(</span>int-array <span style="color: #858580;">[</span>n<span style="color: #858580;">]</span><span style="color: #6276ba;">)</span><span style="color: #907373;">)</span><span style="color: #709870;">]</span>
+     <span style="color: #709870;">(</span>quick-bench <span style="color: #907373;">(</span>.sumNumber ^INDArray x<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span><span style="color: #909183;">[</span>m n<span style="color: #909183;">]</span>
+   <span style="color: #909183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #709870;">[</span>a <span style="color: #907373;">(</span><span style="color: #2F8B58; font-weight: bold;">Nd4j</span>/rand <span style="color: #4E9A06;">\f</span> <span style="color: #6276ba;">(</span>int-array <span style="color: #858580;">[</span>m n<span style="color: #858580;">]</span><span style="color: #6276ba;">)</span><span style="color: #907373;">)</span>
+         d <span style="color: #907373;">(</span>int-array <span style="color: #6276ba;">[</span>0<span style="color: #6276ba;">]</span><span style="color: #907373;">)</span><span style="color: #709870;">]</span>
+     <span style="color: #709870;">(</span>quick-bench <span style="color: #907373;">(</span>.sum ^INDArray a d<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org154513f" class="outline-3">
+<h3 id="org154513f">Neanderthal</h3>
+<div class="outline-text-3" id="text-org154513f">
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">bench-neanderthal-sum</span>
+  <span style="color: #7388d6;">(</span><span style="color: #909183;">[</span>n<span style="color: #909183;">]</span>
+   <span style="color: #909183;">(</span>with-release <span style="color: #709870;">[</span>x <span style="color: #907373;">(</span>fmap! random <span style="color: #6276ba;">(</span>fv n<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span><span style="color: #709870;">]</span>
+     <span style="color: #709870;">(</span>quick-bench <span style="color: #907373;">(</span>sum x<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span><span style="color: #909183;">[</span>m n<span style="color: #909183;">]</span>
+   <span style="color: #909183;">(</span>with-release <span style="color: #709870;">[</span>a <span style="color: #907373;">(</span>fmap! random <span style="color: #6276ba;">(</span>fge m n<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span><span style="color: #709870;">]</span>
+     <span style="color: #709870;">(</span>quick-bench <span style="color: #907373;">(</span>sum a<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org1cd278a" class="outline-3">
+<h3 id="org1cd278a">Speed</h3>
+<div class="outline-text-3" id="text-org1cd278a">
+<p>
+You'll notice that this is the only function on the CPU where Nd4j can be faster than Neanderthal.
+</p>
+</div>
+
+<ul class="org-ul">
+<li><a id="org8737d24"></a>Vector sum<br />
+<div class="outline-text-4" id="text-org8737d24">
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">dimension</th>
+<th scope="col" class="org-left">Nd4j</th>
+<th scope="col" class="org-left">Neanderthal</th>
+<th scope="col" class="org-left">Neanderthal speedup</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left">2</td>
+<td class="org-left">4.214011 µs</td>
+<td class="org-left">71.435637 ns</td>
+<td class="org-left">\(\times\) 59</td>
+</tr>
+
+<tr>
+<td class="org-left">10</td>
+<td class="org-left">4.232423 µs</td>
+<td class="org-left">70.562578 ns</td>
+<td class="org-left">\(\times\) 60</td>
+</tr>
+
+<tr>
+<td class="org-left">100</td>
+<td class="org-left">4.299567 µs</td>
+<td class="org-left">84.437461 ns</td>
+<td class="org-left">\(\times\)  51</td>
+</tr>
+
+<tr>
+<td class="org-left">1,000</td>
+<td class="org-left">4.627851 µs</td>
+<td class="org-left">120.773336 ns</td>
+<td class="org-left">\(\times\) 39</td>
+</tr>
+
+<tr>
+<td class="org-left">10,000</td>
+<td class="org-left">14.572367 µs</td>
+<td class="org-left">1.225827 µs</td>
+<td class="org-left">\(\times\) 12</td>
+</tr>
+
+<tr>
+<td class="org-left">1 M</td>
+<td class="org-left">219.302064 µs</td>
+<td class="org-left">130.245611 µs</td>
+<td class="org-left">\(\times\) 1.7</td>
+</tr>
+
+<tr>
+<td class="org-left">100 M</td>
+<td class="org-left">22.361447 ms</td>
+<td class="org-left">28.147435 ms</td>
+<td class="org-left">\(\times\) 0.8</td>
+</tr>
+</tbody>
+</table>
+</div>
+</li>
+
+<li><a id="orgbde2c98"></a>Matrix sum<br />
+<div class="outline-text-4" id="text-orgbde2c98">
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">dimensions</th>
+<th scope="col" class="org-left">Nd4j</th>
+<th scope="col" class="org-left">Neanderthal</th>
+<th scope="col" class="org-left">Neanderthal speedup</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left">10 \(\times\) 15</td>
+<td class="org-left">5.904680 µs</td>
+<td class="org-left">84.925045 ns</td>
+<td class="org-left">\(\times\) 69</td>
+</tr>
+
+<tr>
+<td class="org-left">100 \(\times\) 100</td>
+<td class="org-left">21.092154 µs</td>
+<td class="org-left">1.254015 µs</td>
+<td class="org-left">\(\times\) 17</td>
+</tr>
+
+<tr>
+<td class="org-left">1,000 \(\times\) 1,000</td>
+<td class="org-left">52.358064 µs</td>
+<td class="org-left">131.412269 µs</td>
+<td class="org-left">\(\times\) 0.4</td>
+</tr>
+
+<tr>
+<td class="org-left">100 \(\times\) 10,000</td>
+<td class="org-left">103.955403 µs</td>
+<td class="org-left">147.992786 µs</td>
+<td class="org-left">\(\times\) 0.7</td>
+</tr>
+
+<tr>
+<td class="org-left">10,000 \(\times\) 100</td>
+<td class="org-left">64.909655 µs</td>
+<td class="org-left">129.061267 µs</td>
+<td class="org-left">\(\times\) 0.5</td>
+</tr>
+
+<tr>
+<td class="org-left">10,000 \(\times\) 10,000</td>
+<td class="org-left">15.360876 ms</td>
+<td class="org-left">27.866048 ms</td>
+<td class="org-left">\(\times\) 0.5</td>
+</tr>
+</tbody>
+</table>
+</div>
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-orgcda771e" class="outline-2">
+<h2 id="orgcda771e">Absolute sum</h2>
+<div class="outline-text-2" id="text-orgcda771e">
+<p>
+OK, I am guilty of not making <code>sum</code> as fast as I should have. However,
+I can offer the <code>asum</code> function, which covers most of <code>sum</code> use cases.
+See how fast that is in Neanderthal.
+</p>
+</div>
+
+<div id="outline-container-org9a39078" class="outline-3">
+<h3 id="org9a39078">Nd4j</h3>
+<div class="outline-text-3" id="text-org9a39078">
+<p>
+Absolute sum is cumbersome to call in Nd4j so I'll skip that code and use <code>sum</code>
+results from Nd4j for comparison. <code>asum</code> has more work to do anyway,
+and in my measurements, Nd4j <code>sum</code> was never slower than Nd4j <code>asum</code>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgc90c770" class="outline-3">
+<h3 id="orgc90c770">Neanderthal</h3>
+<div class="outline-text-3" id="text-orgc90c770">
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">bench-neanderthal-asum</span>
+  <span style="color: #7388d6;">(</span><span style="color: #909183;">[</span>n<span style="color: #909183;">]</span>
+   <span style="color: #909183;">(</span>with-release <span style="color: #709870;">[</span>x <span style="color: #907373;">(</span>fmap! random <span style="color: #6276ba;">(</span>fv n<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span><span style="color: #709870;">]</span>
+     <span style="color: #709870;">(</span>quick-bench <span style="color: #907373;">(</span>asum x<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span><span style="color: #909183;">[</span>m n<span style="color: #909183;">]</span>
+   <span style="color: #909183;">(</span>with-release <span style="color: #709870;">[</span>a <span style="color: #907373;">(</span>fmap! random <span style="color: #6276ba;">(</span>fge m n<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span><span style="color: #709870;">]</span>
+     <span style="color: #709870;">(</span>quick-bench <span style="color: #907373;">(</span>asum a<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgaab1ad1" class="outline-3">
+<h3 id="orgaab1ad1">Speed</h3>
+<div class="outline-text-3" id="text-orgaab1ad1">
+</div>
+<ul class="org-ul">
+<li><a id="orgc74c421"></a>Vector asum<br />
+<div class="outline-text-4" id="text-orgc74c421">
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">dimension</th>
+<th scope="col" class="org-left">Nd4j sum</th>
+<th scope="col" class="org-left">Neanderthal asum</th>
+<th scope="col" class="org-left">Neanderthal speedup</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left">2</td>
+<td class="org-left">4.214011 µs</td>
+<td class="org-left">50.302131 ns</td>
+<td class="org-left">\(\times\) 84</td>
+</tr>
+
+<tr>
+<td class="org-left">10</td>
+<td class="org-left">4.232423 µs</td>
+<td class="org-left">45.395512 ns</td>
+<td class="org-left">\(\times\) 94</td>
+</tr>
+
+<tr>
+<td class="org-left">100</td>
+<td class="org-left">4.299567 µs</td>
+<td class="org-left">49.682850 ns</td>
+<td class="org-left">\(\times\)  86</td>
+</tr>
+
+<tr>
+<td class="org-left">1,000</td>
+<td class="org-left">4.627851 µs</td>
+<td class="org-left">76.036001 ns</td>
+<td class="org-left">\(\times\) 61</td>
+</tr>
+
+<tr>
+<td class="org-left">10,000</td>
+<td class="org-left">14.572367 µs</td>
+<td class="org-left">573.208513 ns</td>
+<td class="org-left">\(\times\) 25</td>
+</tr>
+
+<tr>
+<td class="org-left">1 M</td>
+<td class="org-left">219.302064 µs</td>
+<td class="org-left">32.646665 µs</td>
+<td class="org-left">\(\times\) 6.5</td>
+</tr>
+
+<tr>
+<td class="org-left">100 M</td>
+<td class="org-left">22.361447 ms</td>
+<td class="org-left">13.238496 ms</td>
+<td class="org-left">\(\times\) 1.7</td>
+</tr>
+</tbody>
+</table>
+</div>
+</li>
+
+<li><a id="orgb352946"></a>Matrix sum<br />
+<div class="outline-text-4" id="text-orgb352946">
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">dimensions</th>
+<th scope="col" class="org-left">Nd4j sum</th>
+<th scope="col" class="org-left">Neanderthal asum</th>
+<th scope="col" class="org-left">Neanderthal speedup</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left">10 \(\times\) 15</td>
+<td class="org-left">5.904680 µs</td>
+<td class="org-left">50.816077 ns</td>
+<td class="org-left">\(\times\) 116</td>
+</tr>
+
+<tr>
+<td class="org-left">100 \(\times\) 100</td>
+<td class="org-left">21.092154 µs</td>
+<td class="org-left">466.800109 ns</td>
+<td class="org-left">\(\times\) 45</td>
+</tr>
+
+<tr>
+<td class="org-left">1,000 \(\times\) 1,000</td>
+<td class="org-left">52.358064 µs</td>
+<td class="org-left">31.799570 µs</td>
+<td class="org-left">\(\times\) 1.7</td>
+</tr>
+
+<tr>
+<td class="org-left">100 \(\times\) 10,000</td>
+<td class="org-left">103.955403 µs</td>
+<td class="org-left">33.643302 µs</td>
+<td class="org-left">\(\times\)   3</td>
+</tr>
+
+<tr>
+<td class="org-left">10,000 \(\times\) 100</td>
+<td class="org-left">64.909655 µs</td>
+<td class="org-left">32.994745 µs</td>
+<td class="org-left">\(\times\) 2</td>
+</tr>
+
+<tr>
+<td class="org-left">10,000 \(\times\) 10,000</td>
+<td class="org-left">15.360876 ms</td>
+<td class="org-left">13.070991 ms</td>
+<td class="org-left">\(\times\) 1.15</td>
+</tr>
+</tbody>
+</table>
+</div>
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-orge175cdb" class="outline-2">
+<h2 id="orge175cdb">Finding the position of maximum absolute value</h2>
+<div class="outline-text-2" id="text-orge175cdb">
+<p>
+Often we need to know which element is the largest or smallest.
+</p>
+</div>
+
+<div id="outline-container-org3bdbb53" class="outline-3">
+<h3 id="org3bdbb53">Nd4j</h3>
+<div class="outline-text-3" id="text-org3bdbb53">
+<p>
+In the last section, I was joking that calling absolute sum in Nd4j is too cumbersome
+to show you the code, to make you write some code and measure some of that stuff yourself.
+Rather that being too cumbersome, it is just cumbersome, as in the case of <code>iamax</code> that I show here:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">bench-nd4j-iamax</span>
+  <span style="color: #7388d6;">[</span>n<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #909183;">[</span>x <span style="color: #709870;">(</span><span style="color: #2F8B58; font-weight: bold;">Nd4j</span>/rand <span style="color: #907373;">(</span>int-array <span style="color: #6276ba;">[</span>n<span style="color: #6276ba;">]</span><span style="color: #907373;">)</span><span style="color: #709870;">)</span>
+        exec <span style="color: #709870;">(</span><span style="color: #2F8B58; font-weight: bold;">Nd4j</span>/getExecutioner<span style="color: #709870;">)</span>
+        iamax <span style="color: #709870;">(</span>org.nd4j.linalg.api.ops.impl.indexaccum.IAMax. x<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>quick-bench <span style="color: #709870;">(</span>.getFinalResult <span style="color: #907373;">(</span>.execAndReturn exec iamax<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Notice how you need to setup the executor and keep it around. I do not measure the executor creation
+time here. But beware, wrapping lots of similar Nd4j code inside simpler API might seem as a low hanging
+fruit, but might be a trap if you don't find a way to properly handle the executor life-cycle.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org53b0732" class="outline-3">
+<h3 id="org53b0732">Neanderthal</h3>
+<div class="outline-text-3" id="text-org53b0732">
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">bench-neanderthal-iamax</span> <span style="color: #7388d6;">[</span>n<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>with-release <span style="color: #909183;">[</span>x <span style="color: #709870;">(</span>fmap! random <span style="color: #907373;">(</span>fv n<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>quick-bench <span style="color: #709870;">(</span>iamax x<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgd9dd87e" class="outline-3">
+<h3 id="orgd9dd87e">Speed</h3>
+<div class="outline-text-3" id="text-orgd9dd87e">
+</div>
+<ul class="org-ul">
+<li><a id="org3f36057"></a>Vector iamax<br />
+<div class="outline-text-4" id="text-org3f36057">
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">dimension</th>
+<th scope="col" class="org-left">Nd4j sum</th>
+<th scope="col" class="org-left">Neanderthal asum</th>
+<th scope="col" class="org-left">Neanderthal speedup</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left">2</td>
+<td class="org-left">1.212382 µs</td>
+<td class="org-left">75.503383 ns</td>
+<td class="org-left">\(\times\) 16</td>
+</tr>
+
+<tr>
+<td class="org-left">10</td>
+<td class="org-left">1.234349 µs</td>
+<td class="org-left">66.782601 ns</td>
+<td class="org-left">\(\times\) 19</td>
+</tr>
+
+<tr>
+<td class="org-left">100</td>
+<td class="org-left">1.346079 µs</td>
+<td class="org-left">63.711496 ns</td>
+<td class="org-left">\(\times\)  21</td>
+</tr>
+
+<tr>
+<td class="org-left">1,000</td>
+<td class="org-left">2.080715 µs</td>
+<td class="org-left">305.853934 ns</td>
+<td class="org-left">\(\times\) 7</td>
+</tr>
+
+<tr>
+<td class="org-left">10,000</td>
+<td class="org-left">10.239278 µs</td>
+<td class="org-left">2.540639 µs</td>
+<td class="org-left">\(\times\) 4</td>
+</tr>
+
+<tr>
+<td class="org-left">1 M</td>
+<td class="org-left">209.913386 µs</td>
+<td class="org-left">116.195962 µs</td>
+<td class="org-left">\(\times\)  1.8</td>
+</tr>
+
+<tr>
+<td class="org-left">100 M</td>
+<td class="org-left">20.508549 ms</td>
+<td class="org-left">15.084416 ms</td>
+<td class="org-left">\(\times\) 1.4</td>
+</tr>
+</tbody>
+</table>
+</div>
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-orgd4709f2" class="outline-2">
+<h2 id="orgd4709f2">So, why?</h2>
+<div class="outline-text-2" id="text-orgd4709f2">
+<p>
+If you run the code from this post on your machine you'll probably get different numbers
+but proportionally comparable results. You'll notice one more thing: Neanderthal benchmarks
+will complete in a short time, while Nd4j benchmarks, especially the ones where the function
+itself is very fast, will drag on while the CPU usage spikes. That's because
+Nd4j tries to use Java's garbage collector to explicitly handle external resources. It goes against
+all warnings in Java's GC documentation to not do that. I guess with enough care it works well
+for DL4J folks, but here is one demonstration how it can be a source of incredible slowdown under pressure.
+Use with care.
+</p>
+
+<p>
+However, this is not the reason for the difference in speed of the computations that we measure.
+</p>
+
+<p>
+I have shown you that Neanderthal is much faster, but the title implies that this article will answer
+why is that so. Sorry for the creative title, the answer might be something you discover inspired by this series.
+</p>
+
+<p>
+It seems to me I have shown you enough of the capabilities of both Nd4j and Neandeathal on the CPU.
+The next article will probably explore the GPU side of both libraries.
+</p>
+</div>
+</div>
