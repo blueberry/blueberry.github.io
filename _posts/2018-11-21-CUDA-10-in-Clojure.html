@@ -1,0 +1,850 @@
+---
+date: 2018-11-21
+tags:
+- CUDA
+- Clojure
+- Java
+- ClojureCUDA
+author: dragan
+layout: post
+title: CUDA 10 in Clojure
+excerpt: CUDA 10 support has just landed in ClojureCUDA with the latest version 0.6.0.
+categories:
+- CUDA
+- Clojure
+- Java
+- ClojureCUDA
+---
+<p>
+New CUDA 10 support has just landed in <a href="https://clojurecuda.uncomplicate.org">ClojureCUDA</a> (<iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=clojurecuda&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>)
+with the latest version 0.6.0. <a href="https://clojurecuda.uncomplicate.org/articles/getting_started.html">Install CUDA 10 Toolkit</a>, update your drivers, update the ClojureCUDA version in your
+<code>project.clj</code>, and you should be ready to go! I expect that all your existing code continues to work without changes!
+</p>
+
+<p>
+CUDA is the leading environment for high performance computing on Nvidia GPU hardware. You've probably
+heard about it. What you may not know, is that instead of wrangling with C++ toolchain, you can use
+it directly from your interactive Clojure REPL!
+</p>
+
+<p>
+Other Clojure high performance libraries, such as <a href="https://neanderthal.uncomplicate.org">Neanderthal</a> (<iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=neanderthal&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>)
+take advantage of ClojureCUDA to deliver speed dynamically to your Clojure programs.
+</p>
+
+<p>
+Check these higher-level libraries to see how you can do fast calculations with
+a few lines of Clojure, without writing GPU code yourself. But, see how writing even low level
+code is not so scary when you have the full power of Clojure's interactive environment.
+Here is an interactive REPL session that builds the bulk increment function for the whole array.
+</p>
+
+<p>
+Notice that I don't write any explanations for the following lines of code, and I bet you
+can understand what's happening.
+</p>
+
+<div id="outline-container-orgb0d35a8" class="outline-2">
+<h2 id="orgb0d35a8">Play with the environment</h2>
+<div class="outline-text-2" id="text-orgb0d35a8">
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span>uncomplicate.clojurecuda.core <span style="color: #F5666D;">:refer</span> <span style="color: #F5666D;">:all</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>uncomplicate.commons.core <span style="color: #F5666D;">:refer</span> <span style="color: #F5666D;">:all</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>init<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+true
+
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>device-count<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+2
+
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">my-nvidia-gpu</span> <span style="color: #7388d6;">(</span>device 0<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#'user/my-nvidia-gpu
+
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>info my-nvidia-gpu<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+</colgroup>
+<tbody>
+<tr>
+<td class="org-left">:async-engine-count</td>
+<td class="org-right">2</td>
+<td class="org-left">:managed-memory</td>
+<td class="org-left">true</td>
+<td class="org-left">:multi-gpu-board</td>
+<td class="org-left">false</td>
+<td class="org-left">:maximum-surface2d-layered-layers</td>
+<td class="org-right">2048</td>
+<td class="org-left">:maximum-texturecubemap-width</td>
+<td class="org-right">32768</td>
+<td class="org-left">:ecc-enabled</td>
+<td class="org-left">false</td>
+<td class="org-left">:max-pitch</td>
+<td class="org-right">2147483647</td>
+<td class="org-left">:max-grid-dim-y</td>
+<td class="org-right">65535</td>
+<td class="org-left">:compute-mode</td>
+<td class="org-left">:default</td>
+<td class="org-left">:can-map-host-memory</td>
+<td class="org-left">true</td>
+<td class="org-left">:max-grid-dim-z</td>
+<td class="org-right">65535</td>
+<td class="org-left">:pci-bus-id-string</td>
+<td class="org-right">0000:02:00.0</td>
+<td class="org-left">:maximum-texture2d-mipmapped-width</td>
+<td class="org-right">32768</td>
+<td class="org-left">:texture-pitch-alignment</td>
+<td class="org-right">32</td>
+<td class="org-left">:kernel-exec-timeout</td>
+<td class="org-left">false</td>
+<td class="org-left">:maximum-texture2d-linear-height</td>
+<td class="org-right">65000</td>
+<td class="org-left">:max-shared-memory-per-multiprocessor</td>
+<td class="org-right">98304</td>
+<td class="org-left">:total-mem</td>
+<td class="org-right">11721506816</td>
+<td class="org-left">:maximum-texture1d-layered-width</td>
+<td class="org-right">32768</td>
+<td class="org-left">:maximum-texturecubemap-layered-layers</td>
+<td class="org-right">2046</td>
+<td class="org-left">:maximum-texture3d-width</td>
+<td class="org-right">16384</td>
+<td class="org-left">:maximum-surface2d-layered-height</td>
+<td class="org-right">32768</td>
+<td class="org-left">:max-block-dim-z</td>
+<td class="org-right">64</td>
+<td class="org-left">:maximum-surface1d-width</td>
+<td class="org-right">32768</td>
+<td class="org-left">:maximum-surface3d-width</td>
+<td class="org-right">16384</td>
+<td class="org-left">:name</td>
+<td class="org-left">GeForce GTX 1080 Ti</td>
+<td class="org-left">:maximum-texture3d-height-alternate</td>
+<td class="org-right">8192</td>
+<td class="org-left">:max-threads-per-multiprocessor</td>
+<td class="org-right">2048</td>
+<td class="org-left">:max-shared-memory-per-block</td>
+<td class="org-right">49152</td>
+<td class="org-left">:maximum-texture3d-width-alternate</td>
+<td class="org-right">8192</td>
+<td class="org-left">:compute-capability-major</td>
+<td class="org-right">6</td>
+<td class="org-left">:texture-alignment</td>
+<td class="org-right">512</td>
+<td class="org-left">:global-memory-bus-width</td>
+<td class="org-right">352</td>
+<td class="org-left">:maximum-surface2d-layered-width</td>
+<td class="org-right">32768</td>
+<td class="org-left">:memory-clock-rate</td>
+<td class="org-right">5505000</td>
+<td class="org-left">:maximum-surfacecubemap-layered-layers</td>
+<td class="org-right">2046</td>
+<td class="org-left">:maximum-surface2d-height</td>
+<td class="org-right">65536</td>
+<td class="org-left">:clock-rate</td>
+<td class="org-right">1683000</td>
+<td class="org-left">:concurrent-kernels</td>
+<td class="org-right">1</td>
+<td class="org-left">:compute-capability-minor</td>
+<td class="org-right">1</td>
+<td class="org-left">:maximum-texture2d-width</td>
+<td class="org-right">131072</td>
+<td class="org-left">:max-threads-per-block</td>
+<td class="org-right">1024</td>
+<td class="org-left">:maximum-texture1d-linear-width</td>
+<td class="org-right">134217728</td>
+<td class="org-left">:integrated</td>
+<td class="org-left">false</td>
+<td class="org-left">:maximum-texture2d-layered-layers</td>
+<td class="org-right">2048</td>
+<td class="org-left">:max-block-dim-x</td>
+<td class="org-right">1024</td>
+<td class="org-left">:maximum-texture1d-mipmapped-width</td>
+<td class="org-right">16384</td>
+<td class="org-left">:maximum-texture2d-mipmapped-height</td>
+<td class="org-right">32768</td>
+<td class="org-left">:local-L1-cache-supported</td>
+<td class="org-left">true</td>
+<td class="org-left">:maximum-surface1d-layered-layers</td>
+<td class="org-right">2048</td>
+<td class="org-left">:pci-bus-id</td>
+<td class="org-right">2</td>
+<td class="org-left">:maximum-texture1d-layered-layers</td>
+<td class="org-right">2048</td>
+<td class="org-left">:maximum-surfacecubemap-layered-width</td>
+<td class="org-right">32768</td>
+<td class="org-left">:max-grid-dim-x</td>
+<td class="org-right">2147483647</td>
+<td class="org-left">:maximum-texture2d-height</td>
+<td class="org-right">65536</td>
+<td class="org-left">:global-L1-cache-supported</td>
+<td class="org-left">true</td>
+<td class="org-left">:maximum-texture2d-linear-pitch</td>
+<td class="org-right">2097120</td>
+<td class="org-left">:maximum-texturecubemap-layered-width</td>
+<td class="org-right">32768</td>
+<td class="org-left">:multi-gpu-board-group-id</td>
+<td class="org-right">0</td>
+<td class="org-left">:pci-domain-id</td>
+<td class="org-right">0</td>
+<td class="org-left">:maximum-surface3d-depth</td>
+<td class="org-right">16384</td>
+<td class="org-left">:maximum-surface2d-width</td>
+<td class="org-right">131072</td>
+<td class="org-left">:stream-priorities-supported</td>
+<td class="org-left">true</td>
+<td class="org-left">:multiprocessor-count</td>
+<td class="org-right">28</td>
+<td class="org-left">:tcc-driver</td>
+<td class="org-left">false</td>
+<td class="org-left">:warp-size</td>
+<td class="org-right">32</td>
+<td class="org-left">:unified-addressing</td>
+<td class="org-left">true</td>
+<td class="org-left">:maximum-texture3d-height</td>
+<td class="org-right">16384</td>
+<td class="org-left">:L2-cache-size</td>
+<td class="org-right">2883584</td>
+<td class="org-left">:maximum-surfacecubemap-width</td>
+<td class="org-right">32768</td>
+<td class="org-left">:maximum-texture1d-width</td>
+<td class="org-right">131072</td>
+<td class="org-left">:maximum-surface1d-layered-width</td>
+<td class="org-right">32768</td>
+<td class="org-left">:maximum-surface3d-height</td>
+<td class="org-right">16384</td>
+<td class="org-left">:pci-device-id</td>
+<td class="org-right">0</td>
+<td class="org-left">:max-registers-per-block</td>
+<td class="org-right">65536</td>
+<td class="org-left">:max-block-dim-y</td>
+<td class="org-right">1024</td>
+<td class="org-left">:surface-alignment</td>
+<td class="org-right">512</td>
+<td class="org-left">:maximum-texture3d-depth-alternate</td>
+<td class="org-right">32768</td>
+<td class="org-left">:maximum-texture3d-depth</td>
+<td class="org-right">16384</td>
+<td class="org-left">:total-constant-memory</td>
+<td class="org-right">65536</td>
+<td class="org-left">:maximum-texture2d-linear-width</td>
+<td class="org-right">131072</td>
+<td class="org-left">:max-registers-per-multiprocessor</td>
+<td class="org-right">65536</td>
+<td class="org-left">:maximum-texture2d-layered-height</td>
+<td class="org-right">32768</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+
+<div id="outline-container-org441c836" class="outline-2">
+<h2 id="org441c836">Create the context</h2>
+<div class="outline-text-2" id="text-org441c836">
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">ctx</span> <span style="color: #7388d6;">(</span>context my-nvidia-gpu<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#'user/ctx
+
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>info ctx<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+'(:dev-runtime-pending-launch-count 2048  :dev-runtime-sync-depth 2  :malloc-heap-size 8388608  :stack-size 1024  :api-version 3020  :stream-priority-range (0 -1)  :cache-config :prefer-none  :printf-fifo-size 1048576  :device #object(jcuda.driver.CUdevice 0x1db4190c "CUdevice[nativePointer=0x0]")  :shared-config :four-byte-bank-size)
+
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>= ctx <span style="color: #7388d6;">(</span>current-context<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+true
+
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org6e4f993" class="outline-2">
+<h2 id="org6e4f993">Play with memory</h2>
+<div class="outline-text-2" id="text-org6e4f993">
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">gpu-array</span> <span style="color: #7388d6;">(</span>mem-alloc 1024<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#'user/gpu-array
+
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">main-array</span> <span style="color: #7388d6;">(</span>float-array <span style="color: #909183;">(</span>range 256<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#'user/main-array
+
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>take 10 main-array<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+</colgroup>
+<tbody>
+<tr>
+<td class="org-right">0.0</td>
+<td class="org-right">1.0</td>
+<td class="org-right">2.0</td>
+<td class="org-right">3.0</td>
+<td class="org-right">4.0</td>
+<td class="org-right">5.0</td>
+<td class="org-right">6.0</td>
+<td class="org-right">7.0</td>
+<td class="org-right">8.0</td>
+<td class="org-right">9.0</td>
+</tr>
+</tbody>
+</table>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>memcpy-host! main-array gpu-array<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#object[uncomplicate.clojurecuda.internal.impl.CULinearMemory 0x515e61e0 "uncomplicate.clojurecuda.internal.impl.CULinearMemory@515e61e0"]
+
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org7f89bc8" class="outline-2">
+<h2 id="org7f89bc8">Compute something already</h2>
+<div class="outline-text-2" id="text-org7f89bc8">
+<div class="org-src-container">
+<pre class="src src-c"><span style="color: #A52A2A; font-weight: bold;">extern</span> <span style="color: #4E9A06;">"C"</span>
+__global__ <span style="color: #2F8B58; font-weight: bold;">void</span> <span style="color: #00578E; font-weight: bold;">increment</span>(<span style="color: #2F8B58; font-weight: bold;">int</span> <span style="color: #0084C8; font-weight: bold;">n</span>, <span style="color: #2F8B58; font-weight: bold;">float</span> *<span style="color: #0084C8; font-weight: bold;">a</span>) {
+    <span style="color: #2F8B58; font-weight: bold;">int</span> <span style="color: #0084C8; font-weight: bold;">i</span> = blockIdx.x * blockDim.x + threadIdx.x;
+    <span style="color: #A52A2A; font-weight: bold;">if</span> (i &lt; n) {
+        a[i] = a[i] + 1.0f;
+    }
+};
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">kernel-source</span>
+      <span style="color: #4E9A06;">"extern \"C\"</span>
+<span style="color: #4E9A06;">         __global__ void increment (int n, float *a) {</span>
+<span style="color: #4E9A06;">           int i = blockIdx.x * blockDim.x + threadIdx.x;</span>
+<span style="color: #4E9A06;">           if (i &lt; n) {</span>
+<span style="color: #4E9A06;">             a[i] = a[i] + 1.0f;</span>
+<span style="color: #4E9A06;">        }</span>
+<span style="color: #4E9A06;">       };"</span><span style="color: #707183;">)</span>
+
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">hello-program</span> <span style="color: #7388d6;">(</span>compile! <span style="color: #909183;">(</span>program kernel-source<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">hello-module</span> <span style="color: #7388d6;">(</span>module hello-program<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">increment</span> <span style="color: #7388d6;">(</span>function hello-module <span style="color: #4E9A06;">"increment"</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#'user/kernel-source#'user/hello-program#'user/hello-module#'user/increment
+
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>launch! increment <span style="color: #7388d6;">(</span>grid-1d 256<span style="color: #7388d6;">)</span> <span style="color: #7388d6;">(</span>parameters 256 gpu-array<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+nil
+
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>take 12 <span style="color: #7388d6;">(</span>memcpy-host! gpu-array <span style="color: #909183;">(</span>float-array 256<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+</colgroup>
+<tbody>
+<tr>
+<td class="org-right">1.0</td>
+<td class="org-right">2.0</td>
+<td class="org-right">3.0</td>
+<td class="org-right">4.0</td>
+<td class="org-right">5.0</td>
+<td class="org-right">6.0</td>
+<td class="org-right">7.0</td>
+<td class="org-right">8.0</td>
+<td class="org-right">9.0</td>
+<td class="org-right">10.0</td>
+<td class="org-right">11.0</td>
+<td class="org-right">12.0</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+
+<div id="outline-container-orgb2c16d2" class="outline-2">
+<h2 id="orgb2c16d2">How to get involved</h2>
+<div class="outline-text-2" id="text-orgb2c16d2">
+<p>
+ClojureCUDA and other Uncomplicate libraries are open source. You can contribute with examples, bug fixes,
+new features, etc. I understand that you may need more time or knowledge to be able to do that.
+</p>
+
+<p>
+That's why I've recently started a donation campaign to enable people who do not have enough time,
+to help me have more time to work on this, by donating a monthly amount of your choice on Patreon.
+</p>
+
+<p>
+You can even <a href="./Patreon-Announcement-Adopt-a-Function">adopt a pet function</a> of your own!
+</p>
+
+<p>
+Since the Black Friday is coming, I even created a special Black Friday tier for people who pledge support in the
+next few days! Does it offer super special discounts? NO, since I'm not selling anything :)
+</p>
+
+<p>
+<a href="https://www.patreon.com/bePatron?u=780511" data-patreon-widget-type="become-patron-button">Donate and become a Patron!</a>
+</p>
+</div>
+</div>
+
+<div id="outline-container-org3304349" class="outline-2">
+<h2 id="org3304349">SmallFP ClojureCUDA talk</h2>
+<div class="outline-text-2" id="text-org3304349">
+<p>
+A few month ago I've visited <a href="./SmallFP-presentation-Interactive-Functional-GPU-Accellerated-Programming-Clojure">SmallFP &amp; ClojuTRE</a> conference in beautiful Helsinki, Finland.
+Maybe you'll find that talk interesting. Here's the <a href="https://www.youtube.com/watch?v=ZVnbNLks2Ow">link to the video on YouTube</a>. And <a href="https://dragan.rocks/talks/SmallFP2018/smallfp2018.html">here are the slides</a>.
+</p>
+</div>
+</div>
