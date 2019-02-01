@@ -1,0 +1,154 @@
+---
+date: 2019-02-01
+tags:
+- Deep Learning
+- Neanderthal
+- MKL
+- Clojure
+- CUDA
+- OpenCL
+author: dragan
+layout: post
+title: Deep Learning in Clojure from Scratch to GPU - Part 0 - Why Bother?
+excerpt: An introduction to a series of tutorials about Deep Learning in Clojure funded by Clojurists Together. Start with an empty clj file and build a fast neural network that runs on the GPU, built with nothing else but plain Clojure and Neanderthal. The series is a companion to a free online book Neural Networks and Deep Learning.
+categories:
+- Deep Learning
+- Neanderthal
+- MKL
+- Clojure
+- CUDA
+- OpenCL
+---
+<p>
+In this series, you are going to implement your own deep learning mini library, first run it on the CPU,
+and then learn how to accelerate it on the GPU with (almost) no changes.
+</p>
+
+<div id="outline-container-org92d33d0" class="outline-2">
+<h2 id="org92d33d0">Motivation</h2>
+<div class="outline-text-2" id="text-org92d33d0">
+<p>
+Isn't that lots of work, you'd ask? Let me show you how to do it with a couple dozen lines of code!
+I am not talking about calling a specialized deep learning framework! We'll implement everything from
+scratch. It will only support the classic features, but can we make it faster
+than the mega-frameworks? Let's see&#x2026;
+</p>
+
+<p>
+Implementing deep learning and neural networks from scratch is an excellent way to:
+</p>
+
+<ul class="org-ul">
+<li>Learn the principles behind deep learning.</li>
+<li>Learn how to implement <i>other algorithms</i> using vectors and matrices.</li>
+<li>Learn how to write simple, yet fast, number crunching software.</li>
+<li>Learn when and how to accelerate stuff on the GPU.</li>
+<li>Have some programming fun!</li>
+</ul>
+
+<p>
+Why bother with this? There is TensorFlow by Google, there is PyTorch by Facebook,
+there is MxNet sponsored by Amazon, there are many other frameworks. Why not just learn these,
+and use the abundance of features they offer?
+</p>
+
+<p>
+Well, Google, Facebook, and Amazon certainly know what they're doing. But they are solving different
+problems than me. If I was in competition to out-google Google, I would probably need to use a (better) TensorFlow.
+Most of the features TensorFlow has might be a great fit for Google, but are bloat for the challenges that
+smaller companies have. What is a feature for these giants is often a shackle around small team's ankles.
+</p>
+
+<p>
+Additionally, you might've noticed that learning how to tame these beasts is not as easy as advertised.
+Tings you learn here will help you understand how these big frameworks work and how to use them optimally,
+even if TensorFlow and MxNet <i>are</i> the right tool for you. So, I guess there's no downside :)
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgd3e94db" class="outline-2">
+<h2 id="orgd3e94db">Here's how</h2>
+<div class="outline-text-2" id="text-orgd3e94db">
+<p>
+I wrote a bit about books that programmers can use to <a href="https://dragan.rocks/articles/18/Programmers-Teach-Yourself-Foundations-of-ML-AI-With-These-X-Books">learn about machine learning</a>. It is difficult to
+find resources that discuss the <i>implementation</i> of deep learning tools and algorithms.
+For programmers, I think that a nice short free online book <a href="http://neuralnetworksanddeeplearning.com/">Neural Networks and Deep Learning</a>
+by Michael Nielsen is a good starting choice.
+</p>
+
+<p>
+That book explains how to implement fully connected neural networks, and backs it up by only a minimal amount of math
+and complete Python code backed up by Numpy. This series of blog posts can be read as a companion
+to that (short!) book.
+</p>
+
+<p>
+What is the added value of <i>this</i> series?
+</p>
+
+<p>
+Obviously, one thing is that this is done in Clojure. But that in itself would not be <i>that</i> much.
+</p>
+
+<p>
+What is unique here, is that we will do a more thorough job in implementation.
+We will:
+</p>
+
+<ul class="org-ul">
+<li>have less code</li>
+<li>use more techniques offered by matrix libraries to make a more serious solution</li>
+<li>do a better job in optimizing memory usage</li>
+<li>do a better job in optimizing performance</li>
+<li>make it run on the GPU</li>
+<li>implement some additional DL optimizations that Michael's book just mentions</li>
+<li>make a groundwork for a nice Clojure based DL library with tensors, convolutions, Intel's MKL-DNN, Nvidia's cuDNN and all that.</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-orgce3989f" class="outline-2">
+<h2 id="orgce3989f">Next steps</h2>
+<div class="outline-text-2" id="text-orgce3989f">
+<p>
+Before reading this series, it would be a good idea that you do some preparation:
+</p>
+
+<ul class="org-ul">
+<li>Read the first chapter <a href="http://neuralnetworksanddeeplearning.com/chap1.html">of the book</a>. It's a nice (short!) introduction.</li>
+<li><a href="https://neanderthal.uncomplicate.org/articles/getting_started.html">Learn how</a> to include <a href="https://neanderthal.uncomplicate.org">Neanderthal</a> (<iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=neanderthal&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>) in your Clojure projects.</li>
+<li>Read a few short matrix tutorials, such as <a href="https://dragan.rocks/articles/17/Clojure-Linear-Algebra-Refresher-Vector-Spaces">Vector Spaces</a>, <a href="https://dragan.rocks/articles/17/Clojure-Linear-Algebra-Refresher-3-Matrix-Transformations">Matrix Transformations</a>, and <a href="https://dragan.rocks/articles/17/Clojure-Numerics-1-Use-Matrices-Efficiently">Use Matrices Efficiently</a>.</li>
+</ul>
+
+<p>
+The idea is that you have a straightforward path from the higher-level explanations in Michael's free online book,
+to the fast implementation details that I show.
+</p>
+
+<p>
+I'll give you a few days to catch up with these resources, and then I'll try to keep your interest
+with small and easily digestible articles that tackle implementation issues one by one. I won't hit
+you with much complexity in one big blow. If you make this preparation, gradually following this series will be a piece of cake!
+</p>
+</div>
+</div>
+
+<div id="outline-container-org5b521ed" class="outline-2">
+<h2 id="org5b521ed">Table of contents</h2>
+<div class="outline-text-2" id="text-org5b521ed">
+<p>
+This place will be updated with links to the new articles.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org0247ab6" class="outline-2">
+<h2 id="org0247ab6">Thank you</h2>
+<div class="outline-text-2" id="text-org0247ab6">
+<p>
+<a href="https://www.clojuriststogether.org/news/q1-2019-funding-announcement/">Clojurists Together</a> financially supported writing this series. Big thanks to all Clojurians who contribute,
+and thank you for reading and discussing this series.
+</p>
+</div>
+</div>
