@@ -204,7 +204,7 @@ To try this in Clojure, we require some basic Neanderthal functions.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span>uncomplicate.commons.core <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span><span style="color: #A52A2A; font-weight: bold;">let-release</span><span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span>uncomplicate.commons.core <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>with-release<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
          '<span style="color: #7388d6;">[</span>uncomplicate.neanderthal
            <span style="color: #909183;">[</span>native <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>dv dge<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
            <span style="color: #909183;">[</span>core <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>mv!<span style="color: #709870;">]</span><span style="color: #909183;">]</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
@@ -216,20 +216,20 @@ The minimal code example, following the <a href="https://martinfowler.com/bliki/
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let-release</span> <span style="color: #7388d6;">[</span>x <span style="color: #909183;">(</span>dv 0.3 0.9<span style="color: #909183;">)</span>
-              w1 <span style="color: #909183;">(</span>dge 4 2 <span style="color: #709870;">[</span>0.3 0.6
-                           0.1 2.0
-                           0.9 3.7
-                           0.0 1.0<span style="color: #709870;">]</span>
-                      <span style="color: #709870;">{</span><span style="color: #F5666D;">:layout</span> <span style="color: #F5666D;">:row</span><span style="color: #709870;">}</span><span style="color: #909183;">)</span>
-              h1 <span style="color: #909183;">(</span>dv 4<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>with-release <span style="color: #7388d6;">[</span>x <span style="color: #909183;">(</span>dv 0.3 0.9<span style="color: #909183;">)</span>
+               w1 <span style="color: #909183;">(</span>dge 4 2 <span style="color: #709870;">[</span>0.3 0.6
+                            0.1 2.0
+                            0.9 3.7
+                            0.0 1.0<span style="color: #709870;">]</span>
+                       <span style="color: #709870;">{</span><span style="color: #F5666D;">:layout</span> <span style="color: #F5666D;">:row</span><span style="color: #709870;">}</span><span style="color: #909183;">)</span>
+               h1 <span style="color: #909183;">(</span>dv 4<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
   <span style="color: #7388d6;">(</span>mv! w1 x h1<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
 <pre class="example">
 nil#RealBlockVector[double, n:4, offset: 0, stride:1]
-[   0.63    1.83    3.60    0.90 ]
+[6.91E-3101.8     3.6     .90     ]
 </pre>
 
 
@@ -243,7 +243,7 @@ applies the matrix transformation <code>w1</code> to the vector <code>x</code> (
 We should make sure that this code works well with large networks processed through lots of cycles when we get to
 implement the <i>learning</i> part, so we have to take care to reuse memory; thus we use the destructive
 version of <code>mv</code>, <code>mv!</code>. Also, the memory that holds the data is outside the JVM; thus we need to take care
-of its lifecycle and release it (automatically, using <code>let-release</code>) as soon it is not needed.
+of its lifecycle and release it (automatically, using <code>with-release</code>) as soon it is not needed.
 This might not be important for such small examples, but is crucial in "real" use cases.
 </p>
 
@@ -252,22 +252,22 @@ The output of the first layer is the input of the second layer:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let-release</span> <span style="color: #7388d6;">[</span>x <span style="color: #909183;">(</span>dv 0.3 0.9<span style="color: #909183;">)</span>
-              w1 <span style="color: #909183;">(</span>dge 4 2 <span style="color: #709870;">[</span>0.3 0.6
-                           0.1 2.0
-                           0.9 3.7
-                           0.0 1.0<span style="color: #709870;">]</span>
-                      <span style="color: #709870;">{</span><span style="color: #F5666D;">:layout</span> <span style="color: #F5666D;">:row</span><span style="color: #709870;">}</span><span style="color: #909183;">)</span>
-              h1 <span style="color: #909183;">(</span>dv 4<span style="color: #909183;">)</span>
-              w2 <span style="color: #909183;">(</span>dge 1 4 <span style="color: #709870;">[</span>0.75 0.15 0.22 0.33<span style="color: #709870;">]</span><span style="color: #909183;">)</span>
-              y <span style="color: #909183;">(</span>dv 1<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
-  <span style="color: #7388d6;">(</span>mv! w2 <span style="color: #909183;">(</span>mv! w1 x h1<span style="color: #909183;">)</span> y<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>with-release <span style="color: #7388d6;">[</span>x <span style="color: #909183;">(</span>dv 0.3 0.9<span style="color: #909183;">)</span>
+               w1 <span style="color: #909183;">(</span>dge 4 2 <span style="color: #709870;">[</span>0.3 0.6
+                            0.1 2.0
+                            0.9 3.7
+                            0.0 1.0<span style="color: #709870;">]</span>
+                       <span style="color: #709870;">{</span><span style="color: #F5666D;">:layout</span> <span style="color: #F5666D;">:row</span><span style="color: #709870;">}</span><span style="color: #909183;">)</span>
+               h1 <span style="color: #909183;">(</span>dv 4<span style="color: #909183;">)</span>
+               w2 <span style="color: #909183;">(</span>dge 1 4 <span style="color: #709870;">[</span>0.75 0.15 0.22 0.33<span style="color: #709870;">]</span><span style="color: #909183;">)</span>
+               y <span style="color: #909183;">(</span>dv 1<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>mv! w2 <span style="color: #909183;">(</span>mv! w1 x h1<span style="color: #909183;">)</span> y<span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>first y<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
 <pre class="example">
-nil#RealBlockVector[double, n:1, offset: 0, stride:1]
-[   1.84 ]
+nil1.8359999999999999
 </pre>
 
 
@@ -313,6 +313,10 @@ There are posts on this blog showing how to do this, too.
 My intention is to offer an easy start, so you <i>do try</i> this code. We will gradually apply and discuss
 each improvement in the following posts. Run this easy code on your own computer, and, why not,
 improve it in advance! The best way to learn is by experimenting and making mistakes.
+</p>
+
+<p>
+The next article is waiting for you: <a href="./Deep-Learning-in-Clojure-From-Scratch-to-GPU-2-Bias-and-Activation-Function">2 - Bias and Activation Function</a>.
 </p>
 </div>
 </div>
