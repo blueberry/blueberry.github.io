@@ -223,15 +223,14 @@ The minimal code example, following the <a href="https://martinfowler.com/bliki/
                             0.0 1.0<span style="color: #709870;">]</span>
                        <span style="color: #709870;">{</span><span style="color: #F5666D;">:layout</span> <span style="color: #F5666D;">:row</span><span style="color: #709870;">}</span><span style="color: #909183;">)</span>
                h1 <span style="color: #909183;">(</span>dv 4<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
-  <span style="color: #7388d6;">(</span>mv! w1 x h1<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+  <span style="color: #7388d6;">(</span>println <span style="color: #909183;">(</span>mv! w1 x h1<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
 <pre class="example">
 #RealBlockVector[double, n:4, offset: 0, stride:1]
-[6.91E-3101.8     3.6     .90     ]
+[   0.00    1.83    3.60    0.90 ]
 </pre>
-
 
 <p>
 The code does not need much explaining: <code>w1</code>, <code>x</code>, and <code>h1</code> represent weights, input, and the first hidden layer.
@@ -261,15 +260,14 @@ The output of the first layer is the input of the second layer:
                h1 <span style="color: #909183;">(</span>dv 4<span style="color: #909183;">)</span>
                w2 <span style="color: #909183;">(</span>dge 1 4 <span style="color: #709870;">[</span>0.75 0.15 0.22 0.33<span style="color: #709870;">]</span><span style="color: #909183;">)</span>
                y <span style="color: #909183;">(</span>dv 1<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
-  <span style="color: #7388d6;">(</span>mv! w2 <span style="color: #909183;">(</span>mv! w1 x h1<span style="color: #909183;">)</span> y<span style="color: #7388d6;">)</span>
-  <span style="color: #7388d6;">(</span>first y<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+  <span style="color: #7388d6;">(</span>println <span style="color: #909183;">(</span>mv! w2 <span style="color: #709870;">(</span>mv! w1 x h1<span style="color: #709870;">)</span> y<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
 <pre class="example">
-1.8359999999999999
+#RealBlockVector[double, n:1, offset: 0, stride:1]
+[   1.84 ]
 </pre>
-
 
 <p>
 The final result is \(y_1=1.84\). What does it represent and mean? Which function does it approximate? Who knows. The
@@ -313,10 +311,6 @@ There are posts on this blog showing how to do this, too.
 My intention is to offer an easy start, so you <i>do try</i> this code. We will gradually apply and discuss
 each improvement in the following posts. Run this easy code on your own computer, and, why not,
 improve it in advance! The best way to learn is by experimenting and making mistakes.
-</p>
-
-<p>
-The next article is waiting for you: <a href="./Deep-Learning-in-Clojure-From-Scratch-to-GPU-2-Bias-and-Activation-Function">2 - Bias and Activation Function</a>.
 </p>
 </div>
 </div>
