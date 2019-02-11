@@ -1,0 +1,466 @@
+---
+date: 2019-02-11
+tags:
+- Deep Learning
+- Neanderthal
+- MKL
+- Clojure
+- CUDA
+- OpenCL
+author: dragan
+layout: post
+title: Deep Learning from Scratch to GPU - 2 - Bias and Activation Function
+excerpt: PLACEHOLDER We add the activation function, biases, etc.
+categories:
+- Deep Learning
+- Neanderthal
+- MKL
+- Clojure
+- CUDA
+- OpenCL
+---
+<p>
+If you haven't yet, read my introduction to this series in <a href="./Deep-Learning-in-Clojure-From-Scratch-to-GPU-0-Why-Bother">Deep Learning in Clojure from Scratch to GPU - Part 0 - Why Bother?</a>.
+</p>
+
+<p>
+The previous article, Part 1, is here: <a href="./Deep-Learning-in-Clojure-From-Scratch-to-GPU-1-Representing-Layers-and-Connections">Representing Layers and Connections</a>.
+</p>
+
+<p>
+To run the code, you need a Clojure project with <a href="https://neanderthal.uncomplicate.org">Neanderthal</a> (<iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=neanderthal&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>) included as a dependency.
+If you're in a hurry, you can clone <a href="https://github.com/uncomplicate/neanderthal/blob/master/examples/hello-world/">Neanderthal Hello World project</a>.
+</p>
+
+<p>
+Don't forget to read at least some introduction from <a href="http://neuralnetworksanddeeplearning.com/">Neural Networks and Deep Learning</a>,
+start up the REPL from your favorite Clojure development environment, and let's continue with the tutorial.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span>uncomplicate.commons.core <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>with-release<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>uncomplicate.fluokitten.core <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>fmap!<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>uncomplicate.neanderthal
+           <span style="color: #909183;">[</span>native <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>dv dge<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>core <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>mv! mv axpy! scal!<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>math <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>signum exp<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>vect-math <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>fmax! tanh! linear-frac!<span style="color: #709870;">]</span><span style="color: #909183;">]</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div id="outline-container-org0845c5a" class="outline-2">
+<h2 id="org0845c5a">The Network Diagram</h2>
+<div class="outline-text-2" id="text-org0845c5a">
+<p>
+I'll repeat the basic diagram from <a href="./Deep-Learning-in-Clojure-From-Scratch-to-GPU-1-Representing-Layers-and-Connections">the previous post</a>, as a reference.
+</p>
+
+
+<div class="figure">
+<p><img src="../img/deep-learning-from-scratch/1/nn-input-first.png" alt="nn-input-first.png" />
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org3444f92" class="outline-2">
+<h2 id="org3444f92">Threshold and Bias</h2>
+<div class="outline-text-2" id="text-org3444f92">
+<p>
+In the current state, the network combines all layers into a <a href="../17/Clojure-Linear-Algebra-Refresher-3-Matrix-Transformations#org5ccdc85">single linear transformation</a>.
+We can introduce basic decision-making capability by adding a cutoff to the output of each neuron.
+When the weighted sums of its inputs are below that threshold, the output is zero
+and when they are above, the output is one.
+</p>
+
+\begin{equation}
+output =
+\left\{
+\begin{array}{ll}
+      0 & W\mathbf{x} \leq threshold \\
+      1 & W\mathbf{x} > threshold \\
+\end{array}
+\right.
+\end{equation}
+
+
+<div class="figure">
+<p><object type="image/svg+xml" data="../img/deep-learning-from-scratch/2/step.svg" class="org-svg">
+Sorry, your browser does not support SVG.</object>
+</p>
+</div>
+
+<p>
+Since we keep the current outputs in a (potentially) huge vector, it would be inconvenient to
+write a scalar-based logic for that. I prefer to use a vectorized function, or create one if
+there is not exactly what we need.
+</p>
+
+<p>
+Neanderthal does not have the exact cutoff function, but we can create one by subtracting threshold
+from the maximum of each threshold and the signal value and then mapping the signum function to the
+result. There are simpler ways to compute this, but I wanted to use the existing functions,
+and do the computation in-place. It is of purely educational value, anyway. We will see soon
+that there are better things to use for transforming the output than the vanilla step function.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">step!</span> <span style="color: #7388d6;">[</span>threshold x<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>fmap! signum <span style="color: #909183;">(</span>axpy! -1.0 threshold <span style="color: #709870;">(</span>fmax! threshold x x<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #7388d6;">[</span>threshold <span style="color: #909183;">(</span>dv <span style="color: #709870;">[</span>1 2 3<span style="color: #709870;">]</span><span style="color: #909183;">)</span>
+      x <span style="color: #909183;">(</span>dv <span style="color: #709870;">[</span>0 2 7<span style="color: #709870;">]</span><span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>step! threshold x<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+nil#RealBlockVector[double, n:3, offset: 0, stride:1]
+[   0.00    0.00    1.00 ]
+</pre>
+
+
+<p>
+I'm going to show you a few steps in the evolution of the code, so I will
+reuse weights and x. To simplify the example, we will use global <code>def</code> and not care about properly releasing the memory.
+It will not matter in a REPL session, but not forget to do it in the real code.
+Continuing the example from <a href="./Deep-Learning-in-Clojure-From-Scratch-to-GPU-1-Representing-Layers-and-Connections">Part 1:</a>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">x</span> <span style="color: #7388d6;">(</span>dv 0.3 0.9<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">w1</span> <span style="color: #7388d6;">(</span>dge 4 2 <span style="color: #909183;">[</span>0.3 0.6
+                  0.1 2.0
+                  0.9 3.7
+                  0.0 1.0<span style="color: #909183;">]</span>
+             <span style="color: #909183;">{</span><span style="color: #F5666D;">:layout</span> <span style="color: #F5666D;">:row</span><span style="color: #909183;">}</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">threshold</span> <span style="color: #7388d6;">(</span>dv 0.7 0.2 1.1 2<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Since we do not care about extra instances at the moment, we'll use the pure
+ <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-mv"><code>mv</code></a> function instead of <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-mv.21"><code>mv!</code></a> for convenience. <code>mv</code> creates the resulting vector <code>y</code>,
+instead of mutating the one that has to be provided as an argument.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>step! threshold <span style="color: #7388d6;">(</span>mv w1 x<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+nil#RealBlockVector[double, n:4, offset: 0, stride:1]
+[   0.00    1.00    1.00    0.00 ]
+</pre>
+
+
+<p>
+The bias is simply the threshold moved to the left side of the equation:
+</p>
+
+\begin{equation}
+output =
+\left\{
+\begin{array}{ll}
+      0 & W\mathbf{x} - bias \leq 0 \\
+      1 & W\mathbf{x} - bias > 0 \\
+\end{array}
+\right.
+\end{equation}
+
+
+<div class="figure">
+<p><object type="image/svg+xml" data="../img/deep-learning-from-scratch/2/step1.svg" class="org-svg">
+Sorry, your browser does not support SVG.</object>
+</p>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">bias</span> <span style="color: #7388d6;">(</span>dv 0.7 0.2 1.1 2<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">zero</span> <span style="color: #7388d6;">(</span>dv 4<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>step! zero <span style="color: #7388d6;">(</span>axpy! -1.0 bias <span style="color: #909183;">(</span>mv w1 x<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+nil#RealBlockVector[double, n:4, offset: 0, stride:1]
+[   0.00    1.00    1.00    0.00 ]
+</pre>
+
+
+<p>
+Remember that bias is the same as threshold. There is no need for the extra
+zero vector.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>step! bias <span style="color: #7388d6;">(</span>mv w1 x<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+nil#RealBlockVector[double, n:4, offset: 0, stride:1]
+[   0.00    1.00    1.00    0.00 ]
+</pre>
+</div>
+</div>
+
+<div id="outline-container-orga96f486" class="outline-2">
+<h2 id="orga96f486">Activation Function</h2>
+<div class="outline-text-2" id="text-orga96f486">
+<p>
+The decision capabilities supported by the step function are rather crude. The neuron either
+outputs a constant value (<code>1</code>), or zero. It is better to use functions that offer different levels
+of the signal strength. Instead of the step function, the output of each neuron passes through
+an <i>activation function</i>. Countless functions can be an activation function, but a handful proved
+the best choice.
+</p>
+
+<p>
+Like neural networks themselves, the functions that work well are simple.
+Activation functions have to be chosen carefully, to support the <i>learning</i> algorithms, most
+importantly to be easily differentiable.  Until recently, the <i>sigmoid</i> and <i>tanh</i> functions
+were the top picks. Recently an even simpler function, <i>ReLU</i>, became the activation function of choice.
+</p>
+</div>
+
+<div id="outline-container-orged1973d" class="outline-3">
+<h3 id="orged1973d">Rectified Linear Unit (\(ReLU\))</h3>
+<div class="outline-text-3" id="text-orged1973d">
+<p>
+<a href="https://en.wikipedia.org/wiki/Rectifier_(neural_networks)">ReLU</a> is short for Rectified Linear Unit. Sounds mysterious, but it is a straightforward
+linear function that has zero value below the threshold, which is typically zero.
+</p>
+
+\begin{equation}
+f(x) = max(0, x)
+\end{equation}
+
+
+<div class="figure">
+<p><object type="image/svg+xml" data="../img/deep-learning-from-scratch/2/relu.svg" class="org-svg">
+Sorry, your browser does not support SVG.</object>
+</p>
+</div>
+
+<p>
+It's even simpler to implement than the step function, so we do this, if nothing else, for fun.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">relu!</span> <span style="color: #7388d6;">[</span>threshold x<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>axpy! -1.0 threshold <span style="color: #909183;">(</span>fmax! threshold x x<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+It might seem strange that I kept the threshold as an argument to the <code>relu</code> function. Isn't ReLU
+always cut-off at zero? Consider it a bit of optimization. There is no built-in optimize ReLU function.
+To implement the formula \(f(x) = max(0, x)\) we either have to use mapping over the <code>max</code> function,
+or to use the vectorized <code>fmax</code>, which requires an additional vector that holds the zeros. Since we
+need to subtract the biases anyway before the activation, by fusing these two phases, I avoided
+the need for maintaining the extra array of zeros. That may or may not be the best choice for the
+complete library, but since the main point of this blog is teaching, we stick to the Yagni principle.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>relu! bias <span style="color: #7388d6;">(</span>mv w1 x<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+nil#RealBlockVector[double, n:4, offset: 0, stride:1]
+[   0.00    1.63    2.50    0.00 ]
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org4e08466" class="outline-3">
+<h3 id="org4e08466">Hyperbolic Tangent (\(tanh\))</h3>
+<div class="outline-text-3" id="text-org4e08466">
+<p>
+One popular activation function is <a href="https://en.wikipedia.org/wiki/Hyperbolic_function">tanh</a>.
+</p>
+
+\begin{equation}
+tanh(x) = \frac{sinh(x)}{cosh(x)} = \frac{e^{2x} - 1}{e^{2x} + 1}
+\end{equation}
+
+
+<div class="figure">
+<p><object type="image/svg+xml" data="../img/deep-learning-from-scratch/2/tanh.svg" class="org-svg">
+Sorry, your browser does not support SVG.</object>
+</p>
+</div>
+
+<p>
+Note how it is close to the identity function \(f(x) = x\) in large part of the perimeter between \(-1\) and \(1\).
+As the absolute value of \(x\) gets larger, \(tanh(x)\) asymptotically approaches \(1\). Thus, the output is
+between \(-1\) and \(1\).
+</p>
+
+<p>
+Since Neanderhtal has the vectorized variant of the <code>tanh</code> function in its <code>vect-math</code>, the implementation
+is easy.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>tanh! <span style="color: #7388d6;">(</span>axpy! -1.0 bias <span style="color: #909183;">(</span>mv w1 x<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+nil#RealBlockVector[double, n:4, offset: 0, stride:1]
+[  -0.07    0.93    0.99   -0.80 ]
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org120631d" class="outline-3">
+<h3 id="org120631d">Sigmoid function</h3>
+<div class="outline-text-3" id="text-org120631d">
+<p>
+Until ReLU became popular, <a href="https://en.wikipedia.org/wiki/Sigmoid_function">sigmoid</a> was the most often used activation function.
+Sigmoid refers to a whole family of S-shaped functions, or, often, to a special case - the <i>logistic function</i>.
+</p>
+
+\begin{equation}
+S(x) = \frac{1}{1 + e^{-x}} = \frac{e^x}{e^{x} + 1}
+\end{equation}
+
+
+<div class="figure">
+<p><object type="image/svg+xml" data="../img/deep-learning-from-scratch/2/sigmoid.svg" class="org-svg">
+Sorry, your browser does not support SVG.</object>
+</p>
+</div>
+
+<p>
+Standard libraries often do not come with the implementation of the sigmoid function.
+We have to implement our own. We could implement it in the most straightforward way,
+just following the formula. That might be a good approach if we're only flexing our
+muscles, but may be not completely safe if we intend to use such implementation for the real work.
+<code>(exp 710)</code> is too big to fit even in <code>double</code>, while <code>(exp 89)</code> does not fit into <code>float</code> and
+produce an infinity (<code>##Inf</code>).
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">[</span><span style="color: #7388d6;">(</span>exp 709<span style="color: #7388d6;">)</span> <span style="color: #7388d6;">(</span>exp 710<span style="color: #7388d6;">)</span> <span style="color: #7388d6;">(</span>float <span style="color: #909183;">(</span>exp 88<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span> <span style="color: #7388d6;">(</span>float <span style="color: #909183;">(</span>exp 89<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">]</span>
+</pre>
+</div>
+
+<pre class="example">
+nil[8.218407461554972E307 ##Inf 1.6516363E38 ##Inf]
+</pre>
+
+
+<p>
+You can program that implementation as an exercise, and I'll show you another approach instead.
+Let me pull the following equality out of the magic mathematical hat, and ask you to believe me
+that it is true:
+</p>
+
+\begin{equation}
+S(x) = \frac{1}{2} + \frac{1}{2} \times tanh(\frac{x}{2})
+\end{equation}
+
+<p>
+We can implement that easily by combining the vectorized <code>tanh!</code> and a bit of vectorized scaling.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">sigmoid!</span> <span style="color: #7388d6;">[</span>x<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>linear-frac! 0.5 <span style="color: #909183;">(</span>tanh! <span style="color: #709870;">(</span>scal! 0.5 x<span style="color: #709870;">)</span><span style="color: #909183;">)</span> 0.5<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Let's program our layer with the logistic sigmoid activation.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>sigmoid! <span style="color: #7388d6;">(</span>axpy! -1.0 bias <span style="color: #909183;">(</span>mv w1 x<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+nil#RealBlockVector[double, n:4, offset: 0, stride:1]
+[   0.48    0.84    0.92    0.25 ]
+</pre>
+
+
+<p>
+You can benchmark both implementations with large vectors, and see whether there is a difference
+in performance. I expect it to be only a fraction of the complete run time of the network.
+Consider that <code>tanh(x)</code> is safe, since it comes from a standard library, while you'll have to
+investigate whether the straightforward formula translation is good enough for what you want to do.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgf0d61e8" class="outline-2">
+<h2 id="orgf0d61e8">The next step</h2>
+<div class="outline-text-2" id="text-orgf0d61e8">
+<p>
+The layers of our fully connected network now go beyond linear transformations.
+We can stack as many as we'd like and do the inference.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>with-release <span style="color: #7388d6;">[</span>x <span style="color: #909183;">(</span>dv 0.3 0.9<span style="color: #909183;">)</span>
+               w1 <span style="color: #909183;">(</span>dge 4 2 <span style="color: #709870;">[</span>0.3 0.6
+                            0.1 2.0
+                            0.9 3.7
+                            0.0 1.0<span style="color: #709870;">]</span>
+                       <span style="color: #709870;">{</span><span style="color: #F5666D;">:layout</span> <span style="color: #F5666D;">:row</span><span style="color: #709870;">}</span><span style="color: #909183;">)</span>
+               bias1 <span style="color: #909183;">(</span>dv 0.7 0.2 1.1 2<span style="color: #909183;">)</span>
+               h1 <span style="color: #909183;">(</span>dv 4<span style="color: #909183;">)</span>
+               w2 <span style="color: #909183;">(</span>dge 1 4 <span style="color: #709870;">[</span>0.75 0.15 0.22 0.33<span style="color: #709870;">]</span><span style="color: #909183;">)</span>
+               bias2 <span style="color: #909183;">(</span>dv 0.3<span style="color: #909183;">)</span>
+               y <span style="color: #909183;">(</span>dv 1<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>tanh! <span style="color: #909183;">(</span>axpy! -1.0 bias1 <span style="color: #709870;">(</span>mv! w1 x h1<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>println <span style="color: #909183;">(</span>sigmoid! <span style="color: #709870;">(</span>axpy! -1.0 bias2 <span style="color: #907373;">(</span>mv! w2 h1 y<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealBlockVector[double, n:1, offset: 0, stride:1]
+[   0.44 ]
+</pre>
+
+<p>
+This is getting repetitive. For each layer we add, we have to herd a few more disconnected
+matrices, vectors, and activation functions in place. In the next article, we will fix this
+by abstracting it into easy to use layers.
+</p>
+
+<p>
+After that, we will make a few minor adjustments that enable our code to run on the GPU,
+just to make sure that it is easy to do.
+</p>
+
+<p>
+Then we will be ready to tackle the 95% of the work: create the code for <i>learning</i> these
+weights from data, so that the numbers that the network compute have some meaning.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgd3b5a8c" class="outline-2">
+<h2 id="orgd3b5a8c">Thank you</h2>
+<div class="outline-text-2" id="text-orgd3b5a8c">
+<p>
+<a href="https://www.clojuriststogether.org/news/q1-2019-funding-announcement/">Clojurists Together</a> financially supported writing this series. Big thanks to all Clojurians who contribute,
+and thank you for reading and discussing this series.
+</p>
+</div>
+</div>
