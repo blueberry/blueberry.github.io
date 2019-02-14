@@ -1,0 +1,303 @@
+---
+date: 2019-02-14
+tags:
+- Deep Learning
+- Neanderthal
+- MKL
+- Clojure
+- CUDA
+- OpenCL
+author: dragan
+layout: post
+title: Deep Learning from Scratch to GPU - 3 - Fully Connected Inference Layers
+excerpt: It's time to formalize some structure of our layers into a layer type.
+categories:
+- Deep Learning
+- Neanderthal
+- MKL
+- Clojure
+- CUDA
+- OpenCL
+---
+<p>
+If you haven't yet, read my introduction to this series in <a href="./Deep-Learning-in-Clojure-From-Scratch-to-GPU-0-Why-Bother">Deep Learning in Clojure from Scratch to GPU - Part 0 - Why Bother?</a>.
+</p>
+
+<p>
+The previous article, Part 2, is here: <a href="./Deep-Learning-in-Clojure-From-Scratch-to-GPU-2-Bias-and-Activation-Function">Bias and Activation Function</a>.
+</p>
+
+<p>
+To run the code, you need a Clojure project with <a href="https://neanderthal.uncomplicate.org">Neanderthal</a> (<iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=neanderthal&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>) included as a dependency.
+If you're in a hurry, you can clone <a href="https://github.com/uncomplicate/neanderthal/blob/master/examples/hello-world/">Neanderthal Hello World project</a>.
+</p>
+
+<p>
+Don't forget to read at least some introduction from <a href="http://neuralnetworksanddeeplearning.com/">Neural Networks and Deep Learning</a>,
+start up the REPL from your favorite Clojure development environment, and let's continue with the tutorial.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span>uncomplicate.commons.core <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>with-release <span style="color: #A52A2A; font-weight: bold;">let-release</span> Releaseable release<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>uncomplicate.neanderthal
+           <span style="color: #909183;">[</span>native <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>dv dge<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>core <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>mv! axpy! scal! transfer!<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>vect-math <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>tanh! linear-frac!<span style="color: #709870;">]</span><span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>criterium.core <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>quick-bench<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div id="outline-container-org390c842" class="outline-2">
+<h2 id="org390c842">The updated network diagram</h2>
+<div class="outline-text-2" id="text-org390c842">
+<p>
+We'll update the neural network diagram, to reflect the recently included biases and activation functions.
+</p>
+
+
+<div class="figure">
+<p><img src="../img/deep-learning-from-scratch/3/nn-bias-activation.png" alt="nn-bias-activation.png" />
+</p>
+</div>
+
+<p>
+In each layer, bias is shown as an additional, <i>"zero"-indexed</i>, node, which,
+connected to nodes in the next layer, gives the bias vector. I haven't explicitly shown
+activation functions to avoid clutter. Consider that each node has activation at the output.
+If a layer didn't have any activation whatsoever, it would have been redundant
+(see <a href="../17/Clojure-Linear-Algebra-Refresher-3-Matrix-Transformations#org5ccdc85">composition of transformations</a>).
+</p>
+</div>
+</div>
+
+<div id="outline-container-org84327f0" class="outline-2">
+<h2 id="org84327f0">The Layer type</h2>
+<div class="outline-text-2" id="text-org84327f0">
+<p>
+We need a structure that keeps the account of the weights, biases and output of each layer.
+It should manage the life-cycle and release that memory space when appropriate.
+That structure can implement Clojure's <code>IFn</code> interface, so we can invoke it as any regular
+Clojure function.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>import 'clojure.lang.IFn<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+We will create <code>FullyConnectedInference</code> as a Clojure type, which gets compiled into a Java class.
+<code>FullyConnectedInference</code> implements the <code>release</code> method of the <code>Releaseable</code> protocol,
+and the <code>invoke</code> method of <code>IFn</code>. We would also like to access and see the weights and bias values
+so we create new protocol, <code>Parameters</code>, with <code>weight</code> and <code>bias</code> methods.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defprotocol</span> <span style="color: #2F8B58; font-weight: bold;">Parameters</span>
+  <span style="color: #7388d6;">(</span>weights <span style="color: #909183;">[</span>this<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>bias <span style="color: #909183;">[</span>this<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">deftype</span> <span style="color: #2F8B58; font-weight: bold;">FullyConnectedInference</span> <span style="color: #7388d6;">[</span>w b h activ-fn<span style="color: #7388d6;">]</span>
+  Releaseable
+  <span style="color: #7388d6;">(</span>release <span style="color: #909183;">[</span>_<span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>release w<span style="color: #909183;">)</span>
+    <span style="color: #909183;">(</span>release b<span style="color: #909183;">)</span>
+    <span style="color: #909183;">(</span>release h<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  Parameters
+  <span style="color: #7388d6;">(</span>weights <span style="color: #909183;">[</span>this<span style="color: #909183;">]</span> w<span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>bias <span style="color: #909183;">[</span>this<span style="color: #909183;">]</span> b<span style="color: #7388d6;">)</span>
+  IFn
+  <span style="color: #7388d6;">(</span>invoke <span style="color: #909183;">[</span>_ x<span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>activ-fn b <span style="color: #709870;">(</span>mv! w x h<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org6fd154c" class="outline-2">
+<h2 id="org6fd154c">Constructor function</h2>
+<div class="outline-text-2" id="text-org6fd154c">
+<p>
+At the time of creation, each <code>FullyConnectedInference</code> need to be supplied with an activation function,
+the matrix for weights, and vectors for bias and output that have matching dimensions. Of course,
+we will automate that process.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">fully-connected</span> <span style="color: #7388d6;">[</span>activ-fn in-dim out-dim<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">let-release</span> <span style="color: #909183;">[</span>w <span style="color: #709870;">(</span>dge out-dim in-dim<span style="color: #709870;">)</span>
+                bias <span style="color: #709870;">(</span>dv out-dim<span style="color: #709870;">)</span>
+                h <span style="color: #709870;">(</span>dv out-dim<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>-&gt;FullyConnectedInference w bias h activ-fn<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Now a simple call to the <code>fully-connected</code> function that specifies the activation function and
+the dimensions of input dimension (number of neurons in the previous layer) and output dimension
+(the number of neurons in this layer) will create and properly initialize it.
+</p>
+
+<p>
+<code>let-release</code> is a variant of <code>let</code> that releases its bindings (<code>w</code>, <code>bias</code>, and/or <code>h</code>) if
+anything goes wrong and an exception gets thrown in its scope.
+<code>with-release</code>, on the other hand, releases the bindings in all cases.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org25f07e6" class="outline-2">
+<h2 id="org25f07e6">Activation functions</h2>
+<div class="outline-text-2" id="text-org25f07e6">
+<p>
+We can use a few matching functions that we discussed in the <a href="./Deep-Learning-in-Clojure-From-Scratch-to-GPU-2-Bias-and-Activation-Function">previous article</a>.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">activ-sigmoid!</span> <span style="color: #7388d6;">[</span>bias x<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>axpy! -1.0 bias x<span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>linear-frac! 0.5 <span style="color: #909183;">(</span>tanh! <span style="color: #709870;">(</span>scal! 0.5 x<span style="color: #709870;">)</span><span style="color: #909183;">)</span> 0.5<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">activ-tanh!</span> <span style="color: #7388d6;">[</span>bias x<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>tanh! <span style="color: #909183;">(</span>axpy! -1.0 bias x<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>  <span style="color: #707183;">)</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org42a99cc" class="outline-2">
+<h2 id="org42a99cc">Using the fully-connected layer</h2>
+<div class="outline-text-2" id="text-org42a99cc">
+<p>
+Now we are ready to re-create the existing example in a more convenient form. Note that we no longer
+have to worry about creating the matching structures of a layer; it happens automatically when
+we create each layer. I use the <code>transfer!</code> function to set up the values of weights and bias,
+but typically these values will already be there after the training (learning) of the network. Here
+we are using the same "random" numbers as before as a temporary testing crutch.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>with-release <span style="color: #7388d6;">[</span>x <span style="color: #909183;">(</span>dv 0.3 0.9<span style="color: #909183;">)</span>
+               layer-1 <span style="color: #909183;">(</span>fully-connected activ-sigmoid! 2 4<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>transfer! <span style="color: #909183;">[</span>0.3 0.1 0.0 0.0 0.6 2.0 3.7 1.0<span style="color: #909183;">]</span> <span style="color: #909183;">(</span>weights layer-1<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>transfer! <span style="color: #909183;">(</span>dv 0.7 0.2 1.1 2<span style="color: #909183;">)</span> <span style="color: #909183;">(</span>bias layer-1<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>println <span style="color: #909183;">(</span>layer-1 x<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealBlockVector[double, n:4, offset: 0, stride:1]
+[   0.48    0.84    0.90    0.25 ]
+</pre>
+
+<p>
+The output is the same as before, as we expected.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orge71b8e2" class="outline-2">
+<h2 id="orge71b8e2">Multiple hidden layers</h2>
+<div class="outline-text-2" id="text-orge71b8e2">
+<p>
+Note that the layer is a <i>transfer function</i> that, given the input, computes and returns the output.
+Like with other Clojure functions, the output value can be an input to the next layer function.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>with-release <span style="color: #7388d6;">[</span>x <span style="color: #909183;">(</span>dv 0.3 0.9<span style="color: #909183;">)</span>
+               layer-1 <span style="color: #909183;">(</span>fully-connected activ-tanh! 2 4<span style="color: #909183;">)</span>
+               layer-2 <span style="color: #909183;">(</span>fully-connected activ-sigmoid! 4 1<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>transfer! <span style="color: #909183;">[</span>0.3 0.1 0.9 0.0 0.6 2.0 3.7 1.0<span style="color: #909183;">]</span> <span style="color: #909183;">(</span>weights layer-1<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>transfer! <span style="color: #909183;">[</span>0.7 0.2 1.1 2<span style="color: #909183;">]</span> <span style="color: #909183;">(</span>bias layer-1<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>transfer! <span style="color: #909183;">[</span>0.75 0.15 0.22 0.33<span style="color: #909183;">]</span> <span style="color: #909183;">(</span>weights layer-2<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>transfer! <span style="color: #909183;">[</span>0.3<span style="color: #909183;">]</span> <span style="color: #909183;">(</span>bias layer-2<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>println <span style="color: #909183;">(</span>layer-2 <span style="color: #709870;">(</span>layer-1 x<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealBlockVector[double, n:1, offset: 0, stride:1]
+[   0.44 ]
+</pre>
+
+<p>
+If we don't count the <code>transfer!</code> calls, we have 3 lines of code that describe the whole network:
+two lines to create the layers, and one line for the nested call of layers as functions. It is already
+concise, and we will still improve it in the upcoming articles.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgd12e5a8" class="outline-2">
+<h2 id="orgd12e5a8">Micro benchmark</h2>
+<div class="outline-text-2" id="text-orgd12e5a8">
+<p>
+With rather small networks consisting of a few layers with few neurons each, any implementation
+will be fast. Let's create a network with a larger number of neurons, to get a feel of how fast
+we can expect these things to run.
+</p>
+
+<p>
+Here is a network with input dimension of 10000. The exact numbers are not important, since
+the example is superficial, but you can imagine that 10000 represents an image
+that has 400 &times; 250 pixels. I've put 5000 neurons in the first layer, 1000 in the second layer,
+and 10 at the output. Just some random large-ish dimensions. Imagine 10 categories at the output.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>with-release <span style="color: #7388d6;">[</span>x <span style="color: #909183;">(</span>dv 10000<span style="color: #909183;">)</span>
+               layer-1 <span style="color: #909183;">(</span>fully-connected activ-tanh! 10000 5000<span style="color: #909183;">)</span>
+               layer-2 <span style="color: #909183;">(</span>fully-connected activ-sigmoid! 5000 1000<span style="color: #909183;">)</span>
+               layer-3 <span style="color: #909183;">(</span>fully-connected activ-sigmoid! 1000 10<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #204A87;">;; </span><span style="color: #204A87;">Call it like this:</span>
+  <span style="color: #204A87;">;; </span><span style="color: #204A87;">(quick-bench (layer-3 (layer-2 (layer-1 x))))</span>
+  <span style="color: #7388d6;">(</span>layer-3 <span style="color: #909183;">(</span>layer-2 <span style="color: #709870;">(</span>layer-1 x<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+Evaluation count : 36 in 6 samples of 6 calls.
+             Execution time mean : 18.320566 ms
+    Execution time std-deviation : 1.108914 ms
+   Execution time lower quantile : 17.117256 ms ( 2.5%)
+   Execution time upper quantile : 19.847416 ms (97.5%)
+                   Overhead used : 7.384194 ns
+</pre>
+
+<p>
+On my 5 year old CPU (i7-4790k), one inference through this network takes 18 milliseconds. If you have
+another neural networks library at hand, you could construct the same network
+(virtually any NN software should support this basic structure) and compare the timings.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org28d04bc" class="outline-2">
+<h2 id="org28d04bc">The next article</h2>
+<div class="outline-text-2" id="text-org28d04bc">
+<p>
+So far so good. 18 ms should not be slow. But what if we have lots of data to process?
+Does that mean that if I have 10 thousand inputs, I'd need to make a loop that invokes this inference
+10 thousand times with different input, and wait 3 minutes for the results?
+</p>
+
+<p>
+Is the way to speed that up putting it on the GPU? We'll do that later, but there is something that
+we can do even on the CPU to improve this! That's the topic of the next article!
+</p>
+</div>
+</div>
+
+<div id="outline-container-org9b1620d" class="outline-2">
+<h2 id="org9b1620d">Thank you</h2>
+<div class="outline-text-2" id="text-org9b1620d">
+<p>
+<a href="https://www.clojuriststogether.org/news/q1-2019-funding-announcement/">Clojurists Together</a> financially supported writing this series. Big thanks to all Clojurians who contribute,
+and thank you for reading and discussing this series.
+</p>
+</div>
+</div>
