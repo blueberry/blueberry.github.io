@@ -1,0 +1,483 @@
+---
+date: 2019-02-18
+tags:
+- Deep Learning
+- Neanderthal
+- MKL
+- Clojure
+- CUDA
+- OpenCL
+author: dragan
+layout: post
+title: Deep Learning from Scratch to GPU - 4 - Increasing Performance with Batch Processing
+excerpt: We increase performance many times by computing a group of (vector) inputs as one (matrix) batch.
+categories:
+- Deep Learning
+- Neanderthal
+- MKL
+- Clojure
+- CUDA
+- OpenCL
+---
+<p>
+If you haven't yet, read my introduction to this series in <a href="./Deep-Learning-in-Clojure-From-Scratch-to-GPU-0-Why-Bother">Deep Learning in Clojure from Scratch to GPU - Part 0 - Why Bother?</a>.
+</p>
+
+<p>
+The previous article, Part 3, is here: <a href="./Deep-Learning-in-Clojure-From-Scratch-to-GPU-3-Fully-Connected-Inference-Layers">Fully Connected Inference Layers</a>.
+</p>
+
+<p>
+To run the code, you need a Clojure project with <a href="https://neanderthal.uncomplicate.org">Neanderthal</a> (<iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=neanderthal&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>) included as a dependency.
+If you're in a hurry, you can clone <a href="https://github.com/uncomplicate/neanderthal/blob/master/examples/hello-world/">Neanderthal Hello World project</a>.
+</p>
+
+<p>
+Don't forget to read at least some introduction from <a href="http://neuralnetworksanddeeplearning.com/">Neural Networks and Deep Learning</a>,
+start up the REPL from your favorite Clojure development environment, and let's continue with the tutorial.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span>uncomplicate.commons.core <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>with-release <span style="color: #A52A2A; font-weight: bold;">let-release</span> Releaseable release<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>uncomplicate.neanderthal
+           <span style="color: #909183;">[</span>core <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>mv! axpy! scal! transfer! col mm! mm rk! entry! copy!<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>native <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>dv dge<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>vect-math <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>tanh! linear-frac!<span style="color: #709870;">]</span><span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>criterium.core <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>quick-bench<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>import 'clojure.lang.IFn<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div id="outline-container-orgabcd40f" class="outline-2">
+<h2 id="orgabcd40f">The network diagram</h2>
+<div class="outline-text-2" id="text-orgabcd40f">
+<p>
+I'm repeating the network diagram from the <a href="./Deep-Learning-in-Clojure-From-Scratch-to-GPU-3-Fully-Connected-Inference-Layers">previous article</a> as a convenient reference.
+</p>
+
+
+<div class="figure">
+<p><img src="../img/deep-learning-from-scratch/1/nn-bias-activation.png" alt="nn-bias-activation.png" />
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org27d3659" class="outline-2">
+<h2 id="org27d3659">The idea of batch processing</h2>
+<div class="outline-text-2" id="text-org27d3659">
+<p>
+The current processing of the network, shown above, is such that
+each input vector is threaded through layers, transformed by a series of matrices and
+non-linear activation functions, to produce an output vector. The heart of the implementation
+is the matrix-vector product operation (<a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-mv.21"><code>mv!</code></a>), which is performed by optimized high performance libraries
+(<a href="https://neanderthal.uncomplicate.org">Neanderthal</a> in this case).
+</p>
+
+<p>
+If we have only one input instance to process, there is not much that we can do to speed that up.
+However, we often have many input instances that we would like to process, either at once,
+or in a short period. Instead of calling the network function for each of these instances in a loop,
+we can process the whole batch using matrix functions that do the equivalent thing,
+but in an optimized way. We will process the whole <i>batch</i> at once.
+</p>
+
+<p>
+Consider a matrix \(A\) and its columns. If we want to transform all these columns by
+a matrix transformation \(T\), we can do this by invoking a matrix-vector product (<a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-mv.21"><code>mv!</code></a>) for each column of \(A\).
+As I discussed in <a href="http://localhost:4000/articles/17/Clojure-Linear-Algebra-Refresher-3-Matrix-Transformations#orgfb4c0f9">matrix transformations</a>, we can get the same result
+by doing a matrix-matrix multiplication of \(T\) and \(A\). Matrix-matrix multiplication
+has more space for hardware optimization than looping over simpler matrix-vector multiplications,
+and it will be faster.
+</p>
+
+<p>
+Let's see the difference!
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">t</span> <span style="color: #7388d6;">(</span>dge 1000 1000<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">a</span> <span style="color: #7388d6;">(</span>dge 1000 10000<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">y</span> <span style="color: #7388d6;">(</span>dv 1000<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">b</span> <span style="color: #7388d6;">(</span>dge 1000 10000<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>time <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">dotimes</span> <span style="color: #909183;">[</span>i 10000<span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>mv! t <span style="color: #709870;">(</span>col a i<span style="color: #709870;">)</span> y<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+"Elapsed time: 987.553046 msecs"
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>time <span style="color: #7388d6;">(</span>mm! t a b<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+"Elapsed time: 102.086963 msecs"
+</pre>
+
+<p>
+For this particular size of input (1000) and batch (10000), on my CPU (i7-4790k), matrix-matrix multiplication
+is roughly 10 times faster than the equivalent loop of 10000 matrix-vector multiplications.
+</p>
+
+<p>
+The exact difference in performance depends on the hardware and the matrix dimensions. The rule of thumb
+is that the speed-up is higher for larger matrices. In consequence, since
+the input dimension of a network stays constant, we expect that the network speed per input vector increases
+with larger batch size.
+</p>
+
+<p>
+On the GPU, the difference is even more noticeable than on the CPU. We will explore this soon,
+when we support GPU computing.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgf80766d" class="outline-2">
+<h2 id="orgf80766d">Batched layer processing</h2>
+<div class="outline-text-2" id="text-orgf80766d">
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">x</span> <span style="color: #7388d6;">(</span>dge 2 1 <span style="color: #909183;">[</span>0.3 0.9<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">w1</span> <span style="color: #7388d6;">(</span>dge 4 2 <span style="color: #909183;">[</span>0.3 0.6
+                  0.1 2.0
+                  0.9 3.7
+                  0.0 1.0<span style="color: #909183;">]</span>
+             <span style="color: #909183;">{</span><span style="color: #F5666D;">:layout</span> <span style="color: #F5666D;">:row</span><span style="color: #909183;">}</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>mm w1 x<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+nil#'user/x#'user/w1#RealGEMatrix[double, mxn:4x1, layout:column, offset:0]
+   ▥       ↓       ┓
+   →       0.63
+   →       1.83
+   →       3.60
+   →       0.90
+   ┗               ┛
+</pre>
+
+
+<p>
+As we can see, transforming an \(m\times{1}\) matrix is equivalent to transforming its only column.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">sigmoid!</span> <span style="color: #7388d6;">[</span>x<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>linear-frac! 0.5 <span style="color: #909183;">(</span>tanh! <span style="color: #709870;">(</span>scal! 0.5 x<span style="color: #709870;">)</span><span style="color: #909183;">)</span> 0.5<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+We have a problem of how to handle bias, though. Bias is a vector.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">bias-vector</span> <span style="color: #7388d6;">(</span>dv 0.7 0.2 1.1 2<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Calling <code>axpy!</code> to add a bias vector to the \(Wx\) matrix, will throw an exception.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>sigmoid! <span style="color: #7388d6;">(</span>axpy! -1.0 bias-vector <span style="color: #909183;">(</span>mm w1 x<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+nilclass java.lang.ClassCastExceptionclass java.lang.ClassCastExceptionExecution error (ClassCastException) at uncomplicate.neanderthal.internal.host.mkl.DoubleVectorEngine/axpy (mkl.clj:413).
+uncomplicate.neanderthal.internal.host.buffer_block.RealGEMatrix cannot be cast to uncomplicate.neanderthal.internal.host.buffer_block.RealBlockVector
+</pre>
+
+
+<p>
+We could temporarily solve this issue in the same way as turning the input vector to
+a \(m\times{1}\) matrix.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">bias-matrix</span> <span style="color: #7388d6;">(</span>dge 4 1 <span style="color: #909183;">[</span>0.7 0.2 1.1 2<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>sigmoid! <span style="color: #7388d6;">(</span>axpy! -1.0 bias-matrix <span style="color: #909183;">(</span>mm w1 x<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+nil#RealGEMatrix[double, mxn:4x1, layout:column, offset:0]
+   ▥       ↓       ┓
+   →       0.48
+   →       0.84
+   →       0.92
+   →       0.25
+   ┗               ┛
+</pre>
+
+
+<p>
+The result is the same as in  <a href="./Deep-Learning-in-Clojure-From-Scratch-to-GPU-2-Bias-and-Activation-Function">part 2, Bias and Activation Function</a>. However, this does not work
+with batch sizes larger than 1, since the bias is the same for all inputs. We could turn it into
+a matrix where we repeat the same bias column as many times as we need. This would almost double
+the memory required to hold the network. We can't accept such waste!
+</p>
+</div>
+</div>
+
+<div id="outline-container-org1023d26" class="outline-2">
+<h2 id="org1023d26">Vector broadcasting</h2>
+<div class="outline-text-2" id="text-org1023d26">
+<p>
+We need a way to <i>broadcast</i> that vector to all columns of the matrix. I've already written
+an <a href="../18/Neanderthal-vs-ND4J-vol4#org0178694">article</a> that discussed a few ways of implementing this, including performance considerations.
+</p>
+
+<p>
+One convenient solution is to use the <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-rk.21"><code>rk!</code></a> function, which cross-multiplies
+two vectors, adding the product matrix to the resulting matrix of the matching dimensions.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let-release</span> <span style="color: #7388d6;">[</span>a <span style="color: #909183;">(</span>dge 3 2 <span style="color: #709870;">(</span>repeat 6 1000<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>with-release <span style="color: #909183;">[</span>x <span style="color: #709870;">(</span>dv 1 2 3<span style="color: #709870;">)</span>
+                 y <span style="color: #709870;">(</span>dv 20 30<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>rk! 2 x y a<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+nil#RealGEMatrix[double, mxn:3x2, layout:column, offset:0]
+   ▥       ↓       ↓       ┓
+   →    1040.00 1060.00
+   →    1080.00 1120.00
+   →    1120.00 1180.00
+   ┗                       ┛
+</pre>
+
+
+<p>
+In this case, the entry in the first row of the second column is \(2 \times 1 \times 30 + 1000 = 1060\).
+</p>
+
+<p>
+We can use <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-rk.21"><code>rk!</code></a> to implement vector broadcast by cross-multiplying the vector of ones by the vector
+that we want to broadcast and adding it to the matrix that we want the vector broadcast to.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let-release</span> <span style="color: #7388d6;">[</span>a <span style="color: #909183;">(</span>dge 3 2 <span style="color: #709870;">(</span>repeat 6 1000<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>with-release <span style="color: #909183;">[</span>x <span style="color: #709870;">(</span>dv 1 2 3<span style="color: #709870;">)</span>
+                 ones <span style="color: #709870;">(</span>entry! <span style="color: #907373;">(</span>dv 2<span style="color: #907373;">)</span> 1<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>rk! x ones a<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+nil#RealGEMatrix[double, mxn:3x2, layout:column, offset:0]
+   ▥       ↓       ↓       ┓
+   →    1001.00 1001.00
+   →    1002.00 1002.00
+   →    1003.00 1003.00
+   ┗                       ┛
+</pre>
+
+
+<p>
+In this example, the vector <code>x</code> has been added to each column of the matrix <code>a</code>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org93e39e7" class="outline-2">
+<h2 id="org93e39e7">Batched layer implementation</h2>
+<div class="outline-text-2" id="text-org93e39e7">
+<p>
+We will redefine the <code>FullyConnectedinference</code> type, to support both single and batched input and output.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defprotocol</span> <span style="color: #2F8B58; font-weight: bold;">Parameters</span>
+  <span style="color: #7388d6;">(</span>weights <span style="color: #909183;">[</span>this<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>bias <span style="color: #909183;">[</span>this<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">deftype</span> <span style="color: #2F8B58; font-weight: bold;">FullyConnectedInference</span> <span style="color: #7388d6;">[</span>w b h activ-fn<span style="color: #7388d6;">]</span>
+  Releaseable
+  <span style="color: #7388d6;">(</span>release <span style="color: #909183;">[</span>_<span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>release w<span style="color: #909183;">)</span>
+    <span style="color: #909183;">(</span>release b<span style="color: #909183;">)</span>
+    <span style="color: #909183;">(</span>release h<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  Parameters
+  <span style="color: #7388d6;">(</span>weights <span style="color: #909183;">[</span>this<span style="color: #909183;">]</span> w<span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>bias <span style="color: #909183;">[</span>this<span style="color: #909183;">]</span> b<span style="color: #7388d6;">)</span>
+  IFn
+  <span style="color: #7388d6;">(</span>invoke <span style="color: #909183;">[</span>_ x<span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>activ-fn <span style="color: #709870;">(</span>axpy! -1.0 b <span style="color: #907373;">(</span>mv! w x h<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>invoke <span style="color: #909183;">[</span>_ x ones a<span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>activ-fn <span style="color: #709870;">(</span>rk! -1.0 b ones <span style="color: #907373;">(</span>mm! 1.0 w x 0.0 a<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+We use <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-mm.21"><code>mm!</code></a> (matrix-matrix multiplication) instead of <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-mv.21"><code>mv!</code></a> (matrix-vector multiplication).
+Since we'd like to support arbitrary batch sizes, we provide the input matrix <code>x</code>, the broadcast helper <code>ones</code>,
+and the output matrix <code>a</code> as the arguments of the invoke function. If we kept <code>a</code> and <code>ones</code> as fields,
+in the same way as <code>h</code>, the size of the batch would be fixed to their dimensions.
+</p>
+
+<p>
+To support both vectors and matrices in the activation function, I separated the bias subtraction from
+the activation function and moved it to the invoke method itself.
+</p>
+
+<p>
+Note how the only change is that instead of a simple addition of matching structures (<a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-axpy.21"><code>axpy!</code></a>), we are
+using the <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-rk.21"><code>rk!</code></a> powered vector-matrix broadcast.
+</p>
+
+<p>
+This is an effective solution. Unfortunately, the same simple change can not be applied
+to our implementation of the <code>relu</code> activation function. We will skip <code>relu</code> at the moment, and find
+the best way to support it later.
+</p>
+
+<p>
+The constructor, <code>fully-connected</code> does not require any changes.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">fully-connected</span> <span style="color: #7388d6;">[</span>activ-fn in-dim out-dim<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">let-release</span> <span style="color: #909183;">[</span>w <span style="color: #709870;">(</span>dge out-dim in-dim<span style="color: #709870;">)</span>
+                bias <span style="color: #709870;">(</span>dv out-dim<span style="color: #709870;">)</span>
+                h <span style="color: #709870;">(</span>dv out-dim<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>-&gt;FullyConnectedInference w bias h activ-fn<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Using already existing <code>x</code>, <code>bias-matrix</code> and <code>w1</code>, we get the same result as before.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let-release</span> <span style="color: #7388d6;">[</span>a <span style="color: #909183;">(</span>dge 4 1<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>with-release <span style="color: #909183;">[</span>layer-1 <span style="color: #709870;">(</span>fully-connected sigmoid! 2 4<span style="color: #709870;">)</span>
+                 ones <span style="color: #709870;">(</span>dv <span style="color: #907373;">[</span>1<span style="color: #907373;">]</span><span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>copy! w1 <span style="color: #709870;">(</span>weights layer-1<span style="color: #709870;">)</span><span style="color: #909183;">)</span>
+    <span style="color: #909183;">(</span>copy! bias-vector <span style="color: #709870;">(</span>bias layer-1<span style="color: #709870;">)</span><span style="color: #909183;">)</span>
+    <span style="color: #909183;">(</span>layer-1 x ones a<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+nil#RealGEMatrix[double, mxn:4x1, layout:column, offset:0]
+   ▥       ↓       ┓
+   →       0.48
+   →       0.84
+   →       0.92
+   →       0.25
+   ┗               ┛
+</pre>
+
+
+<p>
+The result is as expected.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org70d7de1" class="outline-2">
+<h2 id="org70d7de1">Micro benchmark</h2>
+<div class="outline-text-2" id="text-org70d7de1">
+<p>
+Let's compare the performance of the batched implementation with the results we have got
+in <a href="./Deep-Learning-in-Clojure-From-Scratch-to-GPU-3-Fully-Connected-Inference-Layers">Part 3</a>.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>with-release <span style="color: #7388d6;">[</span>x <span style="color: #909183;">(</span>dge 10000 10000<span style="color: #909183;">)</span>
+               ones <span style="color: #909183;">(</span>entry! <span style="color: #709870;">(</span>dv 10000<span style="color: #709870;">)</span> 1<span style="color: #909183;">)</span>
+               layer-1 <span style="color: #909183;">(</span>fully-connected tanh! 10000 5000<span style="color: #909183;">)</span>
+               a1 <span style="color: #909183;">(</span>dge 5000 10000<span style="color: #909183;">)</span>
+               layer-2 <span style="color: #909183;">(</span>fully-connected sigmoid! 5000 1000<span style="color: #909183;">)</span>
+               a2 <span style="color: #909183;">(</span>dge 1000 10000<span style="color: #909183;">)</span>
+               layer-3 <span style="color: #909183;">(</span>fully-connected sigmoid! 1000 10<span style="color: #909183;">)</span>
+               a3 <span style="color: #909183;">(</span>dge 10 10000<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+
+  <span style="color: #7388d6;">(</span>time
+   <span style="color: #909183;">(</span><span style="color: #A52A2A; font-weight: bold;">-&gt;</span> x
+       <span style="color: #709870;">(</span>layer-1 ones a1<span style="color: #709870;">)</span>
+       <span style="color: #709870;">(</span>layer-2 ones a2<span style="color: #709870;">)</span>
+       <span style="color: #709870;">(</span>layer-3 ones a3<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+On the same machine that required 18 ms per one input column, my 5 year old CPU (i7-4790k),
+I get 6 seconds for the batched version.
+</p>
+
+<pre class="example">
+"Elapsed time: 6012.853561 msecs"
+</pre>
+
+<p>
+Compared to 18 ms &times; 10000, which gives 180 seconds, the batched implementation, at 6 seconds,
+is roughly <i>30 times faster</i>! The difference in performance is typically positively correlated to the batch and input size.
+</p>
+
+<p>
+This is a significant gain, since the logic stays the same and the required changes are
+minimal. The important lesson is that <i>we should prefer vectored operations instead
+of writing manual loops</i> whenever possible.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org0087cc7" class="outline-2">
+<h2 id="org0087cc7">The next article</h2>
+<div class="outline-text-2" id="text-org0087cc7">
+<p>
+Step by step, we explored the basic building blocks of fully connected inference layers.
+</p>
+
+<p>
+The version with batched inference introduced a complication with supplying a vector of ones,
+and the need to supply large matrices to hold outputs of each layer.
+</p>
+
+<p>
+There is just one thing that we need to discuss before we generalize the inference layer and run it on the GPU!
+</p>
+
+<p>
+After that, we are ready to tackle the implementation of <i>learning</i>.
+It may seem to you that I'm obsessing about implementation details too much,
+but you'll see that we will use them to great benefit once we tackle the harder challenge.
+<i>Then</i>, you will not hit a wall, because you'd already be prepared and have them in your toolbox.
+</p>
+
+<p>
+On Thursday (or right away, if you're not reading this right away), read about <a href="./Deep-Learning-in-Clojure-From-Scratch-to-GPU-5-Reusing-Memory">Reusing Memory</a>!
+</p>
+</div>
+</div>
+
+<div id="outline-container-org1a1e6ab" class="outline-2">
+<h2 id="org1a1e6ab">Thank you</h2>
+<div class="outline-text-2" id="text-org1a1e6ab">
+<p>
+<a href="https://www.clojuriststogether.org/news/q1-2019-funding-announcement/">Clojurists Together</a> financially supported writing this series. Big thanks to all Clojurians who contribute,
+and thank you for reading and discussing this series.
+</p>
+</div>
+</div>
