@@ -1,0 +1,331 @@
+---
+date: 2019-02-21
+tags:
+- Deep Learning
+- Neanderthal
+- MKL
+- Clojure
+- CUDA
+- OpenCL
+author: dragan
+layout: post
+title: Deep Learning from Scratch to GPU - 5 - Sharing Memory
+excerpt: Sharing and reusing memory buffers is inescapable if we want high performance. It is a sharp but powerful tool.
+categories:
+- Deep Learning
+- Neanderthal
+- MKL
+- Clojure
+- CUDA
+- OpenCL
+---
+<p>
+If you haven't yet, read my introduction to this series in <a href="./Deep-Learning-in-Clojure-From-Scratch-to-GPU-0-Why-Bother">Deep Learning in Clojure from Scratch to GPU - Part 0 - Why Bother?</a>.
+</p>
+
+<p>
+The previous article, Part 4, is here: <a href="./Deep-Learning-in-Clojure-From-Scratch-to-GPU-4-Increasing-Performance-with-Batch-Processing">Increasing Performance with Batch Processing</a>.
+</p>
+
+<p>
+To run the code, you need a Clojure project with <a href="https://neanderthal.uncomplicate.org">Neanderthal</a> (<iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=neanderthal&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>) included as a dependency.
+If you're in a hurry, you can clone <a href="https://github.com/uncomplicate/neanderthal/blob/master/examples/hello-world/">Neanderthal Hello World project</a>.
+</p>
+
+<p>
+Don't forget to read at least some introduction from <a href="http://neuralnetworksanddeeplearning.com/">Neural Networks and Deep Learning</a>,
+start up the REPL from your favorite Clojure development environment, and let's continue with the tutorial.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span>uncomplicate.commons.core <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>with-release <span style="color: #A52A2A; font-weight: bold;">let-release</span> Releaseable release<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>uncomplicate.neanderthal
+           <span style="color: #909183;">[</span>core <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>axpy! scal! transfer! mm! rk! view-ge mv!<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>native <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>dv dge<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>vect-math <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>tanh! linear-frac!<span style="color: #709870;">]</span><span style="color: #909183;">]</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>import 'clojure.lang.IFn<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div id="outline-container-org9cee47e" class="outline-2">
+<h2 id="org9cee47e">The network diagram</h2>
+<div class="outline-text-2" id="text-org9cee47e">
+<p>
+I'm repeating the network diagram from an <a href="./Deep-Learning-in-Clojure-From-Scratch-to-GPU-3-Fully-Connected-Inference-Layers">earlier article</a> as a convenient reference.
+</p>
+
+
+<div class="figure">
+<p><img src="../img/deep-learning-from-scratch/1/nn-bias-activation.png" alt="nn-bias-activation.png" />
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgcb00605" class="outline-2">
+<h2 id="orgcb00605">What bothers me in the current layer implementation</h2>
+<div class="outline-text-2" id="text-orgcb00605">
+<p>
+This is an implementation that we have from the last article.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defprotocol</span> <span style="color: #2F8B58; font-weight: bold;">Parameters</span>
+  <span style="color: #7388d6;">(</span>weights <span style="color: #909183;">[</span>this<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>bias <span style="color: #909183;">[</span>this<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">deftype</span> <span style="color: #2F8B58; font-weight: bold;">FullyConnectedInference</span> <span style="color: #7388d6;">[</span>w b h activ-fn<span style="color: #7388d6;">]</span>
+  Releaseable
+  <span style="color: #7388d6;">(</span>release <span style="color: #909183;">[</span>_<span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>release w<span style="color: #909183;">)</span>
+    <span style="color: #909183;">(</span>release b<span style="color: #909183;">)</span>
+    <span style="color: #909183;">(</span>release h<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  Parameters
+  <span style="color: #7388d6;">(</span>weights <span style="color: #909183;">[</span>this<span style="color: #909183;">]</span> w<span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>bias <span style="color: #909183;">[</span>this<span style="color: #909183;">]</span> b<span style="color: #7388d6;">)</span>
+  IFn
+  <span style="color: #7388d6;">(</span>invoke <span style="color: #909183;">[</span>_ x<span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>activ-fn <span style="color: #709870;">(</span>axpy! -1.0 b <span style="color: #907373;">(</span>mv! w x h<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>invoke <span style="color: #909183;">[</span>_ x ones a<span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>activ-fn <span style="color: #709870;">(</span>rk! -1.0 b ones <span style="color: #907373;">(</span>mm! 1.0 w x 0.0 a<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+nil#'user/fully-connected
+</pre>
+
+
+<p>
+The current structure supports both single vectors, and multiple vectors batched as columns
+in a matrix, as its input and output.
+</p>
+
+<p>
+One thing bothers me, though: the memory that the network requires to operate. Weights and biases
+of each layer consume memory that is a fixed cost that we can not avoid. On the other hand,
+the output of each layer is relevant only during the propagation. When the signal passes
+to the next layer, that memory becomes irrelevant. The space it uses becomes used only
+when the inference is invoked with another input.
+</p>
+
+<p>
+It can be argued that, when the network processes a single input, the wasted memory is not
+large, compared to the memory that we use for weights and bias. For example, if the input
+contains 200, and the output 1000 entries, the weight matrix needs 200 times more space
+than the output.
+</p>
+
+<p>
+However, with batched input processing, the space used by the output matrix <code>a</code> becomes
+much more relevant. In the same example of the output size of 1000, and the batch size of 1000,
+the output matrix <code>a</code> now uses 5 times more than the weight matrix!
+</p>
+
+<p>
+Let's say that the layer consists of 100,000 neurons, and we want to process 1000 inputs
+in a batch. The layer now uses 400 megabytes of memory for output alone. Having 10 such layers
+wastes 4 GB of memory, the total available on mid-range GPUs. One solution is to buy a more
+expensive GPU, but that does not take us far. With such relaxed approach, we soon
+exhaust the limits of top of the line consumer offerings, and will have to look at distributed solutions,
+which are much more expensive, and much slower.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgef554c5" class="outline-2">
+<h2 id="orgef554c5">Share the underlying memory</h2>
+<div class="outline-text-2" id="text-orgef554c5">
+<p>
+The solution is to reuse the memory. Instead of creating a new matrix for each output, we could
+provide one big vector, and provide submatrices of its views to each layer. The layer will
+not see any difference, but we would have some complication during the network setup.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defprotocol</span> <span style="color: #2F8B58; font-weight: bold;">Parameters</span>
+  <span style="color: #7388d6;">(</span>weights <span style="color: #909183;">[</span>this<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>bias <span style="color: #909183;">[</span>this<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">deftype</span> <span style="color: #2F8B58; font-weight: bold;">FullyConnectedInference</span> <span style="color: #7388d6;">[</span>w b activ-fn<span style="color: #7388d6;">]</span>
+  Releaseable
+  <span style="color: #7388d6;">(</span>release <span style="color: #909183;">[</span>_<span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>release w<span style="color: #909183;">)</span>
+    <span style="color: #909183;">(</span>release b<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  Parameters
+  <span style="color: #7388d6;">(</span>weights <span style="color: #909183;">[</span>this<span style="color: #909183;">]</span> w<span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>bias <span style="color: #909183;">[</span>this<span style="color: #909183;">]</span> b<span style="color: #7388d6;">)</span>
+  IFn
+  <span style="color: #7388d6;">(</span>invoke <span style="color: #909183;">[</span>_ x ones a<span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>activ-fn <span style="color: #709870;">(</span>rk! -1.0 b ones <span style="color: #907373;">(</span>mm! 1.0 w x 0.0 a<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">fully-connected</span> <span style="color: #7388d6;">[</span>activ-fn in-dim out-dim<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">let-release</span> <span style="color: #909183;">[</span>w <span style="color: #709870;">(</span>dge out-dim in-dim<span style="color: #709870;">)</span>
+                bias <span style="color: #709870;">(</span>dv out-dim<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>-&gt;FullyConnectedInference w bias activ-fn<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+I removed the non-batch output, since it has the equivalent functionality to the batch of one.
+</p>
+
+<p>
+The activation function stays the same as before.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">sigmoid!</span> <span style="color: #7388d6;">[</span>x<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>linear-frac! 0.5 <span style="color: #909183;">(</span>tanh! <span style="color: #709870;">(</span>scal! 0.5 x<span style="color: #709870;">)</span><span style="color: #909183;">)</span> 0.5<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+I modified the example with two layers that we used in previous articles by
+just replicating the same input two times. We now have two identical inputs in a testing batch of two.
+</p>
+
+<p>
+Instead of creating two outputs, <code>a-1</code> and <code>a-2</code>, I created one vector <code>temp-a</code> and then
+took two general matrix views of that vector. <code>view-ge</code> creates a matrix that shares
+memory with the source, but in a matrix structure. In this case, the source vector has
+8 entries, which is big enough for both matrices, a \(4 \times 2\) and \(1 \times 2\) one.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let-release</span> <span style="color: #7388d6;">[</span>temp-a <span style="color: #909183;">(</span>dv 8<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>with-release <span style="color: #909183;">[</span>x <span style="color: #709870;">(</span>dge 2 2 <span style="color: #907373;">[</span>0.3 0.9 0.3 0.9<span style="color: #907373;">]</span><span style="color: #709870;">)</span>
+                 ones <span style="color: #709870;">(</span>dv 1 1<span style="color: #709870;">)</span>
+                 layer-1 <span style="color: #709870;">(</span>fully-connected tanh! 2 4<span style="color: #709870;">)</span>
+                 a-1 <span style="color: #709870;">(</span>view-ge temp-a 4 2<span style="color: #709870;">)</span>
+                 layer-2 <span style="color: #709870;">(</span>fully-connected sigmoid! 4 1<span style="color: #709870;">)</span>
+                 a-2 <span style="color: #709870;">(</span>view-ge temp-a 1 2<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>transfer! <span style="color: #709870;">[</span>0.3 0.1 0.9 0.0 0.6 2.0 3.7 1.0<span style="color: #709870;">]</span> <span style="color: #709870;">(</span>weights layer-1<span style="color: #709870;">)</span><span style="color: #909183;">)</span>
+    <span style="color: #909183;">(</span>transfer! <span style="color: #709870;">[</span>0.7 0.2 1.1 2<span style="color: #709870;">]</span> <span style="color: #709870;">(</span>bias layer-1<span style="color: #709870;">)</span><span style="color: #909183;">)</span>
+    <span style="color: #909183;">(</span>transfer! <span style="color: #709870;">[</span>0.75 0.15 0.22 0.33<span style="color: #709870;">]</span> <span style="color: #709870;">(</span>weights layer-2<span style="color: #709870;">)</span><span style="color: #909183;">)</span>
+    <span style="color: #909183;">(</span>transfer! <span style="color: #709870;">[</span>0.3<span style="color: #709870;">]</span> <span style="color: #709870;">(</span>bias layer-2<span style="color: #709870;">)</span><span style="color: #909183;">)</span>
+    <span style="color: #909183;">(</span>layer-2 <span style="color: #709870;">(</span>layer-1 x ones a-1<span style="color: #709870;">)</span> ones a-2<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+nil#RealGEMatrix[double, mxn:1x2, layout:column, offset:0]
+   ▥       ↓       ↓       ┓
+   →       0.41    0.44
+   ┗                       ┛
+</pre>
+
+
+<p>
+The result is <b>not</b> as expected. Both entries should have been \(0.44\), since both inputs are the same.
+Where is the bug?
+</p>
+</div>
+</div>
+
+<div id="outline-container-org2b64031" class="outline-2">
+<h2 id="org2b64031">Be careful when sharing memory</h2>
+<div class="outline-text-2" id="text-org2b64031">
+<p>
+The bug is the following. In <code>layer-2</code>, both the input (<code>a-1</code>), and the output (<code>a-2</code>), use
+the same underlying memory buffer, the one coming from <code>temp-a</code>. This would not be a problem
+if we weren't <i>modifying</i> the state of one of these matrices.
+</p>
+
+<p>
+We do, however, modify <code>a-2</code>. The problem is that one of the inputs for this modification
+is <code>a-1</code>. Some destructive functions support sharing input and output
+(<a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.vect-math.html#var-tanh.21"><code>tanh!</code></a> is one such function). However, most algorithms for matrix multiplication do not support sharing.
+The algorithm for multiplying general dense matrices (GE) assumes that the output matrix
+does not share memory with neither of the input matrices. It does not raise errors, but
+the result can be corrupted.
+</p>
+
+<p>
+How to know which functions do and which do not support sharing input and output memory?
+Read the documentation and, when not sure, inspect the examples in numerous Neanderthal tests. Once you
+get hang on the API, it is quite predictable and systematic. Most of the functions in <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html"><code>core</code></a>
+<i>do</i> support overlap in input and output. More care should be taken for <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.linalg.html"><code>linalg</code></a> functions.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org012ed7d" class="outline-2">
+<h2 id="org012ed7d">So, what do we do?</h2>
+<div class="outline-text-2" id="text-org012ed7d">
+<p>
+In this case, the only thing that we need to take care of, is that the input and output
+of the <i>same</i> layer do not share memory. In this case, we have only two layers, so
+we get back to the same thing as before: we need two <code>a</code> s.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let-release</span> <span style="color: #7388d6;">[</span>temp-odd <span style="color: #909183;">(</span>dv 8<span style="color: #909183;">)</span>
+              temp-even <span style="color: #909183;">(</span>dv 2<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>with-release <span style="color: #909183;">[</span>x <span style="color: #709870;">(</span>dge 2 2 <span style="color: #907373;">[</span>0.3 0.9 0.3 0.9<span style="color: #907373;">]</span><span style="color: #709870;">)</span>
+                 ones <span style="color: #709870;">(</span>dv 1 1<span style="color: #709870;">)</span>
+                 layer-1 <span style="color: #709870;">(</span>fully-connected tanh! 2 4<span style="color: #709870;">)</span>
+                 a-1 <span style="color: #709870;">(</span>view-ge temp-odd 4 2<span style="color: #709870;">)</span>
+                 layer-2 <span style="color: #709870;">(</span>fully-connected sigmoid! 4 1<span style="color: #709870;">)</span>
+                 a-2 <span style="color: #709870;">(</span>view-ge temp-even 1 2<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>transfer! <span style="color: #709870;">[</span>0.3 0.1 0.9 0.0 0.6 2.0 3.7 1.0<span style="color: #709870;">]</span> <span style="color: #709870;">(</span>weights layer-1<span style="color: #709870;">)</span><span style="color: #909183;">)</span>
+    <span style="color: #909183;">(</span>transfer! <span style="color: #709870;">[</span>0.7 0.2 1.1 2<span style="color: #709870;">]</span> <span style="color: #709870;">(</span>bias layer-1<span style="color: #709870;">)</span><span style="color: #909183;">)</span>
+    <span style="color: #909183;">(</span>transfer! <span style="color: #709870;">[</span>0.75 0.15 0.22 0.33<span style="color: #709870;">]</span> <span style="color: #709870;">(</span>weights layer-2<span style="color: #709870;">)</span><span style="color: #909183;">)</span>
+    <span style="color: #909183;">(</span>transfer! <span style="color: #709870;">[</span>0.3<span style="color: #709870;">]</span> <span style="color: #709870;">(</span>bias layer-2<span style="color: #709870;">)</span><span style="color: #909183;">)</span>
+    <span style="color: #909183;">(</span>layer-2 <span style="color: #709870;">(</span>layer-1 x ones a-1<span style="color: #709870;">)</span> ones a-2<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+nil#RealGEMatrix[double, mxn:1x2, layout:column, offset:0]
+   ▥       ↓       ↓       ┓
+   →       0.44    0.44
+   ┗                       ┛
+</pre>
+
+
+<p>
+Now it's correct.
+</p>
+
+<p>
+We can profit from memory reuse as we increase the number of layers, since we can alternate
+between these two temporary source vectors. If we only connect a few layers,
+that is only a hassle for no benefit, but if we need several more, and process a big batch,
+we can save a lot of (precious) memory.
+</p>
+
+<p>
+In practice, you'll have to decide when it pays off to take this approach, but the technique,
+sharp as it is, is worth keeping in the toolbox. Remember its upsides, but don't forget its dangers.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgd655da2" class="outline-2">
+<h2 id="orgd655da2">The next article</h2>
+<div class="outline-text-2" id="text-orgd655da2">
+<p>
+The next article, <a href="./Deep-Learning-in-Clojure-From-Scratch-to-GPU-5-CUDA-and-OpenCL">CUDA and OpenCL</a> is the one in which we finally generalize the inference layer and run it on the GPU!
+As you can see from the title, we'll support both major platforms, CUDA, <i>and OpenCL</i>, so you will
+be able to try this no matter what hardware you have: Nvidia, AMD, or Intel.
+</p>
+
+<p>
+After that, we will finally be ready to tackle the implementation of <i>learning</i>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org0848e2e" class="outline-2">
+<h2 id="org0848e2e">Thank you</h2>
+<div class="outline-text-2" id="text-org0848e2e">
+<p>
+<a href="https://www.clojuriststogether.org/news/q1-2019-funding-announcement/">Clojurists Together</a> financially supported writing this series. Big thanks to all Clojurians who contribute,
+and thank you for reading and discussing this series.
+</p>
+</div>
+</div>
