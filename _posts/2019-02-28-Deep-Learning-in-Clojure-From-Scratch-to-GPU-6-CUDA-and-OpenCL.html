@@ -1,0 +1,535 @@
+---
+date: 2019-02-28
+tags:
+- Deep Learning
+- Neanderthal
+- MKL
+- Clojure
+- CUDA
+- OpenCL
+author: dragan
+layout: post
+title: Deep Learning from Scratch to GPU - 6 - CUDA and OpenCL
+excerpt: We generalize the network code and run it on the GPU. On an Nvidia GPU with CUDA, and on an AMD GPU with OpenCL. Even more - we mix both CUDA and OpenCL, just because we can.
+categories:
+- Deep Learning
+- Neanderthal
+- MKL
+- Clojure
+- CUDA
+- OpenCL
+---
+<p>
+If you haven't yet, read my introduction to this series in <a href="./Deep-Learning-in-Clojure-From-Scratch-to-GPU-0-Why-Bother">Deep Learning in Clojure from Scratch to GPU - Part 0 - Why Bother?</a>.
+</p>
+
+<p>
+The previous article, Part 5, is here: <a href="./Deep-Learning-in-Clojure-From-Scratch-to-GPU-5-Sharing-Memory">Sharing Memory</a>.
+</p>
+
+<p>
+To run the code, you need a Clojure project with <a href="https://neanderthal.uncomplicate.org">Neanderthal</a> (<iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=neanderthal&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>) included as a dependency.
+If you're in a hurry, you can clone <a href="https://github.com/uncomplicate/neanderthal/blob/master/examples/hello-world/">Neanderthal Hello World project</a>.
+</p>
+
+<p>
+Don't forget to read at least some introduction from <a href="http://neuralnetworksanddeeplearning.com/">Neural Networks and Deep Learning</a>,
+start up the REPL from your favorite Clojure development environment, and let's continue with the tutorial.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span>uncomplicate.commons.core <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>with-release <span style="color: #A52A2A; font-weight: bold;">let-release</span> Releaseable release<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>uncomplicate.clojurecuda.core <span style="color: #F5666D;">:as</span> cuda <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>current-context default-stream synchronize<span style="color: #ee82ee; background-color: #333333;">!</span><span style="color: #909183; background-color: #333333;">]</span><span style="color: #7388d6; background-color: #333333;">]</span>
+         '<span style="color: #7388d6;">[</span>uncomplicate.clojurecl.core <span style="color: #F5666D;">:as</span> opencl <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span><span style="color: #0084C8; font-weight: bold;">*context*</span> <span style="color: #0084C8; font-weight: bold;">*command-queue*</span> finish!<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>uncomplicate.neanderthal
+           <span style="color: #909183;">[</span>core <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>axpy! scal! transfer! transfer mm! rk! view-ge vctr ge entry!<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>native <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>native-double native-float dv dge<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>vect-math <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>tanh! linear-frac!<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>cuda <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>cuda-float<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>opencl <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>opencl-float<span style="color: #709870;">]</span><span style="color: #909183;">]</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>import 'clojure.lang.IFn<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div id="outline-container-orgd5cdad2" class="outline-2">
+<h2 id="orgd5cdad2">The network diagram</h2>
+<div class="outline-text-2" id="text-orgd5cdad2">
+<p>
+I'm repeating the network diagram from the <a href="./Deep-Learning-in-Clojure-From-Scratch-to-GPU-3-Fully-Connected-Inference-Layers">previous article</a> as a convenient reference.
+</p>
+
+
+<div class="figure">
+<p><img src="../img/deep-learning-from-scratch/1/nn-bias-activation.png" alt="nn-bias-activation.png" />
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org1a3c1f0" class="outline-2">
+<h2 id="org1a3c1f0">The inference layer type</h2>
+<div class="outline-text-2" id="text-org1a3c1f0">
+<p>
+We're starting from the existing layer type, and trim it down a bit.
+The single-input function is redundant. We keep just the batch version.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defprotocol</span> <span style="color: #2F8B58; font-weight: bold;">Parameters</span>
+  <span style="color: #7388d6;">(</span>weights <span style="color: #909183;">[</span>this<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>bias <span style="color: #909183;">[</span>this<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">deftype</span> <span style="color: #2F8B58; font-weight: bold;">FullyConnectedInference</span> <span style="color: #7388d6;">[</span>w b activ-fn<span style="color: #7388d6;">]</span>
+  Releaseable
+  <span style="color: #7388d6;">(</span>release <span style="color: #909183;">[</span>_<span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>release w<span style="color: #909183;">)</span>
+    <span style="color: #909183;">(</span>release b<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  Parameters
+  <span style="color: #7388d6;">(</span>weights <span style="color: #909183;">[</span>this<span style="color: #909183;">]</span> w<span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>bias <span style="color: #909183;">[</span>this<span style="color: #909183;">]</span> b<span style="color: #7388d6;">)</span>
+  IFn
+  <span style="color: #7388d6;">(</span>invoke <span style="color: #909183;">[</span>_ x ones a<span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>activ-fn <span style="color: #709870;">(</span>rk! -1.0 b ones <span style="color: #907373;">(</span>mm! 1.0 w x 0.0 a<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+All functions that we have used, <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-axpy"><code>axpy</code></a>, <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-mm"><code>mm</code></a>, etc., are polymorphic and general
+in respect to the device they execute on: CPU, Nvidia GPU, AMD GPU, and Intel GPU.
+The activation functions that we have used are general, too.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">sigmoid!</span> <span style="color: #7388d6;">[</span>x<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>linear-frac! 0.5 <span style="color: #909183;">(</span>tanh! <span style="color: #709870;">(</span>scal! 0.5 x<span style="color: #709870;">)</span><span style="color: #909183;">)</span> 0.5<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+The dispatch to the right implementation is being done by the type of the vector or matrix structure
+at hand. The constructor function that we have used is hard-coded for using <code>double</code> floating point numbers,
+to exist in main memory, and use the native CPU backend (<a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.native.html#var-dge"><code>dge</code></a> and <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.native.html#var-dv"><code>dv</code></a> constructors).
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">fully-connected</span> <span style="color: #7388d6;">[</span>activ-fn in-dim out-dim<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">let-release</span> <span style="color: #909183;">[</span>w <span style="color: #709870;">(</span>dge out-dim in-dim<span style="color: #709870;">)</span>
+                bias <span style="color: #709870;">(</span>dv out-dim<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>-&gt;FullyConnectedInference w bias activ-fn<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org33c77e1" class="outline-2">
+<h2 id="org33c77e1">Generalize the code</h2>
+<div class="outline-text-2" id="text-org33c77e1">
+<p>
+There is only one thing that we have to do to make this code completely general:
+use general constructors from the <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html"><code>core</code></a> namespace, instead of the convenience methods from
+the <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.native.html"><code>native</code></a> namespace. These methods are, in this case, <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-ge"><code>ge</code></a> (general matrix) instead of
+<code>dge</code> (double general native matrix), and <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-vctr"><code>vctr</code></a> instead of <code>dv</code> (double native vector).
+The only difference in these methods is that they require an engine-specific factory
+as their first argument. We accommodate the <code>fully-connected</code> constructor to accept it as
+an input.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">fully-connected</span> <span style="color: #7388d6;">[</span>factory activ-fn in-dim out-dim<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">let-release</span> <span style="color: #909183;">[</span>w <span style="color: #709870;">(</span>ge factory out-dim in-dim<span style="color: #709870;">)</span>
+                bias <span style="color: #709870;">(</span>vctr factory out-dim<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>-&gt;FullyConnectedInference w bias activ-fn<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Now, we repeat the example of running the network with <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.native.html#var-native-double"><code>native-double</code></a>. That is the same factory
+that is used by the <code>dge</code> and <code>dv</code> methods, available in the <code>native</code> namespace. We can use
+<a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.native.html#var-native-float"><code>native-float</code></a> in its place, to use single-precision floating point computations on the CPU,
+or some of the GPU factories, or configure another factory coded by a 3-rd party, or even
+use the same code provided by Neanderthal, but configured in a different way.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>with-release <span style="color: #7388d6;">[</span>x <span style="color: #909183;">(</span>ge native-double 2 2 <span style="color: #709870;">[</span>0.3 0.9 0.3 0.9<span style="color: #709870;">]</span><span style="color: #909183;">)</span>
+               ones <span style="color: #909183;">(</span>vctr native-double 1 1<span style="color: #909183;">)</span>
+               layer-1 <span style="color: #909183;">(</span>fully-connected native-double tanh! 2 4<span style="color: #909183;">)</span>
+               a-1 <span style="color: #909183;">(</span>ge native-double 4 2<span style="color: #909183;">)</span>
+               layer-2 <span style="color: #909183;">(</span>fully-connected native-double sigmoid! 4 1<span style="color: #909183;">)</span>
+               a-2 <span style="color: #909183;">(</span>ge native-double 1 2<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>transfer! <span style="color: #909183;">[</span>0.3 0.1 0.9 0.0 0.6 2.0 3.7 1.0<span style="color: #909183;">]</span> <span style="color: #909183;">(</span>weights layer-1<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>transfer! <span style="color: #909183;">[</span>0.7 0.2 1.1 2<span style="color: #909183;">]</span> <span style="color: #909183;">(</span>bias layer-1<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>transfer! <span style="color: #909183;">[</span>0.75 0.15 0.22 0.33<span style="color: #909183;">]</span> <span style="color: #909183;">(</span>weights layer-2<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>transfer! <span style="color: #909183;">[</span>0.3<span style="color: #909183;">]</span> <span style="color: #909183;">(</span>bias layer-2<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>transfer <span style="color: #909183;">(</span>layer-2 <span style="color: #709870;">(</span>layer-1 x ones a-1<span style="color: #709870;">)</span> ones a-2<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+nil#RealGEMatrix[double, mxn:1x2, layout:column, offset:0]
+   ▥       ↓       ↓       ┓
+   →       0.44    0.44
+   ┗                       ┛
+</pre>
+
+
+<p>
+I modified the result display of this example a bit. Instead of doing a <code>println</code> as in the previous
+articles, I transfer the resulting matrix to main-memory. I do it for convenience, since this blog
+post and its results are automatically generated from live code, and also to teach a few patterns in
+this type of coding.
+</p>
+
+<p>
+Don't forget that, in this example, I have used <code>with-release</code> for <i>all</i> bindings, even the output
+<code>a-2</code>. I do this because the code should support CPU <i>and GPU</i>. On the CPU, releasing the data
+is of great help, but is optional in a REPL session, since the memory eventually gets released by the JVM
+(with a few caveats since JVM might not do it as soon as you hoped). On the GPU, however, JVM can not do anything;
+the underlying GPU buffer that is not released explicitly, is not released at all until we release the whole context.
+Therefore, the habit that I recommend, is to always take care of that and release all vectors, matrices
+and other structures as soon as possible.
+</p>
+
+<p>
+However, we'd like to see the result in the REPL. But, how, if the data stored in the result that
+is being returned (<code>a-2</code>) is released just the moment before it needs to be printed. Here, the <code>transfer</code> method
+transfers the data from wherever it is (main memory or GPU memory) to the equivalent object in the main memory.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org6c2aa32" class="outline-2">
+<h2 id="org6c2aa32">This particular network</h2>
+<div class="outline-text-2" id="text-org6c2aa32">
+<p>
+We are going to run this code on different devices, and I think it is a good idea to
+wrap it into a function. Note that we provide <code>factory</code> as the argument, and everything else is
+general and the same for all platforms!
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">this-particular-network</span> <span style="color: #7388d6;">[</span>factory<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>with-release <span style="color: #909183;">[</span>x <span style="color: #709870;">(</span>ge factory 2 2 <span style="color: #907373;">[</span>0.3 0.9 0.3 0.9<span style="color: #907373;">]</span><span style="color: #709870;">)</span>
+                 ones <span style="color: #709870;">(</span>vctr factory 1 1<span style="color: #709870;">)</span>
+                 layer-1 <span style="color: #709870;">(</span>fully-connected factory tanh! 2 4<span style="color: #709870;">)</span>
+                 a-1 <span style="color: #709870;">(</span>ge factory 4 2<span style="color: #709870;">)</span>
+                 layer-2 <span style="color: #709870;">(</span>fully-connected factory sigmoid! 4 1<span style="color: #709870;">)</span>
+                 a-2 <span style="color: #709870;">(</span>ge factory 1 2<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>transfer! <span style="color: #709870;">[</span>0.3 0.1 0.9 0.0 0.6 2.0 3.7 1.0<span style="color: #709870;">]</span> <span style="color: #709870;">(</span>weights layer-1<span style="color: #709870;">)</span><span style="color: #909183;">)</span>
+    <span style="color: #909183;">(</span>transfer! <span style="color: #709870;">[</span>0.7 0.2 1.1 2<span style="color: #709870;">]</span> <span style="color: #709870;">(</span>bias layer-1<span style="color: #709870;">)</span><span style="color: #909183;">)</span>
+    <span style="color: #909183;">(</span>transfer! <span style="color: #709870;">[</span>0.75 0.15 0.22 0.33<span style="color: #709870;">]</span> <span style="color: #709870;">(</span>weights layer-2<span style="color: #709870;">)</span><span style="color: #909183;">)</span>
+    <span style="color: #909183;">(</span>transfer! <span style="color: #709870;">[</span>0.3<span style="color: #709870;">]</span> <span style="color: #709870;">(</span>bias layer-2<span style="color: #709870;">)</span><span style="color: #909183;">)</span>
+    <span style="color: #909183;">(</span>transfer <span style="color: #709870;">(</span>layer-2 <span style="color: #907373;">(</span>layer-1 x ones a-1<span style="color: #907373;">)</span> ones a-2<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+I can call this function and instruct it to use double-precision floating point computation on the CPU.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>this-particular-network native-double<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+nil#RealGEMatrix[double, mxn:1x2, layout:column, offset:0]
+   ▥       ↓       ↓       ┓
+   →       0.44    0.44
+   ┗                       ┛
+</pre>
+
+
+<p>
+Or, it can use single-precision floating point computation, still on the CPU.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>this-particular-network native-float<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+nil#RealGEMatrix[float, mxn:1x2, layout:column, offset:0]
+   ▥       ↓       ↓       ┓
+   →       0.44    0.44
+   ┗                       ┛
+</pre>
+</div>
+</div>
+
+<div id="outline-container-orgac20ac2" class="outline-2">
+<h2 id="orgac20ac2">With CUDA on an Nvidia GPU</h2>
+<div class="outline-text-2" id="text-orgac20ac2">
+<p>
+The same code, without changes, runs on the GPU! The only thing that it needs,
+is the factory that sets it up with appropriate engines.
+</p>
+
+<p>
+For engines based on Nvidia's <a href="https://developer.nvidia.com/cuda-toolkit">CUDA</a> platform, we use the functions from
+<a href="https://clojurecuda.uncomplicate.org/codox/uncomplicate.clojurecuda.core.html"><code>uncomplicate.clojurecuda.core</code></a> namespace to choose and set up the GPU itself.
+We may have more than one graphics accelerator in our system, and Neanderthal
+has to know which one to use. <a href="https://clojurecuda.uncomplicate.org/codox/uncomplicate.clojurecuda.core.html#var-with-default"><code>with-default</code></a> is a method that will choose the best
+device that you have, and set it up automatically. There are more fine grained
+methods in the <a href="https://clojurecuda.uncomplicate.org/">ClojureCUDA</a> (<iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=clojurecuda&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>) library if you need more control.
+</p>
+
+<p>
+Next, we use the <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.cuda.html#var-cuda-float"><code>cuda-float</code></a> constructor to create a factory whose engines will use
+single-precision floating point computations in the default context and stream provided by
+<a href="https://clojurecuda.uncomplicate.org/">ClojureCUDA</a>. We may need more than one factory for advanced computations.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #2F8B58; font-weight: bold;">cuda</span>/with-default
+  <span style="color: #7388d6;">(</span>with-release <span style="color: #909183;">[</span>cuda-factory <span style="color: #709870;">(</span>cuda-float <span style="color: #907373;">(</span>current-context<span style="color: #907373;">)</span> default-stream<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>this-particular-network cuda-factory<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+nil#RealGEMatrix[float, mxn:1x2, layout:column, offset:0]
+   ▥       ↓       ↓       ┓
+   →       0.44    0.44
+   ┗                       ┛
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org4c8947e" class="outline-2">
+<h2 id="org4c8947e">With OpenCL on an AMD GPU</h2>
+<div class="outline-text-2" id="text-org4c8947e">
+<p>
+In case you have an AMD or Intel GPU, you won't be able to work with <a href="https://developer.nvidia.com/cuda-toolkit">CUDA</a> platform.
+Don't worry, Neanderthal supports <a href="https://www.khronos.org/opencl/">OpenCL</a>, which is an open platform equivalent
+to <a href="https://developer.nvidia.com/cuda-toolkit">CUDA</a>, that supports all major hardware vendors: AMD, Intel, and even Nvidia.
+</p>
+
+<p>
+Instead of ClojureCUDA, you'll use <a href="https://clojurecl.uncomplicate.org/">ClojureCL</a> (<iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=clojurecl&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>) to set up your execution environment.
+Other than a few differences in terminology, most of the knowledge of parallel computing
+on the GPU is transferable between CUDA and <a href="https://www.khronos.org/opencl/">OpenCL</a>.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #2F8B58; font-weight: bold;">opencl</span>/with-default
+  <span style="color: #7388d6;">(</span>with-release <span style="color: #909183;">[</span>opencl-factory <span style="color: #709870;">(</span>opencl-float <span style="color: #0084C8; font-weight: bold;">*context*</span> <span style="color: #0084C8; font-weight: bold;">*command-queue*</span><span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>this-particular-network opencl-factory<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+nil#RealGEMatrix[float, mxn:1x2, layout:column, offset:0]
+   ▥       ↓       ↓       ┓
+   →       0.44    0.44
+   ┗                       ┛
+</pre>
+</div>
+</div>
+
+<div id="outline-container-orgbf48219" class="outline-2">
+<h2 id="orgbf48219">You can even mix CUDA and OpenCL</h2>
+<div class="outline-text-2" id="text-orgbf48219">
+<p>
+With Neanderthal, you can even combine code that partly runs on a Nvidia GPU and partly on
+an AMD GPU. For performance reasons, I can not imagine why you'd want to do this. Don't do it in "real" code.
+But, do it for fun and learning. I included this example only to show you how flexible Neanderthal
+and Clojure are. This is something that you'd struggle to do in competing platforms, if at all!
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #2F8B58; font-weight: bold;">opencl</span>/with-default
+  <span style="color: #7388d6;">(</span><span style="color: #2F8B58; font-weight: bold;">cuda</span>/with-default
+      <span style="color: #909183;">(</span>with-release <span style="color: #709870;">[</span>opencl-factory <span style="color: #907373;">(</span>opencl-float <span style="color: #0084C8; font-weight: bold;">*context*</span> <span style="color: #0084C8; font-weight: bold;">*command-queue*</span><span style="color: #907373;">)</span>
+                     cuda-factory <span style="color: #907373;">(</span>cuda-float <span style="color: #6276ba;">(</span>current-context<span style="color: #6276ba;">)</span> default-stream<span style="color: #907373;">)</span>
+                     x <span style="color: #907373;">(</span>ge opencl-factory 2 2 <span style="color: #6276ba;">[</span>0.3 0.9 0.3 0.9<span style="color: #6276ba;">]</span><span style="color: #907373;">)</span>
+                     ones-opencl <span style="color: #907373;">(</span>vctr opencl-factory 1 1<span style="color: #907373;">)</span>
+                     layer-1 <span style="color: #907373;">(</span>fully-connected opencl-factory tanh! 2 4<span style="color: #907373;">)</span>
+                     a-1 <span style="color: #907373;">(</span>ge opencl-factory 4 2<span style="color: #907373;">)</span>
+                     a-1-cuda <span style="color: #907373;">(</span>ge cuda-factory 4 2<span style="color: #907373;">)</span>
+                     ones-cuda <span style="color: #907373;">(</span>vctr cuda-factory 1 1<span style="color: #907373;">)</span>
+                     layer-2 <span style="color: #907373;">(</span>fully-connected cuda-factory sigmoid! 4 1<span style="color: #907373;">)</span>
+                     a-2 <span style="color: #907373;">(</span>ge cuda-factory 1 2<span style="color: #907373;">)</span><span style="color: #709870;">]</span>
+        <span style="color: #709870;">(</span>transfer! <span style="color: #907373;">[</span>0.3 0.1 0.9 0.0 0.6 2.0 3.7 1.0<span style="color: #907373;">]</span> <span style="color: #907373;">(</span>weights layer-1<span style="color: #907373;">)</span><span style="color: #709870;">)</span>
+        <span style="color: #709870;">(</span>transfer! <span style="color: #907373;">[</span>0.7 0.2 1.1 2<span style="color: #907373;">]</span> <span style="color: #907373;">(</span>bias layer-1<span style="color: #907373;">)</span><span style="color: #709870;">)</span>
+        <span style="color: #709870;">(</span>transfer! <span style="color: #907373;">[</span>0.75 0.15 0.22 0.33<span style="color: #907373;">]</span> <span style="color: #907373;">(</span>weights layer-2<span style="color: #907373;">)</span><span style="color: #709870;">)</span>
+        <span style="color: #709870;">(</span>transfer! <span style="color: #907373;">[</span>0.3<span style="color: #907373;">]</span> <span style="color: #907373;">(</span>bias layer-2<span style="color: #907373;">)</span><span style="color: #709870;">)</span>
+        <span style="color: #709870;">(</span>layer-1 x ones-opencl a-1<span style="color: #709870;">)</span>
+        <span style="color: #709870;">(</span>transfer! a-1 a-1-cuda<span style="color: #709870;">)</span>
+        <span style="color: #709870;">(</span>transfer <span style="color: #907373;">(</span>layer-2 a-1-cuda ones-cuda a-2<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+nil#RealGEMatrix[float, mxn:1x2, layout:column, offset:0]
+   ▥       ↓       ↓       ┓
+   →       0.44    0.44
+   ┗                       ┛
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org5384f4e" class="outline-2">
+<h2 id="org5384f4e">Micro benchmark</h2>
+<div class="outline-text-2" id="text-org5384f4e">
+<p>
+One aspect of GPU computing is <i>how to do it at all</i>. As I hope you'd agree, with Neanderthal, <a href="https://clojurecl.uncomplicate.org/">ClojureCL</a>
+and <a href="https://clojurecl.uncomplicate.org/">ClojureCUDA</a> it is not that hard. Another question is: <i>is it worth the trouble</i>?
+</p>
+</div>
+
+<div id="outline-container-orgf50fd68" class="outline-3">
+<h3 id="orgf50fd68">Nvidia GTX 1080 Ti (2017)</h3>
+<div class="outline-text-3" id="text-orgf50fd68">
+<p>
+I'll measure the same superficial example that we used in the last post. The heavily-optimized native
+CPU engine backed by Intel's MKL (the fastest CPU thing around) computed one pass in 6 seconds. We hope that
+Nvidia's <a href="https://en.wikipedia.org/wiki/List_of_Nvidia_graphics_processing_units#GeForce_10_series">GeForce GTX 1080Ti</a> (11 TFLOPS) will be able to do it in much less time.
+</p>
+
+<p>
+Please note the <a href="https://clojurecuda.uncomplicate.org/codox/uncomplicate.clojurecuda.core.html#var-synchronize.21"><code>(synchronize!)</code></a> call; GPU calls are asynchronous, and here we are making sure
+that we block the main thread and wait for the computation to complete before we declare victory.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #2F8B58; font-weight: bold;">cuda</span>/with-default
+  <span style="color: #7388d6;">(</span>with-release <span style="color: #909183;">[</span>factory <span style="color: #709870;">(</span>cuda-float <span style="color: #907373;">(</span>current-context<span style="color: #907373;">)</span> default-stream<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>with-release <span style="color: #709870;">[</span>x <span style="color: #907373;">(</span>ge factory 10000 10000<span style="color: #907373;">)</span>
+               ones <span style="color: #907373;">(</span>entry! <span style="color: #6276ba;">(</span>vctr factory 10000<span style="color: #6276ba;">)</span> 1<span style="color: #907373;">)</span>
+               layer-1 <span style="color: #907373;">(</span>fully-connected factory tanh! 10000 5000<span style="color: #907373;">)</span>
+               a1 <span style="color: #907373;">(</span>ge factory 5000 10000<span style="color: #907373;">)</span>
+               layer-2 <span style="color: #907373;">(</span>fully-connected factory sigmoid! 5000 1000<span style="color: #907373;">)</span>
+               a2 <span style="color: #907373;">(</span>ge factory 1000 10000<span style="color: #907373;">)</span>
+               layer-3 <span style="color: #907373;">(</span>fully-connected factory sigmoid! 1000 10<span style="color: #907373;">)</span>
+               a3 <span style="color: #907373;">(</span>ge factory 10 10000<span style="color: #907373;">)</span><span style="color: #709870;">]</span>
+      <span style="color: #709870;">(</span>time
+       <span style="color: #907373;">(</span><span style="color: #A52A2A; font-weight: bold;">do</span>
+         <span style="color: #6276ba;">(</span>layer-3 <span style="color: #858580;">(</span>layer-2 <span style="color: #80a880;">(</span>layer-1 x ones a1<span style="color: #80a880;">)</span> ones a2<span style="color: #858580;">)</span> ones a3<span style="color: #6276ba;">)</span>
+         <span style="color: #6276ba;">(</span>synchronize!<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+niltrue
+</pre>
+
+
+<pre class="example">
+"Elapsed time: 122.529925 msecs"
+</pre>
+
+<p>
+And it does! 122 microseconds. This is roughly <i>50 times faster</i> than the optimized engine on my CPU!
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgba8228a" class="outline-3">
+<h3 id="orgba8228a">AMD R9 290X (2013)</h3>
+<div class="outline-text-3" id="text-orgba8228a">
+<p>
+In my system, I also have an old-ish AMD GPU, <a href="https://en.wikipedia.org/wiki/List_of_AMD_graphics_processing_units#Radeon_R5/R7/R9_200_Series">R9 290X</a>, a beast in its days at 5 TFLOPS.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #2F8B58; font-weight: bold;">opencl</span>/with-default
+  <span style="color: #7388d6;">(</span>with-release <span style="color: #909183;">[</span>factory <span style="color: #709870;">(</span>opencl-float <span style="color: #0084C8; font-weight: bold;">*context*</span> <span style="color: #0084C8; font-weight: bold;">*command-queue*</span><span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>with-release <span style="color: #709870;">[</span>x <span style="color: #907373;">(</span>ge factory 10000 10000<span style="color: #907373;">)</span>
+               ones <span style="color: #907373;">(</span>entry! <span style="color: #6276ba;">(</span>vctr factory 10000<span style="color: #6276ba;">)</span> 1<span style="color: #907373;">)</span>
+               layer-1 <span style="color: #907373;">(</span>fully-connected factory tanh! 10000 5000<span style="color: #907373;">)</span>
+               a1 <span style="color: #907373;">(</span>ge factory 5000 10000<span style="color: #907373;">)</span>
+               layer-2 <span style="color: #907373;">(</span>fully-connected factory sigmoid! 5000 1000<span style="color: #907373;">)</span>
+               a2 <span style="color: #907373;">(</span>ge factory 1000 10000<span style="color: #907373;">)</span>
+               layer-3 <span style="color: #907373;">(</span>fully-connected factory sigmoid! 1000 10<span style="color: #907373;">)</span>
+               a3 <span style="color: #907373;">(</span>ge factory 10 10000<span style="color: #907373;">)</span><span style="color: #709870;">]</span>
+      <span style="color: #204A87;">;;</span><span style="color: #204A87;">(layer-1 x ones a1) ;; The first time a BLAS operation is used in OpenCL might incur initial</span><span style="color: #ee82ee; background-color: #333333;">ization cost.</span>
+      <span style="color: #709870;">(</span>time
+       <span style="color: #907373;">(</span><span style="color: #A52A2A; font-weight: bold;">do</span>
+         <span style="color: #6276ba;">(</span>layer-3 <span style="color: #858580;">(</span>layer-2 <span style="color: #80a880;">(</span>layer-1 x ones a1<span style="color: #80a880;">)</span> ones a2<span style="color: #858580;">)</span> ones a3<span style="color: #6276ba;">)</span>
+         <span style="color: #6276ba;">(</span>finish!<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+"Elapsed time: 578.821854 msecs"
+</pre>
+
+<p>
+Roughly 5 times slower than Nvidia. Still worth it, since it is <i>10 times faster</i> than the CPU.
+</p>
+
+<p>
+You may expect it to be closer to Nvidia's result, since it should be twice as slow by the specifications
+(5 TFOPS vs 11 TFLOPS). Instead of Nvidia's proprietary BLAS matrix routines, Neanderthal uses
+an open-source engine in its OpenCL backend. Although it's not <i>that</i> much behind, it can not
+match Nvidia's hardware optimization at the same level. If you have an Nvidia's GPU, you can use <a href="https://clojurecl.uncomplicate.org/">ClojureCL</a> (<iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=clojurecl&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>),
+but if you need maximum performance, use <a href="https://clojurecuda.uncomplicate.org/">ClojureCUDA</a> (<iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=clojurecuda&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>).
+</p>
+</div>
+</div>
+
+<div id="outline-container-orge3365c8" class="outline-3">
+<h3 id="orge3365c8">Performance comparison (in this case)</h3>
+<div class="outline-text-3" id="text-orge3365c8">
+<p>
+Let me sum it up. In this example, we managed to accelerate a top-performance CPU code by <i>10 times</i> with an
+old AMD GPU, and <b>50 times</b> with a fairly recent but not the best Nvidia GPU, keeping the same code!
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgb8d603c" class="outline-2">
+<h2 id="orgb8d603c">Donations</h2>
+<div class="outline-text-2" id="text-orgb8d603c">
+<p>
+While you're still in amazement, let me sneak in a quick reminder that I'm accepting donations
+that I hope will support the development of these cool Clojure libraries in the years to come.
+</p>
+
+<p>
+If you feel that you can afford to help, and wish to donate, I even created a special <i>Starbucks for two</i> tier
+at <a href="https://www.patreon.com/draganrocks">patreon.com/draganrocks</a>, for the generous readers of this article. Don't worry, I won't squander the donations
+at Starbucks. But, not because I don't like a good mocha! There's no Starbucks shops in my country, that's all.
+If you feel specially generous, you can do something even cooler: <a href="https://www.patreon.com/posts/22476035">adopt a pet function</a>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgdbdc7dd" class="outline-2">
+<h2 id="orgdbdc7dd">The next article</h2>
+<div class="outline-text-2" id="text-orgdbdc7dd">
+<p>
+We started with 180 seconds, made it faster by 30 times by introducing batches, and even further, by
+50 times by running it on the GPU. This is <i>1500 times faster</i> than looping the single-input pass, which is
+itself optimized by MKL (and not using any naive code). But, hey, 180 seconds is <i>not that long</i>. Why bother with GPU
+instead of waiting these measly 3 minutes? Yes, 3 minutes might be tolerable in many cases. Before the
+Starbucks barista even gets to adding cream on top of that tasty sugar bomb I'm waiting for, voila, the results are ready.
+</p>
+
+<p>
+However, during the inference we only do <i>one</i> forward pass through the network. To discover
+the weights, that is, to <i>learn</i> the network, we need a forward and a backward pass, and then
+repeat that many, many times. At least a few dozen, but may be hundreds or thousands of times.
+In <i>that</i> case, 1500 times faster might mean waiting one minute instead of <i>the whole day</i> (1440 minutes)!
+Now, that <i>is</i> worth the effort in my book.
+</p>
+
+<p>
+Finally, we can direct our attention to that challenge: <i>learning</i> the network weights.
+The next article will be <a href="./Deep-Learning-in-Clojure-From-Scratch-to-GPU-7-Learning-and-Backpropagation">Learning and Backpropagation</a>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org1309c81" class="outline-2">
+<h2 id="org1309c81">Thank you</h2>
+<div class="outline-text-2" id="text-org1309c81">
+<p>
+<a href="https://www.clojuriststogether.org/news/q1-2019-funding-announcement/">Clojurists Together</a> financially supported writing this series. Big thanks to all Clojurians who contribute,
+and thank you for reading and discussing this series.
+</p>
+</div>
+</div>
