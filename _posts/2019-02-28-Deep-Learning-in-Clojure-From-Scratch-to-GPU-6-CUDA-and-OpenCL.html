@@ -444,7 +444,8 @@ In my system, I also have an old-ish AMD GPU, <a href="https://en.wikipedia.org/
                a2 <span style="color: #907373;">(</span>ge factory 1000 10000<span style="color: #907373;">)</span>
                layer-3 <span style="color: #907373;">(</span>fully-connected factory sigmoid! 1000 10<span style="color: #907373;">)</span>
                a3 <span style="color: #907373;">(</span>ge factory 10 10000<span style="color: #907373;">)</span><span style="color: #709870;">]</span>
-      <span style="color: #204A87;">;;</span><span style="color: #204A87;">(layer-1 x ones a1) ;; The first time a BLAS operation is used in OpenCL might incur initial</span><span style="color: #ee82ee; background-color: #333333;">ization cost.</span>
+      <span style="color: #709870;">(</span>layer-1 x ones a1<span style="color: #709870;">)</span> <span style="color: #204A87;">;; </span><span style="color: #204A87;">The first time a BLAS operation is used in OpenCL might incur initializ</span><span style="color: #ee82ee; background-color: #333333;">ation cost.</span>
+      <span style="color: #709870;">(</span>finish!<span style="color: #709870;">)</span>
       <span style="color: #709870;">(</span>time
        <span style="color: #907373;">(</span><span style="color: #A52A2A; font-weight: bold;">do</span>
          <span style="color: #6276ba;">(</span>layer-3 <span style="color: #858580;">(</span>layer-2 <span style="color: #80a880;">(</span>layer-1 x ones a1<span style="color: #80a880;">)</span> ones a2<span style="color: #858580;">)</span> ones a3<span style="color: #6276ba;">)</span>
@@ -453,11 +454,11 @@ In my system, I also have an old-ish AMD GPU, <a href="https://en.wikipedia.org/
 </div>
 
 <pre class="example">
-"Elapsed time: 578.821854 msecs"
+"Elapsed time: 330.683851 msecs"
 </pre>
 
 <p>
-Roughly 5 times slower than Nvidia. Still worth it, since it is <i>10 times faster</i> than the CPU.
+Roughly 3 times slower than Nvidia. Still worth it, since it is <i>almost 20 times faster</i> than the CPU.
 </p>
 
 <p>
@@ -474,7 +475,7 @@ but if you need maximum performance, use <a href="https://clojurecuda.uncomplica
 <h3 id="orge3365c8">Performance comparison (in this case)</h3>
 <div class="outline-text-3" id="text-orge3365c8">
 <p>
-Let me sum it up. In this example, we managed to accelerate a top-performance CPU code by <i>10 times</i> with an
+Let me sum it up. In this example, we managed to accelerate a top-performance CPU code by <i>20 times</i> with an
 old AMD GPU, and <b>50 times</b> with a fairly recent but not the best Nvidia GPU, keeping the same code!
 </p>
 </div>
