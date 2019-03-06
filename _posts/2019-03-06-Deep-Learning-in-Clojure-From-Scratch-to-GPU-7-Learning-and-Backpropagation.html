@@ -1,0 +1,616 @@
+---
+date: 2019-03-06
+tags:
+- Deep Learning
+- Neanderthal
+- MKL
+- Clojure
+- CUDA
+- OpenCL
+author: dragan
+layout: post
+title: Deep Learning from Scratch to GPU - 7 - Learning and Backpropagation
+excerpt: At last, we reached the point where we can take on the implementation of the learning algorithm. Here we look at the basics of backpropagation, the engine that makes deep learning possible.
+categories:
+- Deep Learning
+- Neanderthal
+- MKL
+- Clojure
+- CUDA
+- OpenCL
+---
+<p>
+At last, we reached the point where we can take on the implementation of the learning algorithm.
+Here we look at the basics of backpropagation, the engine that makes deep learning possible.
+</p>
+
+<p>
+This is the seventh article in the series. Read about the motivation and ToC in <a href="./Deep-Learning-in-Clojure-From-Scratch-to-GPU-0-Why-Bother">Deep Learning in Clojure from Scratch to GPU - Part 0 - Why Bother?</a>.
+</p>
+
+<p>
+The previous article, Part 6, is here: <a href="./Deep-Learning-in-Clojure-From-Scratch-to-GPU-6-CUDA-and-OpenCL">CUDA and OpenCL</a>.
+</p>
+
+<p>
+To run the code, you need a Clojure project with <a href="https://neanderthal.uncomplicate.org">Neanderthal</a> (<iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=neanderthal&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>) included as a dependency.
+If you're in a hurry, you can clone <a href="https://github.com/uncomplicate/neanderthal/blob/master/examples/hello-world/">Neanderthal Hello World project</a>.
+</p>
+
+<p>
+If you already haven't, now is the right time to read the first two chapters of <a href="http://neuralnetworksanddeeplearning.com/">Neural Networks and Deep Learning</a> (a few dozen pages),
+start up the REPL from your favorite Clojure development environment, and let's continue with the tutorial.
+</p>
+
+<p>
+Should you need more theoretical background, see this <a href="../18/Programmers-Teach-Yourself-Foundations-of-ML-AI-With-These-X-Books">(short!) list of recommended books</a>.
+</p>
+
+<div id="outline-container-orgc4c5854" class="outline-2">
+<h2 id="orgc4c5854">The network diagram</h2>
+<div class="outline-text-2" id="text-orgc4c5854">
+<p>
+I'm repeating the network diagram from an <a href="./Deep-Learning-in-Clojure-From-Scratch-to-GPU-3-Fully-Connected-Inference-Layers">earlier article</a> as a convenient reference.
+</p>
+
+
+<div class="figure">
+<p><img src="../img/deep-learning-from-scratch/1/nn-bias-activation.png" alt="nn-bias-activation.png" />
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orga18646f" class="outline-2">
+<h2 id="orga18646f">What learning is about</h2>
+<div class="outline-text-2" id="text-orga18646f">
+<p>
+The numbers I've used in the earlier article were just a prop to illustrate the mechanism,
+the out-of-context numbers that lead to meaningless outputs.
+The goal of the learning process is to find the values of weight matrices and bias vectors
+so that the network gives "good" outputs for the inputs it has never seen.
+</p>
+
+<p>
+There is a really important point that you should never forget: <i>don't hope to reach the "perfect" weights</i>.
+No matter what machine learning method we choose, no matter what
+software we use to implement it, and no matter what domain we apply it on, we are not going to
+make the oracle that always gives the perfect answer. Nor is such answer possible in many cases,
+since these methods are often use to model non-deterministic things.
+</p>
+
+<p>
+Another reason that we can't hope to find perfect coefficients is that the search space is intractably large.
+Even a small matrix between a 10-neuron layer and a 30 neuron layer has 300 entries. Even if the weights
+were binary, <code>0</code> or <code>1</code> valued, there would be \(2^{300}\) possible combinations. That is a large number of
+combinations to try. But the weights are floating point numbers, so the scope is even larger.
+</p>
+
+<p>
+What we can hope, is to find the weights that are good enough. We can not explore each combination,
+but, luckily, most combinations would be equally bad, so most methods are based on trying only
+the combinations that have some sense, and then going in the directions that look promising.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgb8dc17a" class="outline-2">
+<h2 id="orgb8dc17a">Supervised learning and gradient descent</h2>
+<div class="outline-text-2" id="text-orgb8dc17a">
+<p>
+The type of learning that we are using here is called <i>supervised learning</i>. Supervised leaning
+algorithms work by showing the network the examples of data (inputs) and labels (desired outputs),
+and adjusting network weights and biases so that the network approximates the outputs for these inputs.
+This iterative process is called training. If the data examples used in the training represent general
+data well, we hope that the network will we able to correctly approximate even the instances that it has never seen.
+</p>
+
+<p>
+But, how <i>exactly</i> do we adjust the weights? Surely not by blindly trying every possible combination;
+that is intractable. The most common method for teaching neural networks is gradient descent.
+</p>
+
+<p>
+We begin by choosing weight values, usually at random, taking one example from the training data \(x\)
+and calculating the network output \(a\). Since the weights are random, the output will typically be
+far away from the result \(y\) from the training data. If we pick some function that can nicely measure
+that distance, we will be able to tell how far away these two values are. In deep learning terminology,
+this function is called <i>the cost function</i> (also called <i>the loss function</i>, and sometimes <i>the objective function</i>).
+</p>
+
+<p>
+\(C(w,b) \equiv \frac{1}{2n} \sum_x \lVert \mathbf{y}_x - \mathbf{a}_x \lVert ^2\)
+</p>
+
+<p>
+We calculate the distance between network outputs and expected outputs for each
+training example \(x\), average it, and get the number that measures the loss. This particular
+function is also called <i>quadratic cost</i>, or <i>mean squared error</i>.
+</p>
+
+<p>
+So, we know the right answer \(y = f(x)\), we initialized the network weights so that it calculates
+\(a = g(x)\), we can measure the distance between \(a\) and \(y\), and would like to change weights so that
+\(a\) becomes as close as possible to \(y\) on average.
+</p>
+
+<p>
+In other words, we want to <i>minimize the cost function</i>. This is nice, since instead of "learning",
+an abstract and magical concept, we are talking about <i>optimization</i>, a subject that is rather
+well defined and has a clear mathematical background.
+</p>
+
+<p>
+Some optimization problems can be solved analytically with precision, some can be explicitly approximated
+within error range, but neural networks are too large for that. For example,
+minimum(s) of a function can be found by finding where the first derivative of the function is zero.
+But, given the size of neural networks, solving <i>that</i> is intractable. The methods
+that work with more complex problems are usually iterative. They explore the space step by step,
+in each iteration taking some direction that, hopefully, leads to better solutions. What we usually
+can't say with these methods is whether we reached the best solution.
+</p>
+
+<p>
+<a href="https://en.wikipedia.org/wiki/Gradient_descent">Gradient descent</a> is a method that, at each step, takes the direction down the steepest slope.
+That direction is pointed out by the first <a href="https://en.wikipedia.org/wiki/Derivative">derivative</a> of the function. The first derivative
+of a function defines the rate of change of the function at a particular point.
+Explaining this background in detail is out of scope of this article, but if you need some,
+look for some nice text on <a href="https://en.wikipedia.org/wiki/Calculus">calculus</a>.
+</p>
+
+<p>
+Here is a simplified depiction of gradient descent with a scalar function.
+</p>
+
+
+<div class="figure">
+<p><object type="image/svg+xml" data="../img/deep-learning-from-scratch/7/gradient-descent.svg" class="org-svg">
+Sorry, your browser does not support SVG.</object>
+</p>
+</div>
+
+<p>
+Note that it didn't find the global minimum to the left, but a local one closer to the starting point.
+There are ways to make this exploration more robust, but there is no way to guarantee the
+discovery of the global minimum. Luckily, it turns out to not be such a big problem in neural networks.
+Modern implementations are good enough.
+</p>
+
+<p>
+Since we are dealing with vectors, instead of scalars, we use <i>gradient</i>, which is
+a vector of partial derivatives of C, practically a kind of "vector derivative".
+</p>
+
+<p>
+\(\nabla{C} \equiv (\frac{\partial{C}}{\partial{w_1}},\frac{\partial{C}}{\partial{w_2}},\dots)\)
+</p>
+
+<p>
+So, we start from a point, move by \(\Delta{C}\approx \nabla{C}\Delta{w}\), and we want
+to make sure that we are going down (\(\Delta{C}\) is negative), taking the best route \(\Delta{w}\).
+I'll spare you from the details (explore that in the recommended literature), but it can be shown
+that the best route is \(\Delta{w} = -\eta\nabla{C}\), which ensures that \(\Delta{C}\approx -\eta\nabla{C}\nabla{C} = -\eta \nabla{C}^2 \leq 0\).
+Since \(\Delta{C} \leq 0\), the algorithm is guaranteed to go in a good direction.
+</p>
+
+<p>
+The size of the step we take, \(\eta\), is called <i>the learning rate</i>. Choosing a good learning
+rate is important. The gradient only shows the best direction at infinitely small distanc.e The larger
+the step, the greater the chance that the gradient at that distance changes.
+Imagine descending from a peak of the mountain and trying to reach the valley.
+If we make superhuman jumps, we will jump over the valley and land on another peak.
+If the step is too small, we would need too many steps to reach the bottom of the valley.
+As many other things in deep learning such as deciding on the structure of the network,
+it is a craft rather than science. We don't have a formula, and rely on experience, trial, and error.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org65eedd9" class="outline-2">
+<h2 id="org65eedd9">Backpropagation</h2>
+<div class="outline-text-2" id="text-org65eedd9">
+<p>
+We just take the gradient, plug it into the formula \(w' = w + \Delta{w}\) and
+in a number of iterations, we train the network. Great! But, now we have another problem:
+how to calculate the gradient?
+</p>
+
+<p>
+You've probably heard about automatic differentiation, so we should certainly invoke
+some magic from an automatic differentiation software package? Not at all. First, these
+packages are not as powerful as you might imagine. Second, we don't need that sort of magic.
+</p>
+
+<p>
+I've already mentioned that the biggest strength of neural networks is in their simple structure.
+We have a cascade of linear transformations followed by <i>simple</i> activation functions, which
+have been chosen by design to have very straightforward derivatives. We can easily
+calculate the gradient of each of these elements in isolation. The trick that's left is how to
+combine these.
+</p>
+
+<p>
+The answer is <i>backpropagation</i>, an algorithm for calculating gradients of each layer by propagating
+the error backwards, iteratively updating weights.
+</p>
+
+<p>
+In each iteration, the signal is propagated forwards,
+just like during the inference that we've implemented in previous articles. The error is calculated,
+and based on it, going backwards, the gradient for each layer. Along with calculating gradients,
+we update the weights and biases. Then, the new training example becomes the input, the new
+forward step takes place, then the new error is calculated etc.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgfd9ba30" class="outline-2">
+<h2 id="orgfd9ba30">Some code that we'll need later</h2>
+<div class="outline-text-2" id="text-orgfd9ba30">
+<p>
+This article contains too much prose, and too little code, I know. We need an overview
+of the learning algorithm we're going to implement in the next articles.
+</p>
+
+<p>
+We'll also need a few fairly approachable operations that we haven't used before. It might be a good
+idea to present them here. We'll use them right away in theory, and in the next articles in practice.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span>uncomplicate.commons.core <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>with-release <span style="color: #A52A2A; font-weight: bold;">let-release</span><span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>uncomplicate.neanderthal
+           <span style="color: #909183;">[</span>core <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>transfer raw copy<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>native <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>dge dv<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>vect-math <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>mul mul! exp tanh! linear-frac! sin cos exp!<span style="color: #709870;">]</span><span style="color: #909183;">]</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org8345563" class="outline-3">
+<h3 id="org8345563">The Haddamard product</h3>
+<div class="outline-text-3" id="text-org8345563">
+<p>
+The Haddamard product of two vectors, \(\mathbf{x} \odot \mathbf{y}\), is a vector
+that contains products of respective pairs of entries from \(x\) and \(y\).
+</p>
+
+<p>
+In Neanderthal, you can compute this vectorized <code>*</code> function by using the <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.vect-math.html#var-mul"><code>mul</code></a> or <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.vect-math.html#var-mul.21"><code>mul!</code></a> function from the
+<a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.vect-math.html"><code>vect-math</code></a> namespace. That namespace contains vectorized equivalents of the
+scalar-based mathematical functions from the <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.math.html"><code>math</code></a> namespace, applied element-wise.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>with-release <span style="color: #7388d6;">[</span>x <span style="color: #909183;">(</span>dv 1 2 3<span style="color: #909183;">)</span>
+               y <span style="color: #909183;">(</span>dv 4 5 6<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>mul x y<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+nil#RealBlockVector[double, n:3, offset: 0, stride:1]
+[   4.00   10.00   18.00 ]
+</pre>
+
+
+<p>
+The destructive variant puts the result into the first vector.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>with-release <span style="color: #7388d6;">[</span>x <span style="color: #909183;">(</span>dv 1 2 3<span style="color: #909183;">)</span>
+               y <span style="color: #909183;">(</span>dv 4 5 6<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>mul! x y<span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>transfer x<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+nil#RealBlockVector[double, n:3, offset: 0, stride:1]
+[   4.00   10.00   18.00 ]
+</pre>
+
+
+<p>
+All functions from the <code>vect-math</code> namespace equally support vectors <i>and</i> matrices.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>with-release <span style="color: #7388d6;">[</span>a <span style="color: #909183;">(</span>dge 2 3 <span style="color: #709870;">[</span>1 2 3 4 5 6<span style="color: #709870;">]</span><span style="color: #909183;">)</span>
+               b <span style="color: #909183;">(</span>dge 2 3 <span style="color: #709870;">[</span>7 8 9 10 11 12<span style="color: #709870;">]</span><span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>mul a b<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+nil#RealGEMatrix[double, mxn:2x3, layout:column, offset:0]
+   ▥       ↓       ↓       ↓       ┓
+   →       7.00   27.00   55.00
+   →      16.00   40.00   72.00
+   ┗                               ┛
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org3462634" class="outline-3">
+<h3 id="org3462634">The derivative of a function</h3>
+<div class="outline-text-3" id="text-org3462634">
+<p>
+Not all functions have derivatives in the whole domain. When there is a derivative,
+it doesn't mean that it's easy to compute or represent analytically. But, some well-known
+functions are well known exactly because they have an elegant derivative everywhere.
+</p>
+
+<p>
+The finest example is the exponent function. The derivative of the <code>exp</code> function is the
+<code>exp</code> function itself! When we have a vector <code>x</code>, computing <code>(exp x)</code> gives us both
+the value of the function and the value of the derivative of the function at these points.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">x</span> <span style="color: #7388d6;">(</span>dv 0 0.5 0.7 1<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>exp x<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+nil#RealBlockVector[double, n:4, offset: 0, stride:1]
+[   1.00    1.65    2.01    2.72 ]
+</pre>
+
+
+<p>
+Some other functions are finely paired as a function and its derivative in the simplest expressions.
+For example, <code>sin</code> and <code>cos</code>. The derivative of <code>sin</code> is <code>cos</code>, and the derivative of <code>cos</code> is <code>-sin</code>.
+</p>
+
+<p>
+In this example, to compute the values of the function <code>sin</code> at each point in the vector <code>x</code>, we invoke
+the <code>sin</code> function.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>sin x<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+nil#RealBlockVector[double, n:4, offset: 0, stride:1]
+[   0.00    0.48    0.64    0.84 ]
+</pre>
+
+
+<p>
+To compute the derivative of the <code>sin</code> function at these same points, we invoke the <code>cos</code> function
+at these same points.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>cos x<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+nil#RealBlockVector[double, n:4, offset: 0, stride:1]
+[   1.00    0.88    0.76    0.54 ]
+</pre>
+
+
+<p>
+Some well-known functions have analytical derivatives, although they are not that
+obvious, and a bit harder to compute. One example is the sigmoid function, which is commonly
+used as an activation function in neural networks.
+</p>
+
+\begin{equation}
+\sigma(x) = \frac{1}{1 + e^{-x}} = \frac{e^x}{e^{x} + 1}
+\end{equation}
+
+<p>
+Fortunately, the sigmoid function has a nice formula for the derivative. Here it is:
+</p>
+
+\begin{equation}
+\sigma ' = \frac{d\sigma}{d{x}} = \sigma(x) \dot (1 - \sigma(x))
+\end{equation}
+
+<p>
+We have already implemented the sigmoid function.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">sigmoid!</span> <span style="color: #7388d6;">[</span>x<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>linear-frac! 0.5 <span style="color: #909183;">(</span>tanh! <span style="color: #709870;">(</span>linear-frac! 0.5 x 0.0<span style="color: #709870;">)</span><span style="color: #909183;">)</span> 0.5<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Now, since we have the sigmoid function, it should be easy to implement its derivative.
+We just invoke a haddamard product on a sigmoid, and a sigmoid subtracted from one.
+The logic is easy, but the implementation is not so straightforward. We can easily compute <code>(sigmoid! x)</code>.
+We can also easily subtract that result from the 1-vector using <code>linear-frac!</code>. However, for the Haddamard
+product, we need both of these intermediate results that reside in the same memory for the multiplication.
+We can't have them at the same time, and we need a "working" memory.
+</p>
+
+<p>
+We could create it internally
+each time the function is invoked, and release it after the function is evaluated. This is a clean
+solution, but wasteful, considering that we will call this function many times in the learning process.
+Another solution is to provide this working space as an additional argument. Here, I design
+<code>sigmoid-prim</code> to return both the sigmoid (<code>x!</code>) and its derivative (<code>prim!</code>).
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">sigmoid-prim!</span>
+  <span style="color: #7388d6;">(</span><span style="color: #909183;">[</span>x!<span style="color: #909183;">]</span>
+   <span style="color: #909183;">(</span><span style="color: #A52A2A; font-weight: bold;">let-release</span> <span style="color: #709870;">[</span>x-copy <span style="color: #907373;">(</span>copy x!<span style="color: #907373;">)</span><span style="color: #709870;">]</span>
+     <span style="color: #709870;">(</span>sigmoid-prim! x! x-copy<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span><span style="color: #909183;">[</span>x! prim!<span style="color: #909183;">]</span>
+   <span style="color: #909183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #709870;">[</span>x <span style="color: #907373;">(</span>sigmoid! x!<span style="color: #907373;">)</span><span style="color: #709870;">]</span>
+     <span style="color: #709870;">(</span>mul! <span style="color: #907373;">(</span>linear-frac! -1.0 x 1.0 prim!<span style="color: #907373;">)</span> x<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Now, given a vector <code>x</code>, we can compute both the value of sigmoid, and its derivative at <code>x</code>.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>with-release <span style="color: #7388d6;">[</span>x <span style="color: #909183;">(</span>dv 0.1 0.5 0.9 <span style="color: #709870;">(</span>/ <span style="color: #2F8B58; font-weight: bold;">Math</span>/PI 2.0<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+ <span style="color: #7388d6;">[</span><span style="color: #909183;">(</span>transfer x<span style="color: #909183;">)</span> <span style="color: #909183;">(</span>sigmoid-prim! x<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+nil[#RealBlockVector[double, n:4, offset: 0, stride:1]
+[   0.10    0.50    0.90    1.57 ]
+ #RealBlockVector[double, n:4, offset: 0, stride:1]
+[   0.25    0.24    0.21    0.14 ]
+]
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org5ca30b7" class="outline-2">
+<h2 id="org5ca30b7">The four important equations</h2>
+<div class="outline-text-2" id="text-org5ca30b7">
+<p>
+Now, we can return to the key functions for implementing backpropagation-based gradient descent
+in neural networks.
+</p>
+
+<p>
+You can look for the details in Michael's book; here I summarize the equations that we're
+going to base our implementation on.
+</p>
+</div>
+
+<div id="outline-container-org2e9c02f" class="outline-3">
+<h3 id="org2e9c02f">The forward pass</h3>
+<div class="outline-text-3" id="text-org2e9c02f">
+<p>
+We have already implemented this as part of the inference calculation, but I repeat it here for reference.
+</p>
+
+<p>
+\(a^l = \sigma(w^l a^{l-1} + b^l)\)
+</p>
+
+<p>
+This equation says that the activated output \(a\) in each layer \(l\) is calculated by
+calling the activation function \(\sigma\) on the output of the product of weights at that layer \(w^l\)
+and the output of the <i>previous</i> layer, \(a^{l-1}\), increased by bias \(b^l\). The input to \(\sigma\)
+will be useful during the backpropagation, so we can keep it as \(z\), and the equation becomes:
+</p>
+
+<p>
+\(a^l = \sigma(z^l)\), where \(z^l = w^l a^{l-1} + b^l\).
+</p>
+
+<p>
+Please note that &sigma; here stands for any activation function, not only the sigmoid function.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgbb57a39" class="outline-3">
+<h3 id="orgbb57a39">The error of the output layer &delta;<sup>L</sup> (1)</h3>
+<div class="outline-text-3" id="text-orgbb57a39">
+<p>
+The error of the output layer can be computed as a haddamard product of the gradient
+of the cost function in respect to the activation \(a\) and the derivative of \(z\).
+</p>
+
+<p>
+\(\delta^L = \nabla_a C \odot \sigma ' (z^L)\)
+</p>
+
+<p>
+The exact formula for \(\nabla_a C\) depends on which cost function we choose. For the
+quadratic cost function, that gradient will be as simple as \(a^L - y\).
+</p>
+
+<p>
+\(\delta^L = (a^L - y) \odot \sigma ' (z^L)\)
+</p>
+</div>
+</div>
+
+<div id="outline-container-org121a6ef" class="outline-3">
+<h3 id="org121a6ef">The error of hidden layers &delta;<sup>l</sup> (2)</h3>
+<div class="outline-text-3" id="text-org121a6ef">
+<p>
+The error in hidden layers is generic. It depends only on the weights and the error of
+the next layer, and the derivative of its own pre-activation outputs.
+</p>
+
+<p>
+\(\delta^l =  ((w^{l+1})^T \delta^{l+1}) \odot \sigma ' (z^L)\)
+</p>
+</div>
+</div>
+
+<div id="outline-container-org5dece96" class="outline-3">
+<h3 id="org5dece96">The rate of change of the cost in respect to bias (3)</h3>
+<div class="outline-text-3" id="text-org5dece96">
+<p>
+Gradient in respect to biases in each layer is equal to the error we have computed.
+</p>
+
+<p>
+\(\nabla_b C^l = \delta^l\)
+</p>
+</div>
+</div>
+
+<div id="outline-container-org36791d7" class="outline-3">
+<h3 id="org36791d7">The rate of change of the cost in respect to weights (4)</h3>
+<div class="outline-text-3" id="text-org36791d7">
+<p>
+Gradient in respect to weights depends on the error of that layer and the activations of
+the <i>previous</i> layer
+</p>
+
+<p>
+\(\nabla_w C^l = a^{l-1} \delta^l\)
+</p>
+
+<p>
+From these equations, we can see that during the backpropagation, in each layer,
+we need some data from the next layer, and some data from the previous layer.
+This have two major consequences. The first is that, when building the network,
+we have to decide on how to connect this chain, which is not trivial since the
+dependencies between layers go in both directions. The second is that, should we decide
+to optimize the memory consumption and reuse some memory, we need to be careful, since
+some data might be needed more than once during the forward and backward passes.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org3942579" class="outline-2">
+<h2 id="org3942579">The next article</h2>
+<div class="outline-text-2" id="text-org3942579">
+<p>
+In the next articles, we take these four fundamental equations, and implement the algorithm
+step by step, taking care of the performance and discussing the implications of each step.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org6902f1a" class="outline-2">
+<h2 id="org6902f1a">Thank you</h2>
+<div class="outline-text-2" id="text-org6902f1a">
+<p>
+<a href="https://www.clojuriststogether.org/news/q1-2019-funding-announcement/">Clojurists Together</a> financially supported writing this series. Big thanks to all Clojurians who contribute,
+and thank you for reading and discussing this series.
+</p>
+</div>
+</div>
