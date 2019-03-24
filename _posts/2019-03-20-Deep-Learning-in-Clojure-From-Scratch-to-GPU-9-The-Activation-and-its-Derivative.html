@@ -109,7 +109,7 @@ Again for reference, I repeat the inference and training layer code that we deve
          '<span style="color: #7388d6;">[</span>uncomplicate.neanderthal
            <span style="color: #909183;">[</span>core <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>mrows dim raw view entry! axpy! copy! scal! transfer!
                          transfer mm! rk! view-ge vctr ge<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
-           <span style="color: #909183;">[</span>vect-math <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>tanh! linear-frac! sqr! mul!<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>vect-math <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>tanh! linear-frac! sqr! mul! cosh! inv!<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
            <span style="color: #909183;">[</span>native <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>fge native-float<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
            <span style="color: #909183;">[</span>cuda <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>cuda-float<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
            <span style="color: #909183;">[</span>opencl <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>opencl-float<span style="color: #709870;">]</span><span style="color: #909183;">]</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
@@ -239,7 +239,7 @@ and receive it through <code>a</code> in the current layer when its turn comes d
 <h2 id="orge6f53f9">Computing the derivative of the activation</h2>
 <div class="outline-text-2" id="text-orge6f53f9">
 <p>
-At first glance, this step seems trivial. We have the activation function \(\sigma\), we wisely saved the
+At first look, this step seems trivial. We have the activation function \(\sigma\), we wisely saved the
 values of the linear outputs \(z^l\), and we just need to find out which function
 is the derivative \(\sigma '\) and apply it.
 </p>
@@ -474,7 +474,7 @@ You can guess that the derivative of this fine function is straightforward.
 </p>
 
 <p>
-\(\tanh'(x) = 1 - \tanh^2(x)\)
+\(\tanh'(x) = \frac{1}{cosh^2(x)}\)
 </p>
 
 <p>
@@ -487,7 +487,7 @@ We even don't need any working memory, so the implementation is easier than with
   <span style="color: #7388d6;">(</span>activ <span style="color: #909183;">[</span>_ z a!<span style="color: #909183;">]</span>
     <span style="color: #909183;">(</span>tanh! z a!<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
   <span style="color: #7388d6;">(</span>prime <span style="color: #909183;">[</span>this z!<span style="color: #909183;">]</span>
-    <span style="color: #909183;">(</span>linear-frac! -1.0 <span style="color: #709870;">(</span>sqr! z!<span style="color: #709870;">)</span> 1.0<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+    <span style="color: #909183;">(</span>sqr! <span style="color: #709870;">(</span>inv! <span style="color: #907373;">(</span>cosh! z!<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
