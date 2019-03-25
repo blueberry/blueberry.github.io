@@ -1,0 +1,835 @@
+---
+date: 2019-03-25
+tags:
+- Deep Learning
+- Neanderthal
+- MKL
+- Clojure
+- CUDA
+- OpenCL
+author: dragan
+layout: post
+excerpt: We complete the basic implementation of the backward pass of backpropagation and gradient descent.
+title: Deep Learning from Scratch to GPU - 10 - The Backward Pass (CUDA, OpenCL, Nvidia, AMD, Intel)
+categories:
+- Deep Learning
+- Neanderthal
+- MKL
+- Clojure
+- CUDA
+- OpenCL
+---
+<p>
+We complete the basic implementation of the backward pass of backpropagation and gradient descent in this article.
+</p>
+
+<p>
+If you haven't yet, read my introduction to this series in
+ <a href="./Deep-Learning-in-Clojure-From-Scratch-to-GPU-0-Why-Bother">Deep Learning in Clojure from Scratch to GPU - Part 0 - Why Bother?</a>.
+</p>
+
+<p>
+The previous article, Part 9, is here: <a href="./Deep-Learning-in-Clojure-From-Scratch-to-GPU-9-The-Activation-and-its-Derivative">The Activation and its Derivative</a>.
+</p>
+
+<p>
+To run the code, you need a Clojure project with <a href="https://neanderthal.uncomplicate.org">Neanderthal</a> (<iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=neanderthal&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>) included as a dependency.
+If you're in a hurry, you can clone <a href="https://github.com/uncomplicate/neanderthal/blob/master/examples/hello-world/">Neanderthal Hello World project</a>.
+</p>
+
+<p>
+Don't forget to read at least some introduction from <a href="http://neuralnetworksanddeeplearning.com/">Neural Networks and Deep Learning</a>,
+start up the REPL from your favorite Clojure development environment, and let's continue with the tutorial.
+</p>
+
+<div id="outline-container-org00ddf39" class="outline-2">
+<h2 id="org00ddf39">The relevant equations</h2>
+<div class="outline-text-2" id="text-org00ddf39">
+<p>
+Two equations from <a href="./Deep-Learning-in-Clojure-From-Scratch-to-GPU-7-Learning%20and%20Backpropagation">Part 7</a> (which introduced gradient descent and backpropagation) of the four which are relevant,
+do a similar thing.
+</p>
+
+<p>
+\(\delta^L = \nabla_a C \odot \sigma ' (z^L)\). (1)
+</p>
+
+<p>
+\(\delta^l =  ((w^{l+1})^T \delta^{l+1}) \odot \sigma ' (z^L)\). (2)
+</p>
+
+<p>
+In both of these formulas, we compute the Haddamard product of the matrix
+that comes from the next layer (\(\nabla_a C\) and \((w^{l+1})^T \delta^{l+1}\)) and
+the matrix that is located in the layer at hand (\(\sigma ' (z^L)\)).
+</p>
+
+<p>
+In the last article we handled the \(\sigma'\) part of the equation, and now we'll handle
+the part that comes from the next layer.
+</p>
+
+<p>
+After that, we'll round the whole pass by dealing with the remaining two equations
+using the tricks we have developed for the first two.
+</p>
+
+<p>
+\(\nabla_b C^l = \delta^l\) (3)
+</p>
+
+<p>
+\(\nabla_w C^l = a^{l-1} \delta^l\) (4)
+</p>
+</div>
+</div>
+
+<div id="outline-container-org5c953f7" class="outline-2">
+<h2 id="org5c953f7">TL;DR</h2>
+<div class="outline-text-2" id="text-org5c953f7">
+<p>
+Translating these four equations to Clojure and Neanderthal is straightforward.
+The key issue that we will analyze in this article is how to do it with minimal use of memory.
+</p>
+
+<p>
+This is what we would like to get.
+</p>
+
+<pre class="example">
+...
+(backward [_]
+  (mul! (prime activ-fn z) a) ;; From the last article (1 and 2)
+  (mm! 1.0 (trans w) z 0.0 a-1) ;; (2)
+  (mv! (/ -1.0 (dim ones)) z ones 1.0 b) ;; (3)
+  (mm! (/ -1.0 (dim ones)) a-1 z 1.0 w)) ;; (4)
+</pre>
+
+<p>
+Note that this is not possible without introducing extra memory. This is similar to
+the <a href="https://en.wikipedia.org/wiki/River_crossing_puzzle">river crossing puzzle.</a> In the code i've shown, <b>there is a serious bug!</b> The second line
+overwrites <code>a-1</code> that we kept from the forward pass. However, we need that old value of <code>a-1</code>
+in the fourth line.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgbf5b18d" class="outline-2">
+<h2 id="orgbf5b18d">The signal traveling backwards</h2>
+<div class="outline-text-2" id="text-orgbf5b18d">
+<p>
+In the previous article, we computed the Haddamard product of the gradient of C with respect to \(a\)
+and the activation derivative. To calculate that signal, we needed to access the next layer.
+That would put us in a position of accessing layers in both directions, which would require
+complex layer initialization. Fortunately, we remembered that the next layer already has
+a view to <code>a</code> (<code>a-1</code> in the next layer).
+</p>
+
+<p>
+The dimensions of \(((w^{l+1})^T \delta^{l+1})\) and <code>a</code> match, so why not just delegate
+to the next layer to compute that and just deliver the result through <code>a-1</code>? Now, while we
+receive this data from the next layer, in <i>this</i> layer, we should do that calculation
+and send the result to <i>its</i> predecessor via <code>a-1</code>.
+</p>
+
+<pre class="example">
+...
+(backward [_]
+  (mul! (prime activ-fn z) a) ;; From the last article (1 and 2)
+  (mm! 1.0 (trans w) z 0.0 a-1)) ;; (2)
+</pre>
+
+<p>
+In the first line, we compute \(\delta^l =  ((w^{l+1})^T \delta^{l+1}) \odot \sigma ' (z^L)\).
+In the second we calculate \(((w^{l})^T \delta^{l})\) and put it into the previous layer's <code>a</code> (this layer's <code>a-1</code>).
+Note that the first line puts \(\delta^l\) in <code>z</code>, since we do not need the old value of z after we have
+ computed \(\sigma ' (z^L)\) in the previous line.
+</p>
+
+<p>
+For the second line, we use the standard in-place matrix multiplication, and store the result in <code>a-1</code>, so
+the previous layer can access it in its backward pass.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org5e9c831" class="outline-2">
+<h2 id="org5e9c831">The bias update</h2>
+<div class="outline-text-2" id="text-org5e9c831">
+<p>
+In a nice struck of luck, the rate of change of the cost in respect to bias has already been calculated,
+since it is equal to the error itself!
+</p>
+
+<p>
+\(\nabla_b C^l = \delta^l\) (3)
+</p>
+
+<p>
+What's left is to update the bias. Hey, but bias is a vector, while the error is a matrix&#x2026; How do I
+subtract a matrix from a vector? Do I need some sort of broadcast? <i>No!</i>
+</p>
+
+<p>
+The error is a matrix only because we are processing the whole batch of samples at once, instead of one by one.
+We want to shrink many vector updates into one. Broadcast would mean "expanding" the vector
+to fit a matrix. Here, we are going in the opposite direction. The way to do it here is to average the
+updates that each column carries.
+</p>
+
+<p>
+The entries of the resulting vector should each be the average of its respective row.
+</p>
+
+<p>
+One naive way to implement this is to write a loop (<code>map</code>, <a href="https://fluokitten.uncomplicate.org/codox/uncomplicate.fluokitten.core.html#var-fmap"><code>fmap</code></a>, or a low level loop/recur)
+and call <code>sum</code> on each row. I guess that this idea popped up immediately in the minds of most readers.
+</p>
+
+<p>
+There is, of course, an easier <i>and faster</i> way to do it with matrix operations. Recall what
+the matrix-vector product does. It multiplies a matrix with a vector and the result is a vector.
+</p>
+
+<p>
+This "structure" matches the problem we are dealing with. But, how does that help with <i>summing</i> the numbers?
+Luckily, each entry in the resulting vector is a dot product of a matrix row and the other vector,
+\(e = \sum\limits_{j=n} r_j x_j\). Now, imagine that \(x_j\) is always one, and we have our sum: \(e = \sum\limits_{j=n} r_j\)
+</p>
+
+<p>
+Cool, if we only had a vector of ones, that would be one call to <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-mv.21"><code>mv!</code></a>. Maybe you forgot, it was half a dozen
+articles ago, but we needed a vector of ones to implement broadcasting in the forward pass. That vector
+is still here! Problem solved; the third equation can be added to our implementation.
+</p>
+
+<pre class="example">
+...
+(backward [_]
+  (mul! (prime activ-fn z) a) ;; From the last article (1 and 2)
+  (mm! 1.0 (trans w) z 0.0 a-1) ;; (2)
+  (mv! (/ -1.0 (dim ones)) z ones 1.0 b)) ;; (3)
+</pre>
+
+<p>
+Note that <code>mv!</code> does not only compute the matrix-vector product, but can add it to the resulting vector.
+Fine, we have just saved us some memory, since we can fuse the calculation of the change of bias, and its subtraction
+from the bias into one operation that does not need a place to store the intermediate result.
+</p>
+
+<p>
+<code>b</code> has been updated :)
+</p>
+</div>
+</div>
+
+<div id="outline-container-org41d9781" class="outline-2">
+<h2 id="org41d9781">The (broken) weights update</h2>
+<div class="outline-text-2" id="text-org41d9781">
+<p>
+Now, to the fourth equation. That should be easier than the bias update, since the
+dimensions of the matrices match. The formula says \(\nabla_w C^l = a^{l-1} \delta^l\).
+We have the reference to <code>a-1</code> and \(\delta^l\) has been safely kept in <code>z</code> since the first line.
+We multiply these two, and subtract its average from <code>w</code> in one fused operation.
+</p>
+
+<pre class="example">
+...
+(backward [_]
+  (mul! (prime activ-fn z) a) ;; From the last article (1 and 2)
+  (mm! 1.0 (trans w) z 0.0 a-1) ;; (2)
+  (mv! (/ -1.0 (dim ones)) z ones 1.0 b) ;; (3)
+  (mm! (/ -1.0 (dim ones)) a-1 z 1.0 w)) ;; (4)
+</pre>
+
+<p>
+The whole backward pass in four lines of code; very nice! (in Borat's voice).
+</p>
+
+<p>
+However, <b>there is a huge bug in this implementation</b>. We have destroyed the correct value
+of <code>a-1</code> in the second line, so the fourth line computes a completely different formula,
+\(((w^{l})^T \delta^{l}) \delta^l\), which is useless for our purpose.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgfa054b9" class="outline-2">
+<h2 id="orgfa054b9">The correct weights update</h2>
+<div class="outline-text-2" id="text-orgfa054b9">
+<p>
+First, I'd try to find a way to rearrange the equations so that
+the last value is computed <i>before</i> <code>a-1</code> has been overwritten. Unfortunately, this
+is not possible, since the second line depends on the <i>old value of <code>w</code></i>, which is being
+updated by the fourth line.
+</p>
+
+<p>
+This brings us to the river crossing puzzle. We have a <a href="https://en.wikipedia.org/wiki/Fox,_goose_and_bag_of_beans_puzzle">fox, goose, and a bag of beans</a>, or
+wolf, goat, and cabbage, or missionaries and cannibals, and have to help them cross the river in
+a boat just too small to carry them all at once. While these puzzles have solutions, this one
+doesn't. I couldn't find a way to rearrange these elegant equations without introducing one more
+memory location to store one of the intermediate results.
+</p>
+
+<p>
+Having decided that I need one, I have to choose whether I'll have one for storing \(\delta^l\),
+or one for storing \(\nabla_w C^l\).
+</p>
+
+<p>
+One criterion would be to choose the smaller one. Since <code>a-1</code> and <code>w</code> share one dimension,
+the number of neurons in the previous layer, the difference is in the batch size vs. this layer's number of neurons.
+The batch size might tend to be larger, but that doesn't have to be the case, so this criterion
+does not give a definitive answer.
+</p>
+
+<p>
+I have a better criterion: introduce a new matrix instance that I might (re)use later.
+We do not have such need now, but I'll cheat, and predict that we will be able to (re)use an
+extra memory of the dimensions of <code>w</code> to implement <a href="https://en.wikipedia.org/wiki/Stochastic_gradient_descent#Momentum">momentum</a>.
+</p>
+
+<p>
+Knowing this, I'll introduce <code>v</code> to <code>FullyConnectedTraining</code>. The correct backward method
+implementation is now:
+</p>
+
+<pre class="example">
+...
+(backward [_]
+  (mul! (prime activ-fn z) a) ;; From the last article (1 and 2)
+  (mm! (/ -1.0 (dim ones)) a-1 z 0.0 v) ;; (4)
+  (mm! 1.0 (trans w) z 0.0 a-1) ;; (2)
+  (mv! (/ -1.0 (dim ones)) z ones 1.0 b) ;; (3)
+  (axpy! 1.0 v w))
+</pre>
+
+<p>
+Note that we haven't implemented the <i>learning rate</i> \(\eta\) yet, but it's a simple addition
+of a scalar argument to the backward method, and replacing <code>1.0</code> with <code>eta</code>.
+</p>
+
+<p>
+If you carefully examined this code, you'll notice that in the <code>mm!</code> in the second line
+the matrix dimensions of <code>a-1</code> multiplied by <code>z</code>, do not match <code>w</code>. That's because in <code>w</code> we chose dimensions
+to be \(output \times input\), since it fits nicely in most formulas. For this reason,
+in <i>this</i> formula, we have to <i>transpose</i> the computation, following its properties \((AB)^T = B^T A^T\).
+</p>
+
+<pre class="example">
+...
+(backward [_]
+  (mul! (prime activ-fn z) a) ;; From the last article (1 and 2)
+  (mm! (/ -1.0 (dim ones)) z (trans a-1) 0.0 v) ;; (4)
+  (mm! 1.0 (trans w) z 0.0 a-1) ;; (2)
+  (mv! (/ -1.0 (dim ones)) z ones 1.0 b) ;; (3)
+  (axpy! 1.0 v w))
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org6310bca" class="outline-2">
+<h2 id="org6310bca">The updated training deftype</h2>
+<div class="outline-text-2" id="text-org6310bca">
+<p>
+We don't need any changes in the inference layer code, but it's nice to have the reference here,
+and we also need this code if we want this article to be self-sufficient.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span>uncomplicate.commons.core
+           <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>with-release <span style="color: #A52A2A; font-weight: bold;">let-release</span> Releaseable release<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>uncomplicate.clojurecuda.core <span style="color: #F5666D;">:as</span> cuda
+           <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>current-context default-stream synchronize!<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>uncomplicate.clojurecl.core <span style="color: #F5666D;">:as</span> opencl
+           <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span><span style="color: #0084C8; font-weight: bold;">*context*</span> <span style="color: #0084C8; font-weight: bold;">*command-queue*</span> finish!<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>uncomplicate.neanderthal
+           <span style="color: #909183;">[</span>core <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>mrows ncols dim raw view view-ge vctr copy row
+                         entry! axpy! copy! scal! mv! transfer! transfer
+                         mm! rk! view-ge vctr ge trans nrm2<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>math <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>sqr<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>vect-math <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>tanh! linear-frac! sqr! mul! cosh! inv!<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>native <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>fge native-float<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>cuda <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>cuda-float<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>opencl <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>opencl-float<span style="color: #709870;">]</span><span style="color: #909183;">]</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>import 'clojure.lang.IFn<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defprotocol</span> <span style="color: #2F8B58; font-weight: bold;">Parameters</span>
+  <span style="color: #7388d6;">(</span>weights <span style="color: #909183;">[</span>this<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>bias <span style="color: #909183;">[</span>this<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defprotocol</span> <span style="color: #2F8B58; font-weight: bold;">ActivationProvider</span>
+  <span style="color: #7388d6;">(</span>activation-fn <span style="color: #909183;">[</span>this<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">deftype</span> <span style="color: #2F8B58; font-weight: bold;">FullyConnectedInference</span> <span style="color: #7388d6;">[</span>w b activ-fn<span style="color: #7388d6;">]</span>
+  Releaseable
+  <span style="color: #7388d6;">(</span>release <span style="color: #909183;">[</span>_<span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>release w<span style="color: #909183;">)</span>
+    <span style="color: #909183;">(</span>release b<span style="color: #909183;">)</span>
+    <span style="color: #909183;">(</span>release activ-fn<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  Parameters
+  <span style="color: #7388d6;">(</span>weights <span style="color: #909183;">[</span>_<span style="color: #909183;">]</span> w<span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>bias <span style="color: #909183;">[</span>_<span style="color: #909183;">]</span> b<span style="color: #7388d6;">)</span>
+  ActivationProvider
+  <span style="color: #7388d6;">(</span>activation-fn <span style="color: #909183;">[</span>_<span style="color: #909183;">]</span> <span style="color: #909183;">(</span>activ-fn<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  IFn
+  <span style="color: #7388d6;">(</span>invoke <span style="color: #909183;">[</span>_ x ones a<span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>activ-fn <span style="color: #709870;">(</span>rk! -1.0 b ones <span style="color: #907373;">(</span>mm! 1.0 w x 0.0 a<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">fully-connected</span> <span style="color: #7388d6;">[</span>factory activ-fn in-dim out-dim<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">let-release</span> <span style="color: #909183;">[</span>w <span style="color: #709870;">(</span>ge factory out-dim in-dim<span style="color: #709870;">)</span>
+                bias <span style="color: #709870;">(</span>vctr factory out-dim<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>-&gt;FullyConnectedInference w bias activ-fn<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defprotocol</span> <span style="color: #2F8B58; font-weight: bold;">Backprop</span>
+  <span style="color: #7388d6;">(</span>forward <span style="color: #909183;">[</span>this<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>backward <span style="color: #909183;">[</span>this eta<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defprotocol</span> <span style="color: #2F8B58; font-weight: bold;">Transfer</span>
+  <span style="color: #7388d6;">(</span>input <span style="color: #909183;">[</span>this<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>output <span style="color: #909183;">[</span>this<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>ones <span style="color: #909183;">[</span>this<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defprotocol</span> <span style="color: #2F8B58; font-weight: bold;">Activation</span>
+  <span style="color: #7388d6;">(</span>activ <span style="color: #909183;">[</span>_ z a!<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>prime <span style="color: #909183;">[</span>_ z!<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Note the new field <code>v</code> and the completed <code>backward</code> method.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">deftype</span> <span style="color: #2F8B58; font-weight: bold;">FullyConnectedTraining</span> <span style="color: #7388d6;">[</span>v w b a-1 z a ones activ-fn<span style="color: #7388d6;">]</span>
+  Releaseable
+  <span style="color: #7388d6;">(</span>release <span style="color: #909183;">[</span>_<span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>release v<span style="color: #909183;">)</span>
+    <span style="color: #909183;">(</span>release w<span style="color: #909183;">)</span>
+    <span style="color: #909183;">(</span>release b<span style="color: #909183;">)</span>
+    <span style="color: #909183;">(</span>release a-1<span style="color: #909183;">)</span>
+    <span style="color: #909183;">(</span>release z<span style="color: #909183;">)</span>
+    <span style="color: #909183;">(</span>release a<span style="color: #909183;">)</span>
+    <span style="color: #909183;">(</span>release ones<span style="color: #909183;">)</span>
+    <span style="color: #909183;">(</span>release activ-fn<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  Parameters
+  <span style="color: #7388d6;">(</span>weights <span style="color: #909183;">[</span>_<span style="color: #909183;">]</span> w<span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>bias <span style="color: #909183;">[</span>_<span style="color: #909183;">]</span> b<span style="color: #7388d6;">)</span>
+  Transfer
+  <span style="color: #7388d6;">(</span>input <span style="color: #909183;">[</span>_<span style="color: #909183;">]</span> a-1<span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>output <span style="color: #909183;">[</span>_<span style="color: #909183;">]</span> a<span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>ones <span style="color: #909183;">[</span>_<span style="color: #909183;">]</span> ones<span style="color: #7388d6;">)</span>
+  Backprop
+  <span style="color: #7388d6;">(</span>forward <span style="color: #909183;">[</span>_<span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>activ activ-fn <span style="color: #709870;">(</span>rk! -1.0 b ones <span style="color: #907373;">(</span>mm! 1.0 w a-1 0.0 z<span style="color: #907373;">)</span><span style="color: #709870;">)</span> a<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>backward <span style="color: #909183;">[</span>_ eta<span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #709870;">[</span>eta-avg <span style="color: #907373;">(</span>- <span style="color: #6276ba;">(</span>/ <span style="color: #858580;">(</span>double eta<span style="color: #858580;">)</span> <span style="color: #858580;">(</span>dim ones<span style="color: #858580;">)</span><span style="color: #6276ba;">)</span><span style="color: #907373;">)</span><span style="color: #709870;">]</span>
+      <span style="color: #709870;">(</span>mul! <span style="color: #907373;">(</span>prime activ-fn z<span style="color: #907373;">)</span> a<span style="color: #709870;">)</span> <span style="color: #204A87;">;; </span><span style="color: #204A87;">From the last article (1 and 2)</span>
+      <span style="color: #709870;">(</span>mm! eta-avg z <span style="color: #907373;">(</span>trans a-1<span style="color: #907373;">)</span> 0.0 v<span style="color: #709870;">)</span> <span style="color: #204A87;">;; </span><span style="color: #204A87;">(4)</span>
+      <span style="color: #709870;">(</span>mm! 1.0 <span style="color: #907373;">(</span>trans w<span style="color: #907373;">)</span> z 0.0 a-1<span style="color: #709870;">)</span> <span style="color: #204A87;">;; </span><span style="color: #204A87;">(2)</span>
+      <span style="color: #709870;">(</span>mv! eta-avg z ones 1.0 b<span style="color: #709870;">)</span> <span style="color: #204A87;">;; </span><span style="color: #204A87;">(3)</span>
+      <span style="color: #709870;">(</span>axpy! 1.0 v w<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+The constructor's signature is unchanged. It internally creates an extra reference that
+matches the dimensions of weights.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">training-layer</span>
+  <span style="color: #7388d6;">(</span><span style="color: #909183;">[</span>inference-layer input ones-vctr<span style="color: #909183;">]</span>
+   <span style="color: #909183;">(</span><span style="color: #A52A2A; font-weight: bold;">let-release</span> <span style="color: #709870;">[</span>w <span style="color: #907373;">(</span>view <span style="color: #6276ba;">(</span>weights inference-layer<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span>
+                 v <span style="color: #907373;">(</span>raw w<span style="color: #907373;">)</span>
+                 b <span style="color: #907373;">(</span>view <span style="color: #6276ba;">(</span>bias inference-layer<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span>
+                 a-1 <span style="color: #907373;">(</span>view input<span style="color: #907373;">)</span>
+                 z <span style="color: #907373;">(</span>ge w <span style="color: #6276ba;">(</span>mrows w<span style="color: #6276ba;">)</span> <span style="color: #6276ba;">(</span>dim ones-vctr<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span>
+                 a <span style="color: #907373;">(</span>raw z<span style="color: #907373;">)</span>
+                 o <span style="color: #907373;">(</span>view ones-vctr<span style="color: #907373;">)</span><span style="color: #709870;">]</span>
+     <span style="color: #709870;">(</span>-&gt;FullyConnectedTraining v w b a-1 z a o <span style="color: #907373;">(</span><span style="color: #6276ba;">(</span>activation-fn inference-layer<span style="color: #6276ba;">)</span> z<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span><span style="color: #909183;">[</span>inference-layer previous-backprop<span style="color: #909183;">]</span>
+   <span style="color: #909183;">(</span>training-layer inference-layer
+                   <span style="color: #709870;">(</span>output previous-backprop<span style="color: #709870;">)</span>
+                   <span style="color: #709870;">(</span>ones previous-backprop<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Let's check whether it works at all, without worrying whether the result is correct. We'll
+need to actually <i>learn</i> something concrete to be able to check that, and we'll do that
+soon, in a dedicated article. The only addition is the learning rate argument
+in the <code>backward</code> method.
+</p>
+
+<p>
+But, first, we'd have to carry over the activation implementations from the last chapter.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">deftype</span> <span style="color: #2F8B58; font-weight: bold;">SigmoidActivation</span> <span style="color: #7388d6;">[</span>work<span style="color: #7388d6;">]</span>
+  Releaseable
+  <span style="color: #7388d6;">(</span>release <span style="color: #909183;">[</span>_<span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>release work<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  Activation
+  <span style="color: #7388d6;">(</span>activ <span style="color: #909183;">[</span>_ z a!<span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>linear-frac! 0.5 <span style="color: #709870;">(</span>tanh! <span style="color: #907373;">(</span>scal! 0.5 <span style="color: #6276ba;">(</span>copy! z a!<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span><span style="color: #709870;">)</span> 0.5<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>prime <span style="color: #909183;">[</span>this z!<span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>linear-frac! 0.5 <span style="color: #709870;">(</span>tanh! <span style="color: #907373;">(</span>scal! 0.5 z!<span style="color: #907373;">)</span><span style="color: #709870;">)</span> 0.5<span style="color: #909183;">)</span>
+    <span style="color: #909183;">(</span>mul! z! <span style="color: #709870;">(</span>linear-frac! -1.0 z! 1.0 work<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">sigmoid</span>
+  <span style="color: #7388d6;">(</span><span style="color: #909183;">[]</span>
+   <span style="color: #909183;">(</span><span style="color: #A52A2A; font-weight: bold;">fn</span> <span style="color: #709870;">[</span>z<span style="color: #709870;">]</span>
+     <span style="color: #709870;">(</span><span style="color: #A52A2A; font-weight: bold;">let-release</span> <span style="color: #907373;">[</span>work <span style="color: #6276ba;">(</span>raw z<span style="color: #6276ba;">)</span><span style="color: #907373;">]</span>
+       <span style="color: #907373;">(</span>-&gt;SigmoidActivation work<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span><span style="color: #909183;">[</span>z!<span style="color: #909183;">]</span>
+   <span style="color: #909183;">(</span>linear-frac! 0.5 <span style="color: #709870;">(</span>tanh! <span style="color: #907373;">(</span>scal! 0.5 z!<span style="color: #907373;">)</span><span style="color: #709870;">)</span> 0.5<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">deftype</span> <span style="color: #2F8B58; font-weight: bold;">TanhActivation</span> <span style="color: #7388d6;">[]</span>
+  Activation
+  <span style="color: #7388d6;">(</span>activ <span style="color: #909183;">[</span>_ z a!<span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>tanh! z a!<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>prime <span style="color: #909183;">[</span>this z!<span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>sqr! <span style="color: #709870;">(</span>inv! <span style="color: #907373;">(</span>cosh! z!<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">tanh</span>
+  <span style="color: #7388d6;">(</span><span style="color: #909183;">[]</span>
+   <span style="color: #909183;">(</span><span style="color: #A52A2A; font-weight: bold;">fn</span> <span style="color: #709870;">[</span>_<span style="color: #709870;">]</span> <span style="color: #709870;">(</span>-&gt;TanhActivation<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span><span style="color: #909183;">[</span>z!<span style="color: #909183;">]</span>
+   <span style="color: #909183;">(</span>tanh! z!<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Checking whether the structure fits nicely:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>with-release <span style="color: #7388d6;">[</span>x <span style="color: #909183;">(</span>ge native-float 2 2 <span style="color: #709870;">[</span>0.3 0.9 0.3 0.9<span style="color: #709870;">]</span><span style="color: #909183;">)</span>
+               ones <span style="color: #909183;">(</span>vctr native-float 1 1<span style="color: #909183;">)</span>
+               layer-1 <span style="color: #909183;">(</span>fully-connected native-float tanh 2 4<span style="color: #909183;">)</span>
+               layer-2 <span style="color: #909183;">(</span>fully-connected native-float sigmoid 4 1<span style="color: #909183;">)</span>
+               training-layer-1 <span style="color: #909183;">(</span>training-layer layer-1 x ones<span style="color: #909183;">)</span>
+               training-layer-2 <span style="color: #909183;">(</span>training-layer layer-2 training-layer-1<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>transfer! <span style="color: #909183;">[</span>0.3 0.1 0.9 0.0 0.6 2.0 3.7 1.0<span style="color: #909183;">]</span> <span style="color: #909183;">(</span>weights layer-1<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>transfer! <span style="color: #909183;">[</span>0.7 0.2 1.1 2<span style="color: #909183;">]</span> <span style="color: #909183;">(</span>bias layer-1<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>transfer! <span style="color: #909183;">[</span>0.75 0.15 0.22 0.33<span style="color: #909183;">]</span> <span style="color: #909183;">(</span>weights layer-2<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>transfer! <span style="color: #909183;">[</span>0.3<span style="color: #909183;">]</span> <span style="color: #909183;">(</span>bias layer-2<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>forward training-layer-1<span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>forward training-layer-2<span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>backward training-layer-2 0.05<span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>backward training-layer-1 0.05<span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>transfer <span style="color: #909183;">(</span>output training-layer-2<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+nil#RealGEMatrix[float, mxn:1x2, layout:column, offset:0]
+   ▥       ↓       ↓       ┓
+   →       0.44    0.44
+   ┗                       ┛
+</pre>
+
+
+<p>
+The output is as expected. Nice job. I hope we continue making this work.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org62e8e75" class="outline-2">
+<h2 id="org62e8e75">Micro benchmark</h2>
+<div class="outline-text-2" id="text-org62e8e75">
+<p>
+Let's check how much the newly added code affects performance. Since we had a few matrix multiplications
+and a few other operations, this should be noticeably slower than the forward pass, but not more than
+a few times slower.
+</p>
+</div>
+
+<div id="outline-container-orgad5ef1e" class="outline-3">
+<h3 id="orgad5ef1e">Intel 4790k (2013)</h3>
+<div class="outline-text-3" id="text-orgad5ef1e">
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>with-release <span style="color: #7388d6;">[</span>factory native-float<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>with-release <span style="color: #909183;">[</span>x <span style="color: #709870;">(</span>ge factory 10000 10000<span style="color: #709870;">)</span>
+                 ones <span style="color: #709870;">(</span>entry! <span style="color: #907373;">(</span>vctr factory 10000<span style="color: #907373;">)</span> 1<span style="color: #709870;">)</span>
+                 layer-1 <span style="color: #709870;">(</span>fully-connected factory tanh 10000 5000<span style="color: #709870;">)</span>
+                 layer-2 <span style="color: #709870;">(</span>fully-connected factory sigmoid 5000 1000<span style="color: #709870;">)</span>
+                 layer-3 <span style="color: #709870;">(</span>fully-connected factory sigmoid 1000 10<span style="color: #709870;">)</span>
+                 training-layer-1 <span style="color: #709870;">(</span>training-layer layer-1 x ones<span style="color: #709870;">)</span>
+                 training-layer-2 <span style="color: #709870;">(</span>training-layer layer-2 training-layer-1<span style="color: #709870;">)</span>
+                 training-layer-3 <span style="color: #709870;">(</span>training-layer layer-3 training-layer-2<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>time
+     <span style="color: #709870;">(</span><span style="color: #A52A2A; font-weight: bold;">do</span>
+       <span style="color: #907373;">(</span>forward training-layer-1<span style="color: #907373;">)</span>
+       <span style="color: #907373;">(</span>forward training-layer-2<span style="color: #907373;">)</span>
+       <span style="color: #907373;">(</span>forward training-layer-3<span style="color: #907373;">)</span>
+       <span style="color: #907373;">(</span>backward training-layer-3 0.05<span style="color: #907373;">)</span>
+       <span style="color: #907373;">(</span>backward training-layer-2 0.05<span style="color: #907373;">)</span>
+       <span style="color: #907373;">(</span>backward training-layer-1 0.05<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span>
+    <span style="color: #F5666D;">true</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+"Elapsed time: 7498.412034 msecs"
+</pre>
+
+<p>
+This is quite fast even on an old desktop CPU! Note that we used single floating point precision
+in CPU computations, which is twice as fast as the double precision engine that we used
+in the previous parts when we measured CPU speed.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgfa85855" class="outline-3">
+<h3 id="orgfa85855">Nvidia GTX 1080 Ti (2017)</h3>
+<div class="outline-text-3" id="text-orgfa85855">
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #2F8B58; font-weight: bold;">cuda</span>/with-default
+  <span style="color: #7388d6;">(</span>with-release <span style="color: #909183;">[</span>factory <span style="color: #709870;">(</span>cuda-float <span style="color: #907373;">(</span>current-context<span style="color: #907373;">)</span> default-stream<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>with-release <span style="color: #709870;">[</span>x <span style="color: #907373;">(</span>ge factory 10000 10000<span style="color: #907373;">)</span>
+                   ones <span style="color: #907373;">(</span>entry! <span style="color: #6276ba;">(</span>vctr factory 10000<span style="color: #6276ba;">)</span> 1<span style="color: #907373;">)</span>
+                   layer-1 <span style="color: #907373;">(</span>fully-connected factory tanh 10000 5000<span style="color: #907373;">)</span>
+                   layer-2 <span style="color: #907373;">(</span>fully-connected factory sigmoid 5000 1000<span style="color: #907373;">)</span>
+                   layer-3 <span style="color: #907373;">(</span>fully-connected factory sigmoid 1000 10<span style="color: #907373;">)</span>
+                   training-layer-1 <span style="color: #907373;">(</span>training-layer layer-1 x ones<span style="color: #907373;">)</span>
+                   training-layer-2 <span style="color: #907373;">(</span>training-layer layer-2 training-layer-1<span style="color: #907373;">)</span>
+                   training-layer-3 <span style="color: #907373;">(</span>training-layer layer-3 training-layer-2<span style="color: #907373;">)</span><span style="color: #709870;">]</span>
+      <span style="color: #709870;">(</span>time
+       <span style="color: #907373;">(</span><span style="color: #A52A2A; font-weight: bold;">do</span>
+         <span style="color: #6276ba;">(</span>forward training-layer-1<span style="color: #6276ba;">)</span>
+         <span style="color: #6276ba;">(</span>forward training-layer-2<span style="color: #6276ba;">)</span>
+         <span style="color: #6276ba;">(</span>forward training-layer-3<span style="color: #6276ba;">)</span>
+         <span style="color: #6276ba;">(</span>backward training-layer-3 0.05<span style="color: #6276ba;">)</span>
+         <span style="color: #6276ba;">(</span>backward training-layer-2 0.05<span style="color: #6276ba;">)</span>
+         <span style="color: #6276ba;">(</span>backward training-layer-1 0.05<span style="color: #6276ba;">)</span>
+         <span style="color: #6276ba;">(</span>synchronize!<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+"Elapsed time: 433.340259 msecs"
+</pre>
+
+<p>
+The result is as we expected. The forward pass does one matrix multiplication and takes 124 milliseconds,
+and the backward pass, which does two matrix multiplications, takes roughly twice as that at a bit less than
+300 milliseconds.
+</p>
+
+<p>
+Compared to CPU, this is around 20 times faster. What happened to the 50 times speedup we got earlier?
+The thing is that we compared the default on the GPU (single precision) with the default on the CPU (double precision).
+This is a kind of apples vs. oranges. Let's just say that GPU has an ace in the sleeve to
+make up for that; keep reading the following articles!
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgee0fc85" class="outline-3">
+<h3 id="orgee0fc85">AMD R9 290X (2013)</h3>
+<div class="outline-text-3" id="text-orgee0fc85">
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #2F8B58; font-weight: bold;">opencl</span>/with-default
+  <span style="color: #7388d6;">(</span>with-release <span style="color: #909183;">[</span>factory <span style="color: #709870;">(</span>opencl-float <span style="color: #0084C8; font-weight: bold;">*context*</span> <span style="color: #0084C8; font-weight: bold;">*command-queue*</span><span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>with-release <span style="color: #709870;">[</span>x <span style="color: #907373;">(</span>ge factory 10000 10000<span style="color: #907373;">)</span>
+                   ones <span style="color: #907373;">(</span>entry! <span style="color: #6276ba;">(</span>vctr factory 10000<span style="color: #6276ba;">)</span> 1<span style="color: #907373;">)</span>
+                   layer-1 <span style="color: #907373;">(</span>fully-connected factory tanh 10000 5000<span style="color: #907373;">)</span>
+                   layer-2 <span style="color: #907373;">(</span>fully-connected factory sigmoid 5000 1000<span style="color: #907373;">)</span>
+                   layer-3 <span style="color: #907373;">(</span>fully-connected factory sigmoid 1000 10<span style="color: #907373;">)</span>
+                   training-layer-1 <span style="color: #907373;">(</span>training-layer layer-1 x ones<span style="color: #907373;">)</span>
+                   training-layer-2 <span style="color: #907373;">(</span>training-layer layer-2 training-layer-1<span style="color: #907373;">)</span>
+                   training-layer-3 <span style="color: #907373;">(</span>training-layer layer-3 training-layer-2<span style="color: #907373;">)</span><span style="color: #709870;">]</span>
+      <span style="color: #709870;">(</span>forward training-layer-1<span style="color: #709870;">)</span>
+      <span style="color: #709870;">(</span>finish!<span style="color: #709870;">)</span>
+      <span style="color: #709870;">(</span>time
+       <span style="color: #907373;">(</span><span style="color: #A52A2A; font-weight: bold;">do</span>
+         <span style="color: #6276ba;">(</span>forward training-layer-1<span style="color: #6276ba;">)</span>
+         <span style="color: #6276ba;">(</span>forward training-layer-2<span style="color: #6276ba;">)</span>
+         <span style="color: #6276ba;">(</span>forward training-layer-3<span style="color: #6276ba;">)</span>
+         <span style="color: #6276ba;">(</span>backward training-layer-3 0.05<span style="color: #6276ba;">)</span>
+         <span style="color: #6276ba;">(</span>backward training-layer-2 0.05<span style="color: #6276ba;">)</span>
+         <span style="color: #6276ba;">(</span>backward training-layer-1 0.05<span style="color: #6276ba;">)</span>
+         <span style="color: #6276ba;">(</span>finish!<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+"Elapsed time: 18836.38278 msecs"
+</pre>
+
+<p>
+When I'm lucky, I get this timing, and when I'm not, I get an <code>OpenCL error: CL_MEM_OBJECT_ALLOCATION_FAILURE</code>.
+Something is suspicious here! This is not 3 times slower than the forward pass alone, but 50 times slower.
+We expected around 1 second, and got 18 seconds. Is our implementation bad? It might be, but it hasn't
+caused any issues with the CUDA engine, so I doubt.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org9aecb1a" class="outline-2">
+<h2 id="org9aecb1a">Keep the network size in check!</h2>
+<div class="outline-text-2" id="text-org9aecb1a">
+<p>
+I suspect that the issue is that we are overstretching the resources in the older AMD's GPU.
+R9 290X was a beast in its heyday, but that was 6 years ago. That in itself would not be a problem,
+but at that time 4GB of memory was a lot. It's not any more; GTX 1080Ti has 11GB.
+</p>
+
+<p>
+We have created a network with (artificially) large layers. Let's count a bit.
+</p>
+
+<ul class="org-ul">
+<li>The input (<code>x</code>) takes 10K &times; 10K elements. That's 100M.</li>
+<li>Vector of ones: 10K.</li>
+<li>Inference layer 1 (<code>w</code> and <code>b</code>): 10K &times; 5K + 5K = 50M + 5K.</li>
+<li>Inference layer 2: 5K &times; 1K + 1K = 5M + 1K.</li>
+<li>Inference layer 3: 1K &times; 10 + 10 = 10K + 10.</li>
+<li>Training layer 1: (<code>z</code>, <code>a</code>, and <code>v</code>): 50M &times; 3 = 150M</li>
+<li>Training layer 2: (<code>z</code>, <code>a</code>, <code>v</code>, and <code>work</code>): 5M &times; 4 = 20M</li>
+<li>Training layer 3: 10K &times; 4 = 40K</li>
+</ul>
+
+<p>
+If I haven't missed something that adds up to 325,057,010 entries. Since we used
+single precision floating point numbers, that would take 4 bytes each,
+so around 1.3GB. That alone should not be a problem for R9 270X's 4GB, of which
+more than 3GB is available for data.
+</p>
+
+<p>
+If we think about it, of course it is not the problem. After all, the network did compute!
+It just took unexpectedly long time to do so. What I suspect is the case, is that a large structure
+strained on some other memory resource. My bet is that there's been some overcrowding that
+forced the registers to spill out to global GPU DRAM at some point.
+</p>
+
+<p>
+I use this GPU as my major display, and I run a few dozen Chromium tabs with some YouTube video
+playing while I'm doing this, and this might eat up some resources.
+Ultimately, these things depend on the hardware. I expect that the new cards are more resilient
+to such corner cases.
+</p>
+
+<p>
+I even found out where the problem was: in the first layer.
+</p>
+
+<p>
+Consider making it just a bit smaller; instead of 10000, we'll set it up with 7200 neurons.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #2F8B58; font-weight: bold;">opencl</span>/with-default
+  <span style="color: #7388d6;">(</span>with-release <span style="color: #909183;">[</span>factory <span style="color: #709870;">(</span>opencl-float <span style="color: #0084C8; font-weight: bold;">*context*</span> <span style="color: #0084C8; font-weight: bold;">*command-queue*</span><span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>with-release <span style="color: #709870;">[</span>x <span style="color: #907373;">(</span>ge factory 10000 7200<span style="color: #907373;">)</span>
+                   ones <span style="color: #907373;">(</span>entry! <span style="color: #6276ba;">(</span>vctr factory 7200<span style="color: #6276ba;">)</span> 1<span style="color: #907373;">)</span>
+                   layer-1 <span style="color: #907373;">(</span>fully-connected factory tanh 10000 5000<span style="color: #907373;">)</span>
+                   layer-2 <span style="color: #907373;">(</span>fully-connected factory sigmoid 5000 1000<span style="color: #907373;">)</span>
+                   layer-3 <span style="color: #907373;">(</span>fully-connected factory sigmoid 1000 10<span style="color: #907373;">)</span>
+                   training-layer-1 <span style="color: #907373;">(</span>training-layer layer-1 x ones<span style="color: #907373;">)</span>
+                   training-layer-2 <span style="color: #907373;">(</span>training-layer layer-2 training-layer-1<span style="color: #907373;">)</span>
+                   training-layer-3 <span style="color: #907373;">(</span>training-layer layer-3 training-layer-2<span style="color: #907373;">)</span><span style="color: #709870;">]</span>
+      <span style="color: #709870;">(</span>forward training-layer-1<span style="color: #709870;">)</span>
+      <span style="color: #709870;">(</span>finish!<span style="color: #709870;">)</span>
+      <span style="color: #709870;">(</span>time
+       <span style="color: #907373;">(</span><span style="color: #A52A2A; font-weight: bold;">do</span>
+         <span style="color: #6276ba;">(</span>forward training-layer-1<span style="color: #6276ba;">)</span>
+         <span style="color: #6276ba;">(</span>forward training-layer-2<span style="color: #6276ba;">)</span>
+         <span style="color: #6276ba;">(</span>forward training-layer-3<span style="color: #6276ba;">)</span>
+         <span style="color: #6276ba;">(</span>backward training-layer-3 0.05<span style="color: #6276ba;">)</span>
+         <span style="color: #6276ba;">(</span>backward training-layer-2 0.05<span style="color: #6276ba;">)</span>
+         <span style="color: #6276ba;">(</span>backward training-layer-1 0.05<span style="color: #6276ba;">)</span>
+         <span style="color: #6276ba;">(</span>finish!<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+"Elapsed time: 828.808597 msecs"
+</pre>
+
+<p>
+This is as we expected! No slowdown here.
+</p>
+
+<p>
+The moral of the story is that you have to measure things for the particular use case and
+the hardware that you'll run it on. No magical framework can make a square peg fit into a smaller round hole.
+It may even be the opposite; they can make pegs much larger than necessary. When we know our tools,
+and invest some time in understanding the methods that we use, we'll at least be able to pick
+the right trade-offs.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org942092d" class="outline-2">
+<h2 id="org942092d">Donations</h2>
+<div class="outline-text-2" id="text-org942092d">
+<p>
+If you feel that you can afford to help, and wish to donate, I even created a special <i>Starbucks for two</i> tier
+at <a href="https://www.patreon.com/draganrocks">patreon.com/draganrocks</a>. You can do something even cooler: <a href="https://www.patreon.com/posts/22476035">adopt a pet function</a>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org8aac00c" class="outline-2">
+<h2 id="org8aac00c">The next article</h2>
+<div class="outline-text-2" id="text-org8aac00c">
+<p>
+It seems to me we have completed a basic implementation of the backpropagation based
+gradient descent algorithm.
+Let's think about how to wrap it in a user-friendly neural networks API.
+In the next article, we will take care of it, and then try to learn a simple function with
+a simple neural network, since I'm curious to find out whether this implementation is correct.
+</p>
+
+<p>
+Have in mind that we have only tested the forward pass, and not the backward pass.
+Once we make sure that the basic implementation works with a simple example,
+we can try to learn something more interesting, and also to think about how to improve
+the <i>quality</i> of learning with a few optimizations to the algorithm itself.
+</p>
+
+<p>
+Stay tuned for the next article.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org0050b5e" class="outline-2">
+<h2 id="org0050b5e">Thank you</h2>
+<div class="outline-text-2" id="text-org0050b5e">
+<p>
+<a href="https://www.clojuriststogether.org/news/q1-2019-funding-announcement/">Clojurists Together</a> financially supported writing this series. Big thanks to all Clojurians who contribute,
+and thank you for reading and discussing this series.
+</p>
+</div>
+</div>
