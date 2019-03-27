@@ -449,8 +449,8 @@ Another solution is to provide this working space as an additional argument. Her
 <div class="org-src-container">
 <pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">sigmoid-prim!</span>
   <span style="color: #7388d6;">(</span><span style="color: #909183;">[</span>x!<span style="color: #909183;">]</span>
-   <span style="color: #909183;">(</span><span style="color: #A52A2A; font-weight: bold;">let-release</span> <span style="color: #709870;">[</span>x-copy <span style="color: #907373;">(</span>copy x!<span style="color: #907373;">)</span><span style="color: #709870;">]</span>
-     <span style="color: #709870;">(</span>sigmoid-prim! x! x-copy<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+   <span style="color: #909183;">(</span>with-release <span style="color: #709870;">[</span>x-raw <span style="color: #907373;">(</span>raw x!<span style="color: #907373;">)</span><span style="color: #709870;">]</span>
+     <span style="color: #709870;">(</span>sigmoid-prim! x! x-raw<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
   <span style="color: #7388d6;">(</span><span style="color: #909183;">[</span>x! prim!<span style="color: #909183;">]</span>
    <span style="color: #909183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #709870;">[</span>x <span style="color: #907373;">(</span>sigmoid! x!<span style="color: #907373;">)</span><span style="color: #709870;">]</span>
      <span style="color: #709870;">(</span>mul! <span style="color: #907373;">(</span>linear-frac! -1.0 x 1.0 prim!<span style="color: #907373;">)</span> x<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
@@ -462,7 +462,7 @@ Now, given a vector <code>x</code>, we can compute both the value of sigmoid, an
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span>with-release <span style="color: #7388d6;">[</span>x <span style="color: #909183;">(</span>dv 0.1 0.5 0.9 <span style="color: #709870;">(</span>/ <span style="color: #2F8B58; font-weight: bold;">Math</span>/PI 2.0<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #7388d6;">[</span>x <span style="color: #909183;">(</span>dv 0.1 0.5 0.9 <span style="color: #709870;">(</span>/ <span style="color: #2F8B58; font-weight: bold;">Math</span>/PI 2.0<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
  <span style="color: #7388d6;">[</span><span style="color: #909183;">(</span>transfer x<span style="color: #909183;">)</span> <span style="color: #909183;">(</span>sigmoid-prim! x<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
 </pre>
 </div>
@@ -471,7 +471,7 @@ Now, given a vector <code>x</code>, we can compute both the value of sigmoid, an
 nil[#RealBlockVector[double, n:4, offset: 0, stride:1]
 [   0.10    0.50    0.90    1.57 ]
  #RealBlockVector[double, n:4, offset: 0, stride:1]
-[   0.25    0.24    0.21    0.14 ]
+[   0.00    0.24    0.21    0.14 ]
 ]
 </pre>
 </div>

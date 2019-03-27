@@ -9,8 +9,8 @@ tags:
 - OpenCL
 author: dragan
 layout: post
-excerpt: We implement the key part of the backward pass, the computation of the error of a layer. Along the way, we set up the infrastructure for the complete implementation of backpropagation.
 title: Deep Learning from Scratch to GPU - 9 - The Activation and its Derivative
+excerpt: We implement the key part of the backward pass, the computation of the error of a layer. Along the way, we set up the infrastructure for the complete implementation of backpropagation.
 categories:
 - Deep Learning
 - Neanderthal
@@ -48,7 +48,7 @@ start up the REPL from your favorite Clojure development environment, and let's 
 <h2 id="orga11d71c">The relevant equations</h2>
 <div class="outline-text-2" id="text-orga11d71c">
 <p>
-Two equations of the four from <a href="./Deep-Learning-in-Clojure-From-Scratch-to-GPU-7-Learning%20and%20Backpropagation">Part 6</a>, which are relevant for this article, do a similar thing.
+Two equations of the four from <a href="./Deep-Learning-in-Clojure-From-Scratch-to-GPU-7-Learning and Backpropagation">Part 6</a>, which are relevant for this article, do a similar thing.
 In both of these formulas, we compute the <a href="./Deep-Learning-in-Clojure-From-Scratch-to-GPU-7-Learning-and-Backpropagation#org8345563">Haddamard product</a> of the matrix
 that comes from the next layer (\(\nabla_a C\) and \((w^{l+1})^T \delta^{l+1}\)) and
 the matrix that is located in the layer at hand (\(\sigma ' (z^L)\)).
@@ -114,21 +114,15 @@ Again for reference, I repeat the inference and training layer code that we deve
            <span style="color: #909183;">[</span>cuda <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>cuda-float<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
            <span style="color: #909183;">[</span>opencl <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>opencl-float<span style="color: #709870;">]</span><span style="color: #909183;">]</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
 <span style="color: #707183;">(</span>import 'clojure.lang.IFn<span style="color: #707183;">)</span>
-</pre>
-</div>
 
-<div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defprotocol</span> <span style="color: #2F8B58; font-weight: bold;">Parameters</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defprotocol</span> <span style="color: #2F8B58; font-weight: bold;">Parameters</span>
   <span style="color: #7388d6;">(</span>weights <span style="color: #909183;">[</span>this<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span>
   <span style="color: #7388d6;">(</span>bias <span style="color: #909183;">[</span>this<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 
 <span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defprotocol</span> <span style="color: #2F8B58; font-weight: bold;">ActivationProvider</span>
   <span style="color: #7388d6;">(</span>activation-fn <span style="color: #909183;">[</span>this<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
-</pre>
-</div>
 
-<div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">deftype</span> <span style="color: #2F8B58; font-weight: bold;">FullyConnectedInference</span> <span style="color: #7388d6;">[</span>w b activ-fn<span style="color: #7388d6;">]</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">deftype</span> <span style="color: #2F8B58; font-weight: bold;">FullyConnectedInference</span> <span style="color: #7388d6;">[</span>w b activ-fn<span style="color: #7388d6;">]</span>
   Releaseable
   <span style="color: #7388d6;">(</span>release <span style="color: #909183;">[</span>_<span style="color: #909183;">]</span>
     <span style="color: #909183;">(</span>release w<span style="color: #909183;">)</span>
@@ -141,19 +135,13 @@ Again for reference, I repeat the inference and training layer code that we deve
   IFn
   <span style="color: #7388d6;">(</span>invoke <span style="color: #909183;">[</span>_ x ones a<span style="color: #909183;">]</span>
     <span style="color: #909183;">(</span>activ-fn <span style="color: #709870;">(</span>rk! -1.0 b ones <span style="color: #907373;">(</span>mm! 1.0 w x 0.0 a<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
-</pre>
-</div>
 
-<div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">fully-connected</span> <span style="color: #7388d6;">[</span>factory activ-fn in-dim out-dim<span style="color: #7388d6;">]</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">fully-connected</span> <span style="color: #7388d6;">[</span>factory activ-fn in-dim out-dim<span style="color: #7388d6;">]</span>
   <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">let-release</span> <span style="color: #909183;">[</span>w <span style="color: #709870;">(</span>ge factory out-dim in-dim<span style="color: #709870;">)</span>
                 bias <span style="color: #709870;">(</span>vctr factory out-dim<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
     <span style="color: #909183;">(</span>-&gt;FullyConnectedInference w bias activ-fn<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
-</pre>
-</div>
 
-<div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defprotocol</span> <span style="color: #2F8B58; font-weight: bold;">Backprop</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defprotocol</span> <span style="color: #2F8B58; font-weight: bold;">Backprop</span>
   <span style="color: #7388d6;">(</span>forward <span style="color: #909183;">[</span>this<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span>
   <span style="color: #7388d6;">(</span>backward <span style="color: #909183;">[</span>this<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 
@@ -161,11 +149,8 @@ Again for reference, I repeat the inference and training layer code that we deve
   <span style="color: #7388d6;">(</span>input <span style="color: #909183;">[</span>this<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span>
   <span style="color: #7388d6;">(</span>output <span style="color: #909183;">[</span>this<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span>
   <span style="color: #7388d6;">(</span>ones <span style="color: #909183;">[</span>this<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
-</pre>
-</div>
 
-<div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">deftype</span> <span style="color: #2F8B58; font-weight: bold;">FullyConnectedTraining</span> <span style="color: #7388d6;">[</span>w b a-1 z a ones-vctr activ-fn<span style="color: #7388d6;">]</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">deftype</span> <span style="color: #2F8B58; font-weight: bold;">FullyConnectedTraining</span> <span style="color: #7388d6;">[</span>w b a-1 z a ones-vctr activ-fn<span style="color: #7388d6;">]</span>
   Releaseable
   <span style="color: #7388d6;">(</span>release <span style="color: #909183;">[</span>_<span style="color: #909183;">]</span>
     <span style="color: #909183;">(</span>release w<span style="color: #909183;">)</span>
@@ -186,11 +171,8 @@ Again for reference, I repeat the inference and training layer code that we deve
     <span style="color: #909183;">(</span>activ-fn <span style="color: #709870;">(</span>rk! -1.0 b ones <span style="color: #907373;">(</span>mm! 1.0 w a-1 0.0 z<span style="color: #907373;">)</span><span style="color: #709870;">)</span> a<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
   <span style="color: #7388d6;">(</span>backward <span style="color: #909183;">[</span>_<span style="color: #909183;">]</span>
     <span style="color: #909183;">(</span><span style="color: #A52A2A; font-weight: bold;">throw</span> <span style="color: #709870;">(</span>ex-info <span style="color: #4E9A06;">"</span><span style="color: #cc9393;">TODO</span><span style="color: #4E9A06;">"</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
-</pre>
-</div>
 
-<div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">training-layer</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">training-layer</span>
   <span style="color: #7388d6;">(</span><span style="color: #909183;">[</span>inference-layer input ones-vctr<span style="color: #909183;">]</span>
    <span style="color: #909183;">(</span><span style="color: #A52A2A; font-weight: bold;">let-release</span> <span style="color: #709870;">[</span>w <span style="color: #907373;">(</span>view <span style="color: #6276ba;">(</span>weights inference-layer<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span>
                  b <span style="color: #907373;">(</span>view <span style="color: #6276ba;">(</span>bias inference-layer<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span>
@@ -290,8 +272,8 @@ In the previous article, we implemented <code>sigmoid-prim!</code>.
 <div class="org-src-container">
 <pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">sigmoid-prim!</span>
   <span style="color: #7388d6;">(</span><span style="color: #909183;">[</span>x!<span style="color: #909183;">]</span>
-   <span style="color: #909183;">(</span><span style="color: #A52A2A; font-weight: bold;">let-release</span> <span style="color: #709870;">[</span>x-copy <span style="color: #907373;">(</span>copy x!<span style="color: #907373;">)</span><span style="color: #709870;">]</span>
-     <span style="color: #709870;">(</span>sigmoid-prim! x! x-copy<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+   <span style="color: #909183;">(</span>with-release <span style="color: #709870;">[</span>x-raw <span style="color: #907373;">(</span>raw x!<span style="color: #907373;">)</span><span style="color: #709870;">]</span>
+     <span style="color: #709870;">(</span>sigmoid-prim! x! x-raw<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
   <span style="color: #7388d6;">(</span><span style="color: #909183;">[</span>x! prim!<span style="color: #909183;">]</span>
    <span style="color: #909183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #709870;">[</span>x <span style="color: #907373;">(</span>sigmoid! x!<span style="color: #907373;">)</span><span style="color: #709870;">]</span>
      <span style="color: #709870;">(</span>mul! <span style="color: #907373;">(</span>linear-frac! -1.0 x 1.0 prim!<span style="color: #907373;">)</span> x<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
@@ -353,7 +335,7 @@ previous layer. Nice, but its <i>dimensions</i> are different than <code>a</code
 
 <p>
 So, then, add new field to the <code>FullyConnectedTraining</code> type? This could work. However, who guarantees
-that some other activation function won't need two or more temporary working matrices? Some functions
+that some other activation function won't need two or more temporal working matrices? Some functions
 (<code>tanh-prim!</code> for example) won't need any additional memory, so in that case it would be a waste.
 </p>
 </div>
