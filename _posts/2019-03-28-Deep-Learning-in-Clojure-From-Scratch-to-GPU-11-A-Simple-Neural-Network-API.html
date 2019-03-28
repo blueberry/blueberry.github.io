@@ -1,0 +1,620 @@
+---
+date: 2019-03-28
+tags:
+- Deep Learning
+- Neanderthal
+- MKL
+- Clojure
+- CUDA
+- OpenCL
+author: dragan
+layout: post
+title: Deep Learning from Scratch to GPU - 11 - A Simple Neural Network Inference API
+excerpt: The time is ripe for wrapping what we have built so far in a nice Neural Network API. After all, who would want to assemble networks by hand?
+categories:
+- Deep Learning
+- Neanderthal
+- MKL
+- Clojure
+- CUDA
+- OpenCL
+---
+<p>
+The time is ripe for wrapping what we have built so far in a nice Neural Network API. After all, who would want
+to assemble networks by hand?
+</p>
+
+<p>
+If you haven't yet, read my introduction to this series in <a href="./Deep-Learning-in-Clojure-From-Scratch-to-GPU-0-Why-Bother">Deep Learning in Clojure from Scratch to GPU - Part 0 - Why Bother?</a>.
+</p>
+
+<p>
+The previous article, Part 10, is here: <a href="./Deep-Learning-in-Clojure-From-Scratch-to-GPU-10-The-Backward-Pass-CDU-GPU-CUDA-OpenCL-Nvidia-AMD-Intel">The Backward Pass</a>.
+</p>
+
+<p>
+To run the code, you need a Clojure project with <a href="https://neanderthal.uncomplicate.org">Neanderthal</a> (<iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=neanderthal&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>) included as a dependency.
+If you're in a hurry, you can clone <a href="https://github.com/uncomplicate/neanderthal/blob/master/examples/hello-world/">Neanderthal Hello World project</a>.
+</p>
+
+<p>
+Don't forget to read at least some introduction from <a href="http://neuralnetworksanddeeplearning.com/">Neural Networks and Deep Learning</a>,
+start up the REPL from your favorite Clojure development environment, and let's continue with the tutorial.
+</p>
+
+<div id="outline-container-org406eb42" class="outline-2">
+<h2 id="org406eb42">The network diagram</h2>
+<div class="outline-text-2" id="text-org406eb42">
+<p>
+I'm repeating the network diagram from the <a href="./Deep-Learning-in-Clojure-From-Scratch-to-GPU-3-Fully-Connected-Inference-Layers">previous article</a> as a convenient reference.
+</p>
+
+
+<div class="figure">
+<p><img src="../img/deep-learning-from-scratch/1/nn-bias-activation.png" alt="nn-bias-activation.png" />
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org4dfa4f3" class="outline-2">
+<h2 id="org4dfa4f3">Defining a simple NN API</h2>
+<div class="outline-text-2" id="text-org4dfa4f3">
+<p>
+Taking a look at the diagram, we conclude that we need the following information
+to define a neural network on a high level:
+</p>
+
+<ul class="org-ul">
+<li>1) the kind of each layer (default available)</li>
+<li>2) the number of neurons in each layer</li>
+<li>3) connections between layers (default available)</li>
+<li>4) the activation at each layer (default available)</li>
+<li>5) the cost function and its derivative at the output (default available)</li>
+</ul>
+
+<p>
+In this tutorial, we are supporting sequential layers. It is possible to connect layers
+in a complicated network, but a traditional approach will be able to
+achieve a lot with just a linear sequence of layers. Fully connected
+and convolutional layers are the most popular layer kinds. We have implemented
+fully connected layers and will use this as the default choice.
+From a handful of activation functions that are most commonly used,
+we will choose sigmoid as the default.
+The cost function is relevant only at the output, and let the default be the mean squared error
+for the time being.
+</p>
+</div>
+
+<div id="outline-container-orgef736c1" class="outline-3">
+<h3 id="orgef736c1">Functional API</h3>
+<div class="outline-text-3" id="text-orgef736c1">
+<p>
+Here's a draft of how using a NN API could look like, based on how we used the functions we
+have created by now.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">input</span> <span style="color: #7388d6;">(</span>fv 1000<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">output</span> <span style="color: #7388d6;">(</span>fv 8<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">inference</span> <span style="color: #7388d6;">(</span>net factory
+                    <span style="color: #909183;">[</span><span style="color: #709870;">(</span>fully-connected sigmoid 1000 256<span style="color: #709870;">)</span>
+                     <span style="color: #709870;">(</span>fully-connected tanh 256 64<span style="color: #709870;">)</span>
+                     <span style="color: #709870;">(</span>fully-connected sigmoid 64 16<span style="color: #709870;">)</span><span style="color: #909183;">]</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">train</span> <span style="color: #7388d6;">(</span>training inference input output quadratic-cost<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>sgd train 20<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+The advantage of the first option is that it gives users the absolute freedom of choice to
+work with, test, and combine each building block on its own. It exposes the integration points
+for new implementations of layers, activations, the way they are invoked, or the way they share
+resources. This would cater to a user most interested in the software engineering side of deep learning.
+It may not be so attractive to users whose primary task is to analyze data,
+since it taxes them with details, while the default implementation is good in most cases.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgc12ec3f" class="outline-3">
+<h3 id="orgc12ec3f">Declarative descriptors</h3>
+<div class="outline-text-3" id="text-orgc12ec3f">
+<p>
+Another approach is to define a DSL for creating a declarative
+specification of the network, and an engine for translating such descriptors
+into an executable form.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">network-desc</span> <span style="color: #7388d6;">(</span>network <span style="color: #909183;">{</span><span style="color: #F5666D;">:input</span> 1000
+                            <span style="color: #F5666D;">:layers</span> <span style="color: #709870;">[</span><span style="color: #907373;">{</span><span style="color: #F5666D;">:type</span> <span style="color: #F5666D;">:fc</span> <span style="color: #F5666D;">:activation</span> <span style="color: #F5666D;">:sigmoid</span> <span style="color: #F5666D;">:size</span> 256<span style="color: #907373;">}</span>
+                                     <span style="color: #907373;">{</span><span style="color: #F5666D;">:type</span> <span style="color: #F5666D;">:fc</span> <span style="color: #F5666D;">:activation</span> <span style="color: #F5666D;">:tanh</span> <span style="color: #F5666D;">:size</span> 64<span style="color: #907373;">}</span>
+                                     <span style="color: #907373;">{</span><span style="color: #F5666D;">:type</span> <span style="color: #F5666D;">:fc</span> <span style="color: #F5666D;">:activation</span> <span style="color: #F5666D;">:sigmoid</span> <span style="color: #F5666D;">:size</span> 16<span style="color: #907373;">}</span><span style="color: #709870;">]</span><span style="color: #909183;">}</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">infer</span> <span style="color: #7388d6;">(</span>inference factory network-desc<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">train</span> <span style="color: #7388d6;">(</span>training inference input output quadratic-cost<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>sgd train<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+This approach may seem to be the most pleasant at first: just describe what you want, and let the
+engine configure the implementation for you. The advantage is that you can write whatever you like
+in a flexible form. However, if there is an error in your declaration, good luck finding
+what the problem might be. If you want to add or change an implementation detail, also good luck :)
+</p>
+</div>
+</div>
+
+<div id="outline-container-org2b0070f" class="outline-3">
+<h3 id="org2b0070f">Functional API with declarative options</h3>
+<div class="outline-text-3" id="text-org2b0070f">
+<p>
+In this series, I'll choose, in my opinion, a good middle ground.
+I choose to offer control over individual peaces and extensible hooks,
+while filling in sensible details, and use declarative options in places where that makes sense.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure">...
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">input</span> <span style="color: #7388d6;">(</span>fv 1000<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">output</span> <span style="color: #7388d6;">(</span>fv 8<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">inference</span> <span style="color: #7388d6;">(</span>net factory 1000
+                    <span style="color: #909183;">[</span><span style="color: #709870;">(</span>fully-connected 256 sigmoid<span style="color: #709870;">)</span>
+                     <span style="color: #709870;">(</span>fully-connected 64 tanh<span style="color: #709870;">)</span>
+                     <span style="color: #709870;">(</span>fully-connected 16 sigmoid<span style="color: #709870;">)</span><span style="color: #909183;">]</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">train</span> <span style="color: #7388d6;">(</span>training inference input output quadratic-cost<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>sgd train 20<span style="color: #707183;">)</span>
+...
+</pre>
+</div>
+
+<p>
+Treat these sketches as illustrations, though, not as complete specifications. We'll discover what
+works step by step.
+</p>
+
+<p>
+The result, I hope, will be something that is rather nice to use (for programmers at least).
+Unfortunately, once we wish to support integration with deep neural networks performance
+libraries such as <a href="https://developer.nvidia.com/cudnn">cuDNN</a> or <a href="https://01.org/mkl-dnn">MKL-DNN</a>, we will have to complicate this a bit, since these libraries
+mandate tensor descriptor-based approach which is more static and highly involved.
+There's a nice education value in writing something nicer and simpler,
+yet fully functional, at first, so we will go our way!
+</p>
+
+<p>
+I hope I won't give out a spoiler if I tell you that our fully connected implementation
+might turn out to be faster than the one assembled from corresponding <a href="https://01.org/mkl-dnn">MKL-DNN</a> primitives.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org17fed40" class="outline-2">
+<h2 id="org17fed40">The existing pieces</h2>
+<div class="outline-text-2" id="text-org17fed40">
+<p>
+First, the imports and requires that we will need.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span>uncomplicate.commons.core
+           <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>with-release <span style="color: #A52A2A; font-weight: bold;">let-release</span> Releaseable release<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>uncomplicate.clojurecuda.core <span style="color: #F5666D;">:as</span> cuda
+           <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>current-context default-stream synchronize!<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>uncomplicate.clojurecl.core <span style="color: #F5666D;">:as</span> opencl
+           <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span><span style="color: #0084C8; font-weight: bold;">*context*</span> <span style="color: #0084C8; font-weight: bold;">*command-queue*</span> finish!<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>uncomplicate.neanderthal
+           <span style="color: #909183;">[</span>core <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>mrows ncols dim raw view view-ge vctr copy row
+                         entry! axpy! copy! scal! mv! transfer! transfer
+                         mm! rk! view-ge vctr ge trans nrm2<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>math <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>sqr<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>vect-math <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>tanh! linear-frac! sqr! mul! cosh! inv!<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>native <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>fge native-float<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>cuda <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>cuda-float<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>opencl <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>opencl-float<span style="color: #709870;">]</span><span style="color: #909183;">]</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>import 'clojure.lang.IFn<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Here is the code that we developed in <a href="./Deep-Learning-in-Clojure-From-Scratch-to-GPU-10-The-Backward-Pass-CDU-GPU-CUDA-OpenCL-Nvidia-AMD-Intel">the last article</a>.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defprotocol</span> <span style="color: #2F8B58; font-weight: bold;">Parameters</span>
+  <span style="color: #7388d6;">(</span>weights <span style="color: #909183;">[</span>this<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>bias <span style="color: #909183;">[</span>this<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defprotocol</span> <span style="color: #2F8B58; font-weight: bold;">ActivationProvider</span>
+  <span style="color: #7388d6;">(</span>activation-fn <span style="color: #909183;">[</span>this<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">deftype</span> <span style="color: #2F8B58; font-weight: bold;">FullyConnectedInference</span> <span style="color: #7388d6;">[</span>w b activ-fn<span style="color: #7388d6;">]</span>
+  Releaseable
+  <span style="color: #7388d6;">(</span>release <span style="color: #909183;">[</span>_<span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>release w<span style="color: #909183;">)</span>
+    <span style="color: #909183;">(</span>release b<span style="color: #909183;">)</span>
+    <span style="color: #909183;">(</span>release activ-fn<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  Parameters
+  <span style="color: #7388d6;">(</span>weights <span style="color: #909183;">[</span>_<span style="color: #909183;">]</span> w<span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>bias <span style="color: #909183;">[</span>_<span style="color: #909183;">]</span> b<span style="color: #7388d6;">)</span>
+  ActivationProvider
+  <span style="color: #7388d6;">(</span>activation-fn <span style="color: #909183;">[</span>_<span style="color: #909183;">]</span> <span style="color: #909183;">(</span>activ-fn<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  IFn
+  <span style="color: #7388d6;">(</span>invoke <span style="color: #909183;">[</span>_ x ones a<span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>activ-fn <span style="color: #709870;">(</span>rk! -1.0 b ones <span style="color: #907373;">(</span>mm! 1.0 w x 0.0 a<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">fully-connected</span> <span style="color: #7388d6;">[</span>factory activ-fn in-dim out-dim<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">let-release</span> <span style="color: #909183;">[</span>w <span style="color: #709870;">(</span>ge factory out-dim in-dim<span style="color: #709870;">)</span>
+                bias <span style="color: #709870;">(</span>vctr factory out-dim<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>-&gt;FullyConnectedInference w bias activ-fn<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defprotocol</span> <span style="color: #2F8B58; font-weight: bold;">Backprop</span>
+  <span style="color: #7388d6;">(</span>forward <span style="color: #909183;">[</span>this<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>backward <span style="color: #909183;">[</span>this eta<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defprotocol</span> <span style="color: #2F8B58; font-weight: bold;">Transfer</span>
+  <span style="color: #7388d6;">(</span>input <span style="color: #909183;">[</span>this<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>output <span style="color: #909183;">[</span>this<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>ones <span style="color: #909183;">[</span>this<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defprotocol</span> <span style="color: #2F8B58; font-weight: bold;">Activation</span>
+  <span style="color: #7388d6;">(</span>activ <span style="color: #909183;">[</span>_ z a!<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>prime <span style="color: #909183;">[</span>_ z!<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">deftype</span> <span style="color: #2F8B58; font-weight: bold;">FullyConnectedTraining</span> <span style="color: #7388d6;">[</span>v w b a-1 z a ones activ-fn<span style="color: #7388d6;">]</span>
+  Releaseable
+  <span style="color: #7388d6;">(</span>release <span style="color: #909183;">[</span>_<span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>release v<span style="color: #909183;">)</span>
+    <span style="color: #909183;">(</span>release w<span style="color: #909183;">)</span>
+    <span style="color: #909183;">(</span>release b<span style="color: #909183;">)</span>
+    <span style="color: #909183;">(</span>release a-1<span style="color: #909183;">)</span>
+    <span style="color: #909183;">(</span>release z<span style="color: #909183;">)</span>
+    <span style="color: #909183;">(</span>release a<span style="color: #909183;">)</span>
+    <span style="color: #909183;">(</span>release ones<span style="color: #909183;">)</span>
+    <span style="color: #909183;">(</span>release activ-fn<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  Parameters
+  <span style="color: #7388d6;">(</span>weights <span style="color: #909183;">[</span>_<span style="color: #909183;">]</span> w<span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>bias <span style="color: #909183;">[</span>_<span style="color: #909183;">]</span> b<span style="color: #7388d6;">)</span>
+  Transfer
+  <span style="color: #7388d6;">(</span>input <span style="color: #909183;">[</span>_<span style="color: #909183;">]</span> a-1<span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>output <span style="color: #909183;">[</span>_<span style="color: #909183;">]</span> a<span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>ones <span style="color: #909183;">[</span>_<span style="color: #909183;">]</span> ones<span style="color: #7388d6;">)</span>
+  Backprop
+  <span style="color: #7388d6;">(</span>forward <span style="color: #909183;">[</span>_<span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>activ activ-fn <span style="color: #709870;">(</span>rk! -1.0 b ones <span style="color: #907373;">(</span>mm! 1.0 w a-1 0.0 z<span style="color: #907373;">)</span><span style="color: #709870;">)</span> a<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>backward <span style="color: #909183;">[</span>_ eta<span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #709870;">[</span>eta-avg <span style="color: #907373;">(</span>- <span style="color: #6276ba;">(</span>/ <span style="color: #858580;">(</span>double eta<span style="color: #858580;">)</span> <span style="color: #858580;">(</span>dim ones<span style="color: #858580;">)</span><span style="color: #6276ba;">)</span><span style="color: #907373;">)</span><span style="color: #709870;">]</span>
+      <span style="color: #709870;">(</span>mul! <span style="color: #907373;">(</span>prime activ-fn z<span style="color: #907373;">)</span> a<span style="color: #709870;">)</span> <span style="color: #204A87;">;; </span><span style="color: #204A87;">(1 and 2)</span>
+      <span style="color: #709870;">(</span>mm! eta-avg z <span style="color: #907373;">(</span>trans a-1<span style="color: #907373;">)</span> 0.0 v<span style="color: #709870;">)</span> <span style="color: #204A87;">;; </span><span style="color: #204A87;">(4)</span>
+      <span style="color: #709870;">(</span>mm! 1.0 <span style="color: #907373;">(</span>trans w<span style="color: #907373;">)</span> z 0.0 a-1<span style="color: #709870;">)</span> <span style="color: #204A87;">;; </span><span style="color: #204A87;">(2)</span>
+      <span style="color: #709870;">(</span>mv! eta-avg z ones 1.0 b<span style="color: #709870;">)</span> <span style="color: #204A87;">;; </span><span style="color: #204A87;">(3)</span>
+      <span style="color: #709870;">(</span>axpy! 1.0 v w<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">training-layer</span>
+  <span style="color: #7388d6;">(</span><span style="color: #909183;">[</span>inference-layer input ones-vctr<span style="color: #909183;">]</span>
+   <span style="color: #909183;">(</span><span style="color: #A52A2A; font-weight: bold;">let-release</span> <span style="color: #709870;">[</span>w <span style="color: #907373;">(</span>view <span style="color: #6276ba;">(</span>weights inference-layer<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span>
+                 v <span style="color: #907373;">(</span>raw w<span style="color: #907373;">)</span>
+                 b <span style="color: #907373;">(</span>view <span style="color: #6276ba;">(</span>bias inference-layer<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span>
+                 a-1 <span style="color: #907373;">(</span>view input<span style="color: #907373;">)</span>
+                 z <span style="color: #907373;">(</span>ge w <span style="color: #6276ba;">(</span>mrows w<span style="color: #6276ba;">)</span> <span style="color: #6276ba;">(</span>dim ones-vctr<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span>
+                 a <span style="color: #907373;">(</span>raw z<span style="color: #907373;">)</span>
+                 o <span style="color: #907373;">(</span>view ones-vctr<span style="color: #907373;">)</span><span style="color: #709870;">]</span>
+     <span style="color: #709870;">(</span>-&gt;FullyConnectedTraining v w b a-1 z a o <span style="color: #907373;">(</span><span style="color: #6276ba;">(</span>activation-fn inference-layer<span style="color: #6276ba;">)</span> z<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span><span style="color: #909183;">[</span>inference-layer previous-backprop<span style="color: #909183;">]</span>
+   <span style="color: #909183;">(</span>training-layer inference-layer
+                   <span style="color: #709870;">(</span>output previous-backprop<span style="color: #709870;">)</span>
+                   <span style="color: #709870;">(</span>ones previous-backprop<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">deftype</span> <span style="color: #2F8B58; font-weight: bold;">SigmoidActivation</span> <span style="color: #7388d6;">[</span>work<span style="color: #7388d6;">]</span>
+  Releaseable
+  <span style="color: #7388d6;">(</span>release <span style="color: #909183;">[</span>_<span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>release work<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  Activation
+  <span style="color: #7388d6;">(</span>activ <span style="color: #909183;">[</span>_ z a!<span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>linear-frac! 0.5 <span style="color: #709870;">(</span>tanh! <span style="color: #907373;">(</span>scal! 0.5 <span style="color: #6276ba;">(</span>copy! z a!<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span><span style="color: #709870;">)</span> 0.5<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>prime <span style="color: #909183;">[</span>this z!<span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>linear-frac! 0.5 <span style="color: #709870;">(</span>tanh! <span style="color: #907373;">(</span>scal! 0.5 z!<span style="color: #907373;">)</span><span style="color: #709870;">)</span> 0.5<span style="color: #909183;">)</span>
+    <span style="color: #909183;">(</span>mul! z! <span style="color: #709870;">(</span>linear-frac! -1.0 z! 1.0 work<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">sigmoid</span>
+  <span style="color: #7388d6;">(</span><span style="color: #909183;">[]</span>
+   <span style="color: #909183;">(</span><span style="color: #A52A2A; font-weight: bold;">fn</span> <span style="color: #709870;">[</span>z<span style="color: #709870;">]</span>
+     <span style="color: #709870;">(</span><span style="color: #A52A2A; font-weight: bold;">let-release</span> <span style="color: #907373;">[</span>work <span style="color: #6276ba;">(</span>raw z<span style="color: #6276ba;">)</span><span style="color: #907373;">]</span>
+       <span style="color: #907373;">(</span>-&gt;SigmoidActivation work<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span><span style="color: #909183;">[</span>z!<span style="color: #909183;">]</span>
+   <span style="color: #909183;">(</span>linear-frac! 0.5 <span style="color: #709870;">(</span>tanh! <span style="color: #907373;">(</span>scal! 0.5 z!<span style="color: #907373;">)</span><span style="color: #709870;">)</span> 0.5<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">deftype</span> <span style="color: #2F8B58; font-weight: bold;">TanhActivation</span> <span style="color: #7388d6;">[]</span>
+  Activation
+  <span style="color: #7388d6;">(</span>activ <span style="color: #909183;">[</span>_ z a!<span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>tanh! z a!<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>prime <span style="color: #909183;">[</span>this z!<span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>sqr! <span style="color: #709870;">(</span>inv! <span style="color: #907373;">(</span>cosh! z!<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">tanh</span>
+  <span style="color: #7388d6;">(</span><span style="color: #909183;">[]</span>
+   <span style="color: #909183;">(</span><span style="color: #A52A2A; font-weight: bold;">fn</span> <span style="color: #709870;">[</span>_<span style="color: #709870;">]</span> <span style="color: #709870;">(</span>-&gt;TanhActivation<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span><span style="color: #909183;">[</span>z!<span style="color: #909183;">]</span>
+   <span style="color: #909183;">(</span>tanh! z!<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Checking whether the structure fits nicely:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>with-release <span style="color: #7388d6;">[</span>x <span style="color: #909183;">(</span>ge native-float 2 2 <span style="color: #709870;">[</span>0.3 0.9 0.3 0.9<span style="color: #709870;">]</span><span style="color: #909183;">)</span>
+               ones <span style="color: #909183;">(</span>vctr native-float 1 1<span style="color: #909183;">)</span>
+               layer-1 <span style="color: #909183;">(</span>fully-connected native-float tanh 2 4<span style="color: #909183;">)</span>
+               layer-2 <span style="color: #909183;">(</span>fully-connected native-float sigmoid 4 1<span style="color: #909183;">)</span>
+               training-layer-1 <span style="color: #909183;">(</span>training-layer layer-1 x ones<span style="color: #909183;">)</span>
+               training-layer-2 <span style="color: #909183;">(</span>training-layer layer-2 training-layer-1<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>transfer! <span style="color: #909183;">[</span>0.3 0.1 0.9 0.0 0.6 2.0 3.7 1.0<span style="color: #909183;">]</span> <span style="color: #909183;">(</span>weights layer-1<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>transfer! <span style="color: #909183;">[</span>0.7 0.2 1.1 2<span style="color: #909183;">]</span> <span style="color: #909183;">(</span>bias layer-1<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>transfer! <span style="color: #909183;">[</span>0.75 0.15 0.22 0.33<span style="color: #909183;">]</span> <span style="color: #909183;">(</span>weights layer-2<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>transfer! <span style="color: #909183;">[</span>0.3<span style="color: #909183;">]</span> <span style="color: #909183;">(</span>bias layer-2<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>forward training-layer-1<span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>forward training-layer-2<span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>backward training-layer-2 0.05<span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>backward training-layer-1 0.05<span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>transfer <span style="color: #909183;">(</span>output training-layer-2<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+: nil#RealGEMatrix[float, mxn:1x2, layout:column, offset:0]
+:    ▥       ↓       ↓       ┓
+:    →       0.44    0.44
+:    ┗                       ┛
+</pre>
+
+<p>
+So far, so good.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org886551f" class="outline-2">
+<h2 id="org886551f">The NeuralNetworkInference deftype</h2>
+<div class="outline-text-2" id="text-org886551f">
+<p>
+Implementing inference is simpler than implementing training. Following the separation between the inference and
+training types, we'll start with a stand-alone <code>NeuralNetworkInference</code>. Looking at the usage example,
+I can imagine it holding a sequence of layers, and implementing the invoke method of the <code>IFn</code> interface.
+</p>
+
+<p>
+Since a network will typically contain several layers, it would be a good thing if it reused the instances
+of all throw-away objects, such as the vector of ones, or <a href="./Deep-Learning-in-Clojure-From-Scratch-to-GPU-5-Sharing-Memory">an additional shared matrix</a> for inputs and outputs.
+Since we want to support arbitrary batch sizes, we would have to create and release these temporary
+objects on each invocation.
+</p>
+
+<p>
+The following <code>invoke</code> implementations might seem too dense at first, but they are nothing more
+than the automation of the code we were writing by hand until now in the test examples
+when we were assembling the network and calling the inference by hand.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">deftype</span> <span style="color: #2F8B58; font-weight: bold;">NeuralNetworkInference</span> <span style="color: #7388d6;">[</span>layers
+                                 <span style="color: #2E3436; background-color: #EDEDED;">^</span><span style="color: #2F8B58; font-weight: bold;">long</span> max-width-1
+                                 <span style="color: #2E3436; background-color: #EDEDED;">^</span><span style="color: #2F8B58; font-weight: bold;">long</span> max-width-2<span style="color: #7388d6;">]</span>
+  Releaseable
+  <span style="color: #7388d6;">(</span>release <span style="color: #909183;">[</span>_<span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span><span style="color: #A52A2A; font-weight: bold;">doseq</span> <span style="color: #709870;">[</span>l layers<span style="color: #709870;">]</span> <span style="color: #709870;">(</span>release l<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  IFn
+  <span style="color: #7388d6;">(</span>invoke <span style="color: #909183;">[</span>_ x ones-vctr temp-1! temp-2!<span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #709870;">[</span>batch <span style="color: #907373;">(</span>dim ones-vctr<span style="color: #907373;">)</span><span style="color: #709870;">]</span>
+      <span style="color: #709870;">(</span><span style="color: #A52A2A; font-weight: bold;">loop</span> <span style="color: #907373;">[</span>x x v1 temp-1! v2 temp-2! layers layers<span style="color: #907373;">]</span>
+        <span style="color: #907373;">(</span><span style="color: #A52A2A; font-weight: bold;">if</span> layers
+          <span style="color: #6276ba;">(</span><span style="color: #A52A2A; font-weight: bold;">recur</span> <span style="color: #858580;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #80a880;">[</span>layer <span style="color: #887070;">(</span>first layers<span style="color: #887070;">)</span><span style="color: #80a880;">]</span>
+                   <span style="color: #80a880;">(</span>layer x ones-vctr
+                          <span style="color: #887070;">(</span>view-ge v1 <span style="color: #707183;">(</span>mrows <span style="color: #7388d6;">(</span>weights layer<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span> batch<span style="color: #887070;">)</span><span style="color: #80a880;">)</span><span style="color: #858580;">)</span>
+                 v2 v1 <span style="color: #858580;">(</span>next layers<span style="color: #858580;">)</span><span style="color: #6276ba;">)</span>
+          x<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>invoke <span style="color: #909183;">[</span>this x a!<span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #709870;">[</span>cnt <span style="color: #907373;">(</span>count layers<span style="color: #907373;">)</span><span style="color: #709870;">]</span>
+      <span style="color: #709870;">(</span><span style="color: #A52A2A; font-weight: bold;">if</span> <span style="color: #907373;">(</span>= 0 cnt<span style="color: #907373;">)</span>
+        <span style="color: #907373;">(</span>copy! x a!<span style="color: #907373;">)</span>
+        <span style="color: #907373;">(</span>with-release <span style="color: #6276ba;">[</span>ones-vctr <span style="color: #858580;">(</span>entry! <span style="color: #80a880;">(</span>vctr x <span style="color: #887070;">(</span>ncols x<span style="color: #887070;">)</span><span style="color: #80a880;">)</span> 1.0<span style="color: #858580;">)</span><span style="color: #6276ba;">]</span>
+          <span style="color: #6276ba;">(</span><span style="color: #A52A2A; font-weight: bold;">if</span> <span style="color: #858580;">(</span>= 1 cnt<span style="color: #858580;">)</span>
+            <span style="color: #858580;">(</span><span style="color: #80a880;">(</span>layers 0<span style="color: #80a880;">)</span> x ones-vctr a!<span style="color: #858580;">)</span>
+            <span style="color: #858580;">(</span>with-release <span style="color: #80a880;">[</span>temp-1 <span style="color: #887070;">(</span>vctr x <span style="color: #707183;">(</span>* max-width-1 <span style="color: #7388d6;">(</span>dim ones-vctr<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span><span style="color: #887070;">)</span><span style="color: #80a880;">]</span>
+              <span style="color: #80a880;">(</span><span style="color: #A52A2A; font-weight: bold;">if</span> <span style="color: #887070;">(</span>= 2 cnt<span style="color: #887070;">)</span>
+                <span style="color: #887070;">(</span>this x ones-vctr temp-1 a!<span style="color: #887070;">)</span>
+                <span style="color: #887070;">(</span>with-release <span style="color: #707183;">[</span>temp-2 <span style="color: #7388d6;">(</span>vctr x <span style="color: #909183;">(</span>* max-width-2 <span style="color: #709870;">(</span>dim ones-vctr<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">]</span>
+                  <span style="color: #707183;">(</span>copy! <span style="color: #7388d6;">(</span>this x ones-vctr temp-1 temp-2<span style="color: #7388d6;">)</span> a!<span style="color: #707183;">)</span><span style="color: #887070;">)</span><span style="color: #80a880;">)</span><span style="color: #858580;">)</span><span style="color: #6276ba;">)</span><span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>invoke <span style="color: #909183;">[</span>this x<span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span><span style="color: #A52A2A; font-weight: bold;">let-release</span> <span style="color: #709870;">[</span>a <span style="color: #907373;">(</span>ge x <span style="color: #6276ba;">(</span>mrows <span style="color: #858580;">(</span>weights <span style="color: #80a880;">(</span>peek layers<span style="color: #80a880;">)</span><span style="color: #858580;">)</span><span style="color: #6276ba;">)</span> <span style="color: #6276ba;">(</span>ncols x<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span><span style="color: #709870;">]</span>
+      <span style="color: #709870;">(</span>this x a<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+The first <code>invoke</code> implementation is at the lowest level. It does not create any of the temporary
+work objects, and expects that the user provides the needed vector of ones, <code>temp-1!</code>, and <code>temp-2</code>
+instances of sufficient capacity. This gives the user the opportunity to optimally manage
+the life-cycle of these structures. This function simply iterates through all layers, and evaluates them (recall
+that they are also functions) with appropriately alternated <code>temp-1!</code> and <code>temp-2!</code>.
+</p>
+
+<p>
+The second <code>invoke</code> implementation goes one level above. It requires only input <code>x</code> and a matrix
+ <code>a!</code>, which is going to be overwritten with the result of the evaluation. Then, depending on the number of layers,
+it calls the first variant of <code>invoke</code> in a most efficient way:
+</p>
+
+<ul class="org-ul">
+<li>1) if the network does not have any layers, it simply copies the input.</li>
+<li>2) if there is a single layer, it is called without initializing any temporary work memory.</li>
+<li>3) if there are two layers, only one temporary object is needed.</li>
+<li>4) for more than two layers, the two alternating work objects are used. The result of evaluation is copied to <code>a!</code> at the end.</li>
+</ul>
+
+<p>
+Of course, all temporary work objects are released at the end of evaluation.
+</p>
+
+<p>
+The third <code>invoke</code> is a pure function. It asks only for input, <code>x</code>, and returns the output in
+a new instance <code>a</code>. All temporary objects and mutations are encapsulated and invisible to the caller.
+</p>
+
+<p>
+With these 3 variants, we have covered different trade-offs. We might pick the pure variant if we have enough
+resources and are concerned with code simplicity, but we can also opt for one of the destructive
+variants if we want, or if we have to be frugal with resources.
+</p>
+
+<p>
+Since our network can automatically create temporary work objects, it needs to know their size.
+This is calculated during construction. The first temporary vector needs to be big enough to hold the
+largest output matrix in odd layers, while the second is charged with doing the same for even layers.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">inference-network</span> <span style="color: #7388d6;">[</span>factory in-dim layers<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #909183;">[</span>out-sizes <span style="color: #709870;">(</span>map #<span style="color: #907373;">(</span><span style="color: #0084C8; font-weight: bold;">%</span><span style="color: #907373;">)</span> layers<span style="color: #709870;">)</span>
+        in-sizes <span style="color: #709870;">(</span>cons in-dim out-sizes<span style="color: #709870;">)</span>
+        max-width-1 <span style="color: #709870;">(</span>apply max <span style="color: #907373;">(</span>take-nth 2 out-sizes<span style="color: #907373;">)</span><span style="color: #709870;">)</span>
+        max-width-2 <span style="color: #709870;">(</span>apply max <span style="color: #907373;">(</span>take-nth 2 <span style="color: #6276ba;">(</span>rest out-sizes<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span><span style="color: #A52A2A; font-weight: bold;">let-release</span> <span style="color: #709870;">[</span>layers <span style="color: #907373;">(</span>vec <span style="color: #6276ba;">(</span>map <span style="color: #858580;">(</span><span style="color: #A52A2A; font-weight: bold;">fn</span> <span style="color: #80a880;">[</span>layer-fn in-size<span style="color: #80a880;">]</span>
+                                     <span style="color: #80a880;">(</span>layer-fn factory in-size<span style="color: #80a880;">)</span><span style="color: #858580;">)</span>
+                                   layers
+                                   in-sizes<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span><span style="color: #709870;">]</span>
+    <span style="color: #709870;">(</span>-&gt;NeuralNetworkInference layers max-width-1 max-width-2<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org69b7e7f" class="outline-2">
+<h2 id="org69b7e7f">Improving the fully-connected constructor function</h2>
+<div class="outline-text-2" id="text-org69b7e7f">
+<p>
+The thing that might puzzle you in the implementation of <code>inference-network</code> is that I
+evaluate layers as functions. Don't they do the inference when evaluated?
+</p>
+
+<p>
+In the old implementation that we have been using until now, network layers were straight functions
+that do the inference when evaluated. That old implementation
+requires the appropriate factory, input, and output dimensions, and the activation function.
+If we used it as-is, we would have to repeat some of these arguments, like this:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>inference-network
+ factory
+ <span style="color: #7388d6;">[</span><span style="color: #909183;">(</span>fully-connected factory 1000 256 sigmoid<span style="color: #909183;">)</span>
+  <span style="color: #909183;">(</span>fully-connected factory 256 64 tanh<span style="color: #909183;">)</span>
+  <span style="color: #909183;">(</span>fully-connected factory 64 16 sigmoid<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Some of these arguments can be supplied automatically, or inferred.
+If we created a mini DSL, we could supply a brief description of each layer,
+and the <code>inference-network</code> could use it to construct appropriate layer objects.
+</p>
+
+<p>
+However, the DSL would take away the nice option of creating stand alone layers.
+This is a situation when Clojure comes to the rescue. In the following implementation,
+I create a closure that captures the arguments specific for each layer, while the rest
+of the arguments are provided when the resulting function is called, either directly,
+or by the <code>neural-network</code> constructor.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">fully-connected</span>
+  <span style="color: #7388d6;">(</span><span style="color: #909183;">[</span>factory in-dim out-dim activ<span style="color: #909183;">]</span>
+   <span style="color: #909183;">(</span><span style="color: #A52A2A; font-weight: bold;">let-release</span> <span style="color: #709870;">[</span>w <span style="color: #907373;">(</span>ge factory out-dim in-dim<span style="color: #907373;">)</span>
+                 bias <span style="color: #907373;">(</span>vctr factory out-dim<span style="color: #907373;">)</span><span style="color: #709870;">]</span>
+     <span style="color: #709870;">(</span>-&gt;FullyConnectedInference w bias activ<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span><span style="color: #909183;">[</span>out-dim activ<span style="color: #909183;">]</span>
+   <span style="color: #909183;">(</span><span style="color: #A52A2A; font-weight: bold;">fn</span>
+     <span style="color: #709870;">(</span><span style="color: #907373;">[</span>factory in-dim<span style="color: #907373;">]</span>
+      <span style="color: #907373;">(</span>fully-connected factory in-dim out-dim activ<span style="color: #907373;">)</span><span style="color: #709870;">)</span>
+     <span style="color: #709870;">(</span><span style="color: #907373;">[]</span>
+      out-dim<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Here is how this API is used. Note how a call such as <code>(fully-connected 4 tanh)</code>
+is super-concise and closely resembles the domain entity it creates:
+a fully connected layer with 4 neurons and a tanh activation. There is no boilerplate
+in that call.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>with-release <span style="color: #7388d6;">[</span>x <span style="color: #909183;">(</span>ge native-float 2 2 <span style="color: #709870;">[</span>0.3 0.9 0.3 0.9<span style="color: #709870;">]</span><span style="color: #909183;">)</span>
+               a <span style="color: #909183;">(</span>ge native-float 1 2<span style="color: #909183;">)</span>
+               inference <span style="color: #909183;">(</span>inference-network
+                          native-float 2
+                          <span style="color: #709870;">[</span><span style="color: #907373;">(</span>fully-connected 4 tanh<span style="color: #907373;">)</span>
+                           <span style="color: #907373;">(</span>fully-connected 1 sigmoid<span style="color: #907373;">)</span><span style="color: #709870;">]</span><span style="color: #909183;">)</span>
+               layers <span style="color: #909183;">(</span>.layers <span style="color: #2E3436; background-color: #EDEDED;">^</span><span style="color: #2F8B58; font-weight: bold;">NeuralNetworkInference</span> inference<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>transfer! <span style="color: #909183;">[</span>0.3 0.1 0.9 0.0 0.6 2.0 3.7 1.0<span style="color: #909183;">]</span> <span style="color: #909183;">(</span>weights <span style="color: #709870;">(</span>layers 0<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>transfer! <span style="color: #909183;">[</span>0.7 0.2 1.1 2<span style="color: #909183;">]</span> <span style="color: #909183;">(</span>bias <span style="color: #709870;">(</span>layers 0<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>transfer! <span style="color: #909183;">[</span>0.75 0.15 0.22 0.33<span style="color: #909183;">]</span> <span style="color: #909183;">(</span>weights <span style="color: #709870;">(</span>layers 1<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>transfer! <span style="color: #909183;">[</span>0.3<span style="color: #909183;">]</span> <span style="color: #909183;">(</span>bias <span style="color: #709870;">(</span>layers 1<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>transfer <span style="color: #909183;">(</span>inference x a<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+nil#RealGEMatrix[float, mxn:1x2, layout:column, offset:0]
+   ▥       ↓       ↓       ┓
+   →       0.44    0.44
+   ┗                       ┛
+</pre>
+
+
+<p>
+This appears to be working correctly with the artificial numbers we were using earlier.
+Zero point forty fours all the way.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgf11ac11" class="outline-2">
+<h2 id="orgf11ac11">Donations</h2>
+<div class="outline-text-2" id="text-orgf11ac11">
+<p>
+If you feel that you can afford to help, and wish to donate, I even created a special <i>Starbucks for two</i> tier
+at <a href="https://www.patreon.com/draganrocks">patreon.com/draganrocks</a>. You can do something even cooler: <a href="https://www.patreon.com/posts/22476035">adopt a pet function</a>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org561e558" class="outline-2">
+<h2 id="org561e558">The next article</h2>
+<div class="outline-text-2" id="text-org561e558">
+<p>
+I hope that the Neural Network API that I've been promising you for the last several articles
+is becoming material. Do you like it? Please send suggestions on how to improve it further.
+</p>
+
+<p>
+There is a bit of boilerplate in how we set weights explicitly, and we will get rid of that soon.
+But, first, a major thing: we have to create an API for the <i>training</i> algorithm! We'll do that
+in the next article. <a href="https://www.youtube.com/watch?v=loFLdYM79gY">Stay tuned for more Rock and Roll</a>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgc650891" class="outline-2">
+<h2 id="orgc650891">Thank you</h2>
+<div class="outline-text-2" id="text-orgc650891">
+<p>
+<a href="https://www.clojuriststogether.org/news/q1-2019-funding-announcement/">Clojurists Together</a> financially supported writing this series. Big thanks to all Clojurians who contribute,
+and thank you for reading and discussing this series.
+</p>
+</div>
+</div>
