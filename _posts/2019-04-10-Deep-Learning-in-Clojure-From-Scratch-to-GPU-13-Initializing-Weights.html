@@ -1,0 +1,844 @@
+---
+date: 2019-04-10
+tags:
+- Deep Learning
+- Neanderthal
+- MKL
+- Clojure
+- CUDA
+- OpenCL
+author: dragan
+layout: post
+title: Deep Learning from Scratch to GPU - 13 - Initializing Weights
+excerpt: As the iterative learning algorithm has to start somewhere, we have to decide how to initialize weights. Here we try a few techniques and weight their strengths and weaknesses until we find one that is good enough.
+categories:
+- Deep Learning
+- Neanderthal
+- MKL
+- Clojure
+- CUDA
+- OpenCL
+---
+<p>
+As the iterative learning algorithm has to start somewhere, we have to decide how to initialize weights.
+Here we try a few techniques and weight their strengths and weaknesses until we find one that is good enough.
+</p>
+
+<p>
+If you haven't yet, read my introduction to this series in <a href="./Deep-Learning-in-Clojure-From-Scratch-to-GPU-0-Why-Bother">Deep Learning in Clojure from Scratch to GPU - Part 0 - Why Bother?</a>.
+</p>
+
+<p>
+The previous article, Part 12, is here: <a href="./Deep-Learning-in-Clojure-From-Scratch-to-GPU-12-A-Simple-Neural-Network-Training-API">A Simple Neural Network Training API</a>.
+</p>
+
+<p>
+To run the code, you need a Clojure project with <a href="https://neanderthal.uncomplicate.org">Neanderthal</a> (<iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=neanderthal&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>) included as a dependency.
+If you're in a hurry, you can clone <a href="https://github.com/uncomplicate/neanderthal/blob/master/examples/hello-world/">Neanderthal Hello World project</a>.
+</p>
+
+<p>
+Don't forget to read at least some introduction from <a href="http://neuralnetworksanddeeplearning.com/">Neural Networks and Deep Learning</a>,
+start up the REPL from your favorite Clojure development environment, and let's continue with the tutorial.
+</p>
+
+<div id="outline-container-org3ad2333" class="outline-2">
+<h2 id="org3ad2333">Why properly initialized weights are important</h2>
+<div class="outline-text-2" id="text-org3ad2333">
+<p>
+So far, we have seen how a neural network is a series of linear transformations interposed
+ with non-linear activations.
+</p>
+
+<p>
+Here's simple example, an one layer network we used in <a href="./Deep-Learning-in-Clojure-From-Scratch-to-GPU-1-Representing-Layers-and-Connections">part 1, Representing Layers and Connections</a>:
+</p>
+
+
+<div class="figure">
+<p><img src="../img/deep-learning-from-scratch/1/nn-input-first.png" alt="nn-input-first.png" />
+</p>
+</div>
+
+<p>
+Take a look at the formula for the linear transformations that we defined
+in that article:
+</p>
+
+<p>
+\(\mathbf{h} = W\mathbf{x}\)
+</p>
+
+<p>
+Each \(h_i\) is a dot product of the respective row of \(W\) and the input.
+</p>
+
+\begin{gather*}
+h^{(1)}_1 = w_{11}\times{} x_1 + w_{12}\times{} x_2\\
+h^{(1)}_2 = w_{21}\times{} x_1 + w_{22}\times{} x_2\\
+h^{(1)}_3 = w_{31}\times{} x_1 + w_{32}\times{} x_2\\
+h^{(1)}_4 = w_{41}\times{} x_1 + w_{42}\times{} x_2\\
+\end{gather*}
+
+<p>
+Until now, we have set the initial weights and inputs to be in the range \([0, 1]\),
+as in the following example that you have seen many times by now.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>with-release <span style="color: #7388d6;">[</span>x <span style="color: #909183;">(</span>ge native-float 2 2 <span style="color: #709870;">[</span>0.3 0.9 0.3 0.9<span style="color: #709870;">]</span><span style="color: #909183;">)</span>
+               y <span style="color: #909183;">(</span>ge native-float 1 2 <span style="color: #709870;">[</span>0.50 0.50<span style="color: #709870;">]</span><span style="color: #909183;">)</span>
+               inference <span style="color: #909183;">(</span>inference-network
+                          native-float 2
+                          <span style="color: #709870;">[</span><span style="color: #907373;">(</span>fully-connected 4 tanh<span style="color: #907373;">)</span>
+                           <span style="color: #907373;">(</span>fully-connected 1 sigmoid<span style="color: #907373;">)</span><span style="color: #709870;">]</span><span style="color: #909183;">)</span>
+               inf-layers <span style="color: #909183;">(</span>layers inference<span style="color: #909183;">)</span>
+               training <span style="color: #909183;">(</span>training-network inference x<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>transfer! <span style="color: #909183;">[</span>0.3 0.1 0.9 0.0 0.6 2.0 3.7 1.0<span style="color: #909183;">]</span> <span style="color: #909183;">(</span>weights <span style="color: #709870;">(</span>inf-layers 0<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>transfer! <span style="color: #909183;">[</span>0.7 0.2 1.1 2<span style="color: #909183;">]</span> <span style="color: #909183;">(</span>bias <span style="color: #709870;">(</span>inf-layers 0<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>transfer! <span style="color: #909183;">[</span>0.75 0.15 0.22 0.33<span style="color: #909183;">]</span> <span style="color: #909183;">(</span>weights <span style="color: #709870;">(</span>inf-layers 1<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>transfer! <span style="color: #909183;">[</span>0.3<span style="color: #909183;">]</span> <span style="color: #909183;">(</span>bias <span style="color: #709870;">(</span>inf-layers 1<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>sgd training y quadratic-cost! 2000 0.05<span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>transfer <span style="color: #909183;">(</span>inference x<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+nil#RealGEMatrix[float, mxn:1x2, layout:column, offset:0]
+   ▥       ↓       ↓       ┓
+   →       0.50    0.50
+   ┗                       ┛
+</pre>
+
+
+<p>
+As all operands are between 0 and 1, the dot products \(h\) are likely to be in that range,
+or at least not much larger.
+</p>
+
+<p>
+If any of the weights \(w\) or inputs \(x\) are large numbers, \(h\) also has a chance to be large.
+If the network didn't have non-linear activations, the inputs to the following layer would
+grow uncontrollably, which would propagate further. Some activation functions, such
+as <a href="./Deep-Learning-in-Clojure-From-Scratch-to-GPU-2-Bias-and-Activation-Function#orged1973d">ReLU</a>, are linear in the positive domain, so this would propagate to the output.
+The <a href="./Deep-Learning-in-Clojure-From-Scratch-to-GPU-2-Bias-and-Activation-Function#org120631d">sigmoid</a> and <a href="./Deep-Learning-in-Clojure-From-Scratch-to-GPU-2-Bias-and-Activation-Function#org4e08466">hyperbolic tangent</a> activation functions would saturate at \(1\) at the upper bound
+and \(0\) or \(-1\) at the lower bound.
+</p>
+
+
+<div class="figure">
+<p><object type="image/svg+xml" data="../img/deep-learning-from-scratch/2/tanh.svg" class="org-svg">
+Sorry, your browser does not support SVG.</object>
+</p>
+</div>
+
+<p>
+Although the saturation will contain the inputs to the next layer to the \([-1,1]\) range,
+it would make the learning difficult, since the saturated functions would have problems
+propagating the gradients backwards.
+</p>
+
+<p>
+We are still using a trivial example, which can easily illustrate this problem
+(that's why I'm still keeping it, despite it being silly).
+Just change the weights to be numbers larger than one. Even though we are just
+chasing one input/output example (\((0.3, 0.9) \mapsto 0.5\)) where there is nothing even remotely
+challenging to learn, our algorithm gets stuck in the saturation zone right away.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>with-release <span style="color: #7388d6;">[</span>x <span style="color: #909183;">(</span>ge native-float 2 2 <span style="color: #709870;">[</span>0.3 0.9 0.3 0.9<span style="color: #709870;">]</span><span style="color: #909183;">)</span>
+               y <span style="color: #909183;">(</span>ge native-float 1 2 <span style="color: #709870;">[</span>0.50 0.50<span style="color: #709870;">]</span><span style="color: #909183;">)</span>
+               inference <span style="color: #909183;">(</span>inference-network
+                          native-float 2
+                          <span style="color: #709870;">[</span><span style="color: #907373;">(</span>fully-connected 4 tanh<span style="color: #907373;">)</span>
+                           <span style="color: #907373;">(</span>fully-connected 1 sigmoid<span style="color: #907373;">)</span><span style="color: #709870;">]</span><span style="color: #909183;">)</span>
+               inf-layers <span style="color: #909183;">(</span>layers inference<span style="color: #909183;">)</span>
+               training <span style="color: #909183;">(</span>training-network inference x<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>transfer! <span style="color: #909183;">[</span>3 1 9 0 6 20 37 10<span style="color: #909183;">]</span> <span style="color: #909183;">(</span>weights <span style="color: #709870;">(</span>inf-layers 0<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>transfer! <span style="color: #909183;">[</span>7 2 11 2<span style="color: #909183;">]</span> <span style="color: #909183;">(</span>bias <span style="color: #709870;">(</span>inf-layers 0<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>transfer! <span style="color: #909183;">[</span>75 15 22 33<span style="color: #909183;">]</span> <span style="color: #909183;">(</span>weights <span style="color: #709870;">(</span>inf-layers 1<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>transfer! <span style="color: #909183;">[</span>3<span style="color: #909183;">]</span> <span style="color: #909183;">(</span>bias <span style="color: #709870;">(</span>inf-layers 1<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>sgd training y quadratic-cost! 2000 0.05<span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>transfer <span style="color: #909183;">(</span>inference x<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+nil#RealGEMatrix[float, mxn:1x2, layout:column, offset:0]
+   ▥       ↓       ↓       ┓
+   →       0.00    0.00
+   ┗                       ┛
+</pre>
+
+
+<p>
+It is obvious that we should keep the average absolute value of weights below 1. But, how small should they be?
+If weights are too small, the signal will be feeble. Feeble signal might not have problems
+in small networks, but when passed through a large number of layers, it would be dampened before
+reaching the output. I'd need a larger example to illustrate it, so for this one I'd have to ask
+you to trust me.
+</p>
+
+<p>
+Let's say that 0.001 is not too small, and yet not too large.
+Why don't we pick a universally good value and set all weights to it? The problem with that approach
+is that all neurons would behave in the same manner. We wouldn't have a variability in the neurons
+that is needed for proper learning.
+</p>
+
+<p>
+Although there is not a universal best strategy for setting weighs, a few things are certain enough:
+</p>
+<ul class="org-ul">
+<li>1) it should be done automatically</li>
+<li>2) the values should be small enough to avoid <i>saturation</i></li>
+<li>3) the values should be large enough to be able to propagate the signal</li>
+<li>4) the initial weights should be random</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-org20c7587" class="outline-2">
+<h2 id="org20c7587">Generating random numbers</h2>
+<div class="outline-text-2" id="text-org20c7587">
+<p>
+As we are going to need a lot of random numbers, it is a good time to see about generating
+them. Clojure, as most programming languages, have a function that returns uniformly distributed
+random numbers - <code>rand</code>. It is important to note that these are <i>pseudo</i> random numbers! They are generated by deterministic
+algorithms, and only appear to be random. The default algorithms used in standard libraries are good enough
+for most casual uses but are not of high quality. They are certainly not good enough for cryptography, but,
+luckily, we are not trying to outsmart NSA. They are not even good enough for serious simulations.
+For this illustration, <code>rand</code> is OK.
+</p>
+
+<p>
+The default <code>rand</code> signature returns uniformly distributed numbers between <code>0</code> and <code>1</code>. It is
+easy enough to produce a sequence of random numbers.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>map rand <span style="color: #7388d6;">(</span>repeat 10 1<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+nil(0.7014240191763038 0.6202193837181832 0.1714819863895033 0.6762836795545388 0.11935216796634984 0.6572938157260321 0.16449131618304536 0.5318560880392705 0.7310647135005525 0.45385262971843154)
+</pre>
+
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span>uncomplicate.fluokitten.core <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>fmap!<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Since Fluokitten's <a href="https://fluokitten.uncomplicate.org/codox/uncomplicate.fluokitten.core.html#var-fmap.21"><code>fmap!</code></a> function supports matrices, we can populate an existing matrix
+with random numbers by simply <a href="https://fluokitten.uncomplicate.org/codox/uncomplicate.fluokitten.core.html#var-fmap.21"><code>fmap!</code></a> ing <code>rand</code> over it, while ignoring the old entry values of the matrix.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>fmap! <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">fn</span> <span style="color: #909183;">[</span>_<span style="color: #909183;">]</span> <span style="color: #909183;">(</span>rand<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span> <span style="color: #7388d6;">(</span>fge 3 2<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+nil#RealGEMatrix[float, mxn:3x2, layout:column, offset:0]
+   ▥       ↓       ↓       ┓
+   →       0.83    0.48
+   →       0.12    0.79
+   →       0.45    0.85
+   ┗                       ┛
+</pre>
+
+
+<p>
+The previous implementation used <a href="https://docs.oracle.com/javase/tutorial/java/data/autoboxing.html">number boxing</a>. Neanderthal supports primitive arguments,
+and by annotating the function arguments with <code>double</code>, we can avoid boxing and make this
+faster by almost an order of magnitude.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">rand-uniform</span> <span style="color: #2E3436; background-color: #EDEDED;">^</span><span style="color: #2F8B58; font-weight: bold;">double</span> <span style="color: #7388d6;">[</span><span style="color: #2E3436; background-color: #EDEDED;">^</span><span style="color: #2F8B58; font-weight: bold;">double</span> _<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>double <span style="color: #909183;">(</span>rand<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Let's try to initialize all weights with uniform random numbers between \(0\) and \(1\).
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>with-release <span style="color: #7388d6;">[</span>x <span style="color: #909183;">(</span>ge native-float 2 2 <span style="color: #709870;">[</span>0.3 0.9 0.3 0.9<span style="color: #709870;">]</span><span style="color: #909183;">)</span>
+               y <span style="color: #909183;">(</span>ge native-float 1 2 <span style="color: #709870;">[</span>0.50 0.50<span style="color: #709870;">]</span><span style="color: #909183;">)</span>
+               inference <span style="color: #909183;">(</span>inference-network
+                          native-float 2
+                          <span style="color: #709870;">[</span><span style="color: #907373;">(</span>fully-connected 4 tanh<span style="color: #907373;">)</span>
+                           <span style="color: #907373;">(</span>fully-connected 1 sigmoid<span style="color: #907373;">)</span><span style="color: #709870;">]</span><span style="color: #909183;">)</span>
+               inf-layers <span style="color: #909183;">(</span>layers inference<span style="color: #909183;">)</span>
+               training <span style="color: #909183;">(</span>training-network inference x<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>fmap! rand-uniform <span style="color: #909183;">(</span>weights <span style="color: #709870;">(</span>inf-layers 0<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>fmap! rand-uniform <span style="color: #909183;">(</span>bias <span style="color: #709870;">(</span>inf-layers 0<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>fmap! rand-uniform <span style="color: #909183;">(</span>weights <span style="color: #709870;">(</span>inf-layers 1<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>fmap! rand-uniform <span style="color: #909183;">(</span>bias <span style="color: #709870;">(</span>inf-layers 1<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>sgd training y quadratic-cost! 2000 0.05<span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>transfer <span style="color: #909183;">(</span>inference x<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+nil#RealGEMatrix[float, mxn:1x2, layout:column, offset:0]
+   ▥       ↓       ↓       ┓
+   →       0.02    0.02
+   ┗                       ┛
+</pre>
+
+
+<p>
+It does not help much. This network still saturates most of the times when I call it. The reason is that,
+for example, \(0.9*0.4 + 0.8*0.75 + 0.1*0.3 + 0.6*0.9\) is still \(1.53\) which saturates the sigmoid or tanh activation.
+</p>
+
+<p>
+We should avoid having too many large weights1. Most weighs should be small, only occasionally
+close to 1, and sometimes, rarely, even larger than 1. Yes, weights larger than 1 are useful.
+They can signify the importance of a particularly influential input.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orge6700e7" class="outline-2">
+<h2 id="orge6700e7">Generating normally distributed random numbers</h2>
+<div class="outline-text-2" id="text-orge6700e7">
+<p>
+The answer is in the <i>Gaussian</i> distribution, also known as <i>Normal</i> distribution.
+I am sure that you've heard of the bell-shaped curve.
+</p>
+
+\begin{equation}
+X \sim \mathcal{N}(\mu,\,\sigma^{2})\,.\\
+P(x) = \frac{1}{\sqrt{ 2\pi \sigma^2 }} e^{- \frac{(x - \mu)^2}{2\sigma ^2}}
+\end{equation}
+
+
+<div class="figure">
+<p><object type="image/svg+xml" data="../img/deep-learning-from-scratch/13/gaussian.svg" class="org-svg">
+Sorry, your browser does not support SVG.</object>
+</p>
+</div>
+
+<p>
+When this curve represents the distribution, \(y\) axis shows the probability of a value \(x\).
+I deliberately avoided labeling the axes, because the point is that the width, height, and the position
+of this curve can be varied with the parameters mean (\(\mu\)) and standard deviation (\(\sigma\)). Mean
+determines the center of this curve, where the probability is highest. We want this to be 0. The standard
+deviation describes the "width" of this distribution. The smaller it is, more values will be closer to mean.
+</p>
+
+<p>
+The Gaussian distribution with mean \(0\) and standard deviation \(1\) is called <i>Standard normal distribution</i>.
+</p>
+
+\begin{equation}
+X \sim \mathcal{N}(0,1)\,.\\
+P(x) = \frac{1}{\sqrt{2\pi}} e^{- \frac{1}{2}x^2}
+\end{equation}
+
+<p>
+If we could generate a sample from the standard normal distribution, we could easily scale the width.
+The first task is, then, to find a way to generate such numbers.
+</p>
+
+<p>
+The bad news is that the generator for the normal distribution is not a part of the standard library.
+The good news is that there are simple algorithms to produce normally distributed samples from uniformly distributed
+samples. This is a strike of good luck, since we can do that only for a few distributions.
+For most distributions, we have to do simulations such as <a href="https://en.wikipedia.org/wiki/Markov_chain_Monte_Carlo">MCMC</a> (check out <a href="https://github.com/uncomplicate/bayadera">Bayadera</a> if you need this!).
+</p>
+
+<p>
+One of the methods to generate random Gaussian numbers from uniformly distributed numbers that
+we already know how to generate is the <a href="https://en.wikipedia.org/wiki/Box%E2%80%93Muller_transform">Box-Muller transform</a>. If I have two uniformly distributed numbers,
+\(U1\) and \(U2\), I can produce two normally distributed numbers, \(Z1\) and \(Z2\) using these formulas:
+</p>
+
+\begin{equation}
+Z_1 = \sqrt{-2 \ln U1} \cos(2\pi U_2)\\
+Z_2 = \sqrt{-2 \ln U1} \sin(2\pi U_2)
+\end{equation}
+
+<p>
+Fine, <code>sin</code>, <code>cos</code>, and <code>log</code> are the functions that we have in Neanderthal, in both
+scalar and vectorized form.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span>uncomplicate.neanderthal
+           <span style="color: #909183;">[</span>vect-math <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>tanh! linear-frac! sqr! mul!<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>math <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>sqrt log sin pi sqr<span style="color: #709870;">]</span><span style="color: #909183;">]</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+The following function generates two uniformly distributed random numbers,
+and uses them to produce one from the normal distribution. It wastes one number,
+but I wanted to keep the implementation simple and compatible with the previous
+setup for generating uniformly distributed numbers.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">rand-gaussian</span> <span style="color: #2E3436; background-color: #EDEDED;">^</span><span style="color: #2F8B58; font-weight: bold;">double</span> <span style="color: #7388d6;">[</span><span style="color: #2E3436; background-color: #EDEDED;">^</span><span style="color: #2F8B58; font-weight: bold;">double</span> _<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #909183;">[</span>u1 <span style="color: #709870;">(</span>rand-uniform <span style="color: #2F8B58; font-weight: bold;">Double</span>/NaN<span style="color: #709870;">)</span>
+        u2 <span style="color: #709870;">(</span>rand-uniform <span style="color: #2F8B58; font-weight: bold;">Double</span>/NaN<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>double <span style="color: #709870;">(</span>* <span style="color: #907373;">(</span>sqrt <span style="color: #6276ba;">(</span>* -2.0 <span style="color: #858580;">(</span>log u1<span style="color: #858580;">)</span><span style="color: #6276ba;">)</span><span style="color: #907373;">)</span> <span style="color: #907373;">(</span>sin <span style="color: #6276ba;">(</span>* 2.0 pi u2<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+The same example works better now.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>with-release <span style="color: #7388d6;">[</span>x <span style="color: #909183;">(</span>ge native-float 2 2 <span style="color: #709870;">[</span>0.3 0.9 0.3 0.9<span style="color: #709870;">]</span><span style="color: #909183;">)</span>
+               y <span style="color: #909183;">(</span>ge native-float 1 2 <span style="color: #709870;">[</span>0.50 0.50<span style="color: #709870;">]</span><span style="color: #909183;">)</span>
+               inference <span style="color: #909183;">(</span>inference-network
+                          native-float 2
+                          <span style="color: #709870;">[</span><span style="color: #907373;">(</span>fully-connected 4 tanh<span style="color: #907373;">)</span>
+                           <span style="color: #907373;">(</span>fully-connected 1 sigmoid<span style="color: #907373;">)</span><span style="color: #709870;">]</span><span style="color: #909183;">)</span>
+               inf-layers <span style="color: #909183;">(</span>layers inference<span style="color: #909183;">)</span>
+               training <span style="color: #909183;">(</span>training-network inference x<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>fmap! rand-gaussian <span style="color: #909183;">(</span>weights <span style="color: #709870;">(</span>inf-layers 0<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>fmap! rand-gaussian <span style="color: #909183;">(</span>bias <span style="color: #709870;">(</span>inf-layers 0<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>fmap! rand-gaussian <span style="color: #909183;">(</span>weights <span style="color: #709870;">(</span>inf-layers 1<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>fmap! rand-gaussian <span style="color: #909183;">(</span>bias <span style="color: #709870;">(</span>inf-layers 1<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>sgd training y quadratic-cost! 2000 0.05<span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>transfer <span style="color: #909183;">(</span>inference x<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+nil#RealGEMatrix[float, mxn:1x2, layout:column, offset:0]
+   ▥       ↓       ↓       ┓
+   →       0.01    0.01
+   ┗                       ┛
+</pre>
+
+
+<p>
+Although this initialization may work well with this trivial example, it fails often enough.
+The weights initialized with standard deviation \(\sigma = 1\) are still too large. We have
+to scale them down with respect to the number of neurons in the layer.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgeeda8fe" class="outline-2">
+<h2 id="orgeeda8fe">Automatically initializing weights</h2>
+<div class="outline-text-2" id="text-orgeeda8fe">
+<p>
+Now that we know how to generate random numbers from the appropriate distribution,
+it's time to automate this functionality.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span>uncomplicate.commons
+           <span style="color: #909183;">[</span>core <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>with-release <span style="color: #A52A2A; font-weight: bold;">let-release</span> Releaseable release<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>utils <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>direct-buffer<span style="color: #709870;">]</span><span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>uncomplicate.clojurecuda.core <span style="color: #F5666D;">:as</span> cuda
+           <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>current-context default-stream synchronize!<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>uncomplicate.clojurecl.core <span style="color: #F5666D;">:as</span> opencl
+           <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span><span style="color: #0084C8; font-weight: bold;">*context*</span> <span style="color: #0084C8; font-weight: bold;">*command-queue*</span> finish!<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>uncomplicate.neanderthal.internal.api <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>native-factory device<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>uncomplicate.neanderthal
+           <span style="color: #909183;">[</span>core <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>mrows ncols dim raw view view-ge vctr copy row
+                         entry! axpy! copy! scal! mv! transfer! transfer
+                         mm! rk! view-ge vctr ge trans nrm2<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>math <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>sqrt log sin pi sqr sqrt<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>vect-math <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>tanh! linear-frac! sqr! mul! cosh! inv!<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>native <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>fge native-float native-double<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>block <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>buffer<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>cuda <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>cuda-float<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>opencl <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>opencl-float<span style="color: #709870;">]</span><span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>criterium.core <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>quick-bench<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>import 'clojure.lang.IFn
+        'uncomplicate.neanderthal.internal.host.MKL<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">init-layer!</span> <span style="color: #7388d6;">[</span>layer!<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #909183;">[</span>w <span style="color: #709870;">(</span>weights layer!<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>scal! <span style="color: #709870;">(</span>sqrt <span style="color: #907373;">(</span>/ 2.0 <span style="color: #6276ba;">(</span>+ <span style="color: #858580;">(</span>mrows w<span style="color: #858580;">)</span> <span style="color: #858580;">(</span>ncols w<span style="color: #858580;">)</span><span style="color: #6276ba;">)</span><span style="color: #907373;">)</span><span style="color: #709870;">)</span> <span style="color: #709870;">(</span>fmap! rand-gaussian w<span style="color: #709870;">)</span><span style="color: #909183;">)</span>
+    <span style="color: #909183;">(</span>fmap! rand-gaussian <span style="color: #709870;">(</span>bias layer!<span style="color: #709870;">)</span><span style="color: #909183;">)</span>
+    layer!<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">init!</span> <span style="color: #7388d6;">[</span>network!<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">doseq</span> <span style="color: #909183;">[</span>layer <span style="color: #709870;">(</span>layers network!<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>init-layer! layer<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  network!<span style="color: #707183;">)</span>
+</pre>
+</div>
+</div>
+
+<div id="outline-container-orgdafdc47" class="outline-3">
+<h3 id="orgdafdc47">Xavier Initialization</h3>
+<div class="outline-text-3" id="text-orgdafdc47">
+<p>
+The function <code>init-layer!</code> extracts weights and biases from the layer and simply delegates
+the job to the appropriate <a href="https://fluokitten.uncomplicate.org/codox/uncomplicate.fluokitten.core.html#var-fmap.21"><code>fmap!</code></a> and <code>rand-gaussian</code>. We are using the Gaussian distribution with mean 0.
+The standard deviation has to be scaled down, proportionally to the number of neurons in the layer,
+to keep the expected value of the output in the safe zone.
+</p>
+
+<p>
+The scaling of the standard deviation is not as straightforward as it seems. There are two trade-offs
+to consider: the signal that propagates forward favors scaling by the number of inputs. However, to preserve
+the gradients flowing backwards, we should scale proportionally to the number of outputs.
+</p>
+
+<p>
+A widely accepted solution, the <a href="http://proceedings.mlr.press/v9/glorot10a/glorot10a.pdf"><i>Xavier</i> initialization</a>, suggests drawing numbers from the distribution
+with the variance \(Var[W^L] = \frac{2}{n_{in}+n_{out}}\). It can be applied with both uniform and normal distribution.
+</p>
+
+<p>
+We will use normal distribution, so this boils down to dividing the sample generated with \(\sigma = 1\) by
+the square root of 2 divided by the sum of inputs and outputs to the layer.
+</p>
+
+<p>
+In theory, this initialization should be the best we implemented so far. Let's try it.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>with-release <span style="color: #7388d6;">[</span>x <span style="color: #909183;">(</span>ge native-float 2 2 <span style="color: #709870;">[</span>0.3 0.9 0.3 0.9<span style="color: #709870;">]</span><span style="color: #909183;">)</span>
+               y <span style="color: #909183;">(</span>ge native-float 1 2 <span style="color: #709870;">[</span>0.50 0.50<span style="color: #709870;">]</span><span style="color: #909183;">)</span>
+               inference <span style="color: #909183;">(</span>init! <span style="color: #709870;">(</span>inference-network
+                                 native-float 2
+                                 <span style="color: #907373;">[</span><span style="color: #6276ba;">(</span>fully-connected 4 tanh<span style="color: #6276ba;">)</span>
+                                  <span style="color: #6276ba;">(</span>fully-connected 1 sigmoid<span style="color: #6276ba;">)</span><span style="color: #907373;">]</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span>
+               training <span style="color: #909183;">(</span>training-network inference x<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>sgd training y quadratic-cost! 2000 0.05<span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>transfer <span style="color: #909183;">(</span>inference x<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+nil#RealGEMatrix[float, mxn:1x2, layout:column, offset:0]
+   ▥       ↓       ↓       ┓
+   →       0.50    0.50
+   ┗                       ┛
+</pre>
+
+
+<p>
+This may work well, but it may also fail. Is our implementation wrong? I hope it is not.
+Please note that this is a network consisting of tiny layers. Therefore, the generated weights
+could often be close to one, and when scaled, they are scaled only by 0.57 and 0.63.
+</p>
+
+<p>
+This makes this artificial example obsolete for our purposes. It served us well, but in the
+next article, with the infrastructure that we now have we can create something a bit more realistic.
+Then, we will see whether our implementation proves capable, and get hints for further improvements.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org192f6ac" class="outline-2">
+<h2 id="org192f6ac">How fast is random number generation</h2>
+<div class="outline-text-2" id="text-org192f6ac">
+<p>
+Before we continue, we should check the efficiency of our weights initialization algorithm.
+</p>
+</div>
+
+<div id="outline-container-org53ae1e0" class="outline-3">
+<h3 id="org53ae1e0">Uniformly distributed random numbers</h3>
+<div class="outline-text-3" id="text-org53ae1e0">
+<p>
+I'll generate a matrix of 10,000 elements. It is large enough to represent something that
+we might see in the wild.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>with-release <span style="color: #7388d6;">[</span>x <span style="color: #909183;">(</span>ge native-double 100 100<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #204A87;">;; </span><span style="color: #204A87;">(quick-bench (fmap! rand-uniform x)) ;; call quick bench</span>
+  <span style="color: #7388d6;">(</span>fmap! rand-uniform x<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+Execution time mean : 1.250046 ms
+</pre>
+
+<p>
+I've varied dimensions a bit, and it seems to take around 125 ns per entry.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org9df72e5" class="outline-3">
+<h3 id="org9df72e5">Normally distributed random numbers</h3>
+<div class="outline-text-3" id="text-org9df72e5">
+<p>
+Recall that, when we generate Gaussian random numbers, we throw away half of the
+uniform samples, and call some square roots, logarithms, sinuses and/or cosinuses.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>with-release <span style="color: #7388d6;">[</span>x <span style="color: #909183;">(</span>ge native-double 100 100<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #204A87;">;; </span><span style="color: #204A87;">(quick-bench (fmap! rand-gaussian x)) ;; call quick bench</span>
+  <span style="color: #7388d6;">(</span>fmap! rand-gaussian x<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+Execution time mean : 2.620225 ms
+</pre>
+
+<p>
+This is twice as slow. Knowing how we generate these numbers, this is even good.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgb0c5ac5" class="outline-2">
+<h2 id="orgb0c5ac5">Random number generation on the GPU</h2>
+<div class="outline-text-2" id="text-orgb0c5ac5">
+<p>
+Our implementation can not be run on the GPU, unfortunately. The source of uniform random numbers, Clojure's
+<code>rand</code> function, is available only on the CPU.
+</p>
+
+<p>
+It turns out that random number generation on the GPU is rather tricky. The strength of GPU processing
+is in parallelization. Unfortunately, almost all pseudo-random generators rely on the state of the generator
+to produce the next random number. If dozens, thousands, or millions of processors are to generate random
+numbers, that would mean that their access to the state must be coordinated. This is a disaster to parallelism.
+</p>
+
+<p>
+Fortunately, there <i>are</i> algorithms that avoid such problems. Unfortunately, the implementation is
+too complex to show here. I implemented some good ones, and this is available in <a href="https://github.com/uncomplicate/bayadera">Bayadera</a>. I will include
+this into a deep learning library that I'm going to release (Yes, that might be a good news! If you are
+rooting for it to see the light of day sooner rather than later, and would like to support my work on it,
+please donate on <a href="https://patreon.com/draganrocks">my Patreon page</a>.
+</p>
+
+<p>
+For this tutorial, though, we would have to resort to generating the random numbers in the main memory
+using CPU and transferring them to the GPU memory.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">init-weights!</span> <span style="color: #7388d6;">[</span>w b<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>scal! <span style="color: #909183;">(</span>/ 1.0 <span style="color: #709870;">(</span>ncols w<span style="color: #709870;">)</span><span style="color: #909183;">)</span> <span style="color: #909183;">(</span>fmap! rand-gaussian w<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>fmap! rand-gaussian b<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">init-layer!</span> <span style="color: #7388d6;">[</span>layer!<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #909183;">[</span>w <span style="color: #709870;">(</span>weights layer!<span style="color: #709870;">)</span>
+        b <span style="color: #709870;">(</span>bias layer!<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span><span style="color: #A52A2A; font-weight: bold;">if</span> <span style="color: #709870;">(</span>= <span style="color: #F5666D;">:cpu</span> <span style="color: #907373;">(</span>device w<span style="color: #907373;">)</span><span style="color: #709870;">)</span>
+      <span style="color: #709870;">(</span>init-weights! w b<span style="color: #709870;">)</span>
+      <span style="color: #709870;">(</span>with-release <span style="color: #907373;">[</span>native-w <span style="color: #6276ba;">(</span>ge <span style="color: #858580;">(</span>native-factory w<span style="color: #858580;">)</span> <span style="color: #858580;">(</span>mrows w<span style="color: #858580;">)</span> <span style="color: #858580;">(</span>ncols w<span style="color: #858580;">)</span><span style="color: #6276ba;">)</span>
+                     native-b <span style="color: #6276ba;">(</span>vctr <span style="color: #858580;">(</span>native-factory b<span style="color: #858580;">)</span> <span style="color: #858580;">(</span>dim b<span style="color: #858580;">)</span><span style="color: #6276ba;">)</span><span style="color: #907373;">]</span>
+        <span style="color: #907373;">(</span>init-weights! native-w native-b<span style="color: #907373;">)</span>
+        <span style="color: #907373;">(</span>transfer! native-w w<span style="color: #907373;">)</span>
+        <span style="color: #907373;">(</span>transfer! native-b b<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span>
+    layer!<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">init!</span> <span style="color: #7388d6;">[</span>network!<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">doseq</span> <span style="color: #909183;">[</span>layer <span style="color: #709870;">(</span>layers network!<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>init-layer! layer<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  network!<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Although this implementation is not ideal, it works on all devices.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #2F8B58; font-weight: bold;">cuda</span>/with-default
+  <span style="color: #7388d6;">(</span>with-release <span style="color: #909183;">[</span>factory <span style="color: #709870;">(</span>cuda-float <span style="color: #907373;">(</span>current-context<span style="color: #907373;">)</span> default-stream<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>with-release <span style="color: #709870;">[</span>x <span style="color: #907373;">(</span>ge factory 10000 10000<span style="color: #907373;">)</span>
+                   y <span style="color: #907373;">(</span>entry! <span style="color: #6276ba;">(</span>ge factory 10 10000<span style="color: #6276ba;">)</span> 0.33<span style="color: #907373;">)</span>
+                   inference <span style="color: #907373;">(</span>time <span style="color: #6276ba;">(</span>init! <span style="color: #858580;">(</span>inference-network
+                                           factory 10000
+                                           <span style="color: #80a880;">[</span><span style="color: #887070;">(</span>fully-connected 5000 tanh<span style="color: #887070;">)</span>
+                                            <span style="color: #887070;">(</span>fully-connected 1000 sigmoid<span style="color: #887070;">)</span>
+                                            <span style="color: #887070;">(</span>fully-connected 10 sigmoid<span style="color: #887070;">)</span><span style="color: #80a880;">]</span><span style="color: #858580;">)</span><span style="color: #6276ba;">)</span><span style="color: #907373;">)</span>
+                   training <span style="color: #907373;">(</span>training-network inference x<span style="color: #907373;">)</span><span style="color: #709870;">]</span>
+      <span style="color: #709870;">(</span>time
+         <span style="color: #907373;">(</span>sgd training y quadratic-cost! 10 0.05<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+"Elapsed time: 14344.241479 msecs"
+"Elapsed time: 2303.362116 msecs"
+</pre>
+
+<p>
+It took a lot of time to initialize these weights. The weights are initialized
+in the main memory (using the slow-ish JVM math <code>sin</code> and <code>ln</code> functions, wasting the half of the uniform sample)
+and then transferred to GPU memory. It is not a major problem right now,
+since we're doing it only once, regardless of how many training epochs we run.
+Also, the network is gigantic. In more realistic cases, the layer sizes would
+be much smaller and this time less noticeable.
+</p>
+
+<p>
+<a href="https://github.com/uncomplicate/bayadera">Bayadera</a> would do this in a matter of milliseconds. But, there is a way to speed this thing up
+even if we use CPU for the random number generation.
+</p>
+
+<p>
+In the following code, I use an internal function from Neanderthal. It is still not available
+in the public API, so don't rely on it, but I'm showcasing it anyway. For proper RNG, <a href="https://github.com/uncomplicate/bayadera">Bayadera</a> is the right choice.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">let-release</span> <span style="color: #7388d6;">[</span>stream <span style="color: #909183;">(</span>direct-buffer <span style="color: #2F8B58; font-weight: bold;">Long</span>/BYTES<span style="color: #909183;">)</span>
+              params <span style="color: #909183;">(</span>vctr native-float <span style="color: #709870;">[</span>0 1<span style="color: #709870;">]</span><span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #909183;">[</span>seed <span style="color: #709870;">(</span>rand-int 1000<span style="color: #709870;">)</span>
+        err <span style="color: #709870;">(</span><span style="color: #2F8B58; font-weight: bold;">MKL</span>/vslNewStreamARS5 seed stream<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span><span style="color: #A52A2A; font-weight: bold;">if</span> <span style="color: #709870;">(</span>= 0 err<span style="color: #709870;">)</span>
+      <span style="color: #709870;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">float-gaussian-sample!</span> <span style="color: #907373;">[</span>res<span style="color: #907373;">]</span>
+        <span style="color: #907373;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #6276ba;">[</span>err <span style="color: #858580;">(</span><span style="color: #2F8B58; font-weight: bold;">MKL</span>/vsRngGaussian stream <span style="color: #80a880;">(</span>dim res<span style="color: #80a880;">)</span> <span style="color: #80a880;">(</span>buffer res<span style="color: #80a880;">)</span> <span style="color: #80a880;">(</span>buffer params<span style="color: #80a880;">)</span><span style="color: #858580;">)</span><span style="color: #6276ba;">]</span>
+          <span style="color: #6276ba;">(</span><span style="color: #A52A2A; font-weight: bold;">if</span> <span style="color: #858580;">(</span>= 0 err<span style="color: #858580;">)</span>
+            res
+            <span style="color: #858580;">(</span><span style="color: #A52A2A; font-weight: bold;">throw</span> <span style="color: #80a880;">(</span>ex-info <span style="color: #4E9A06;">"MKL error."</span> <span style="color: #887070;">{</span><span style="color: #F5666D;">:error-code</span> err<span style="color: #887070;">}</span><span style="color: #80a880;">)</span><span style="color: #858580;">)</span><span style="color: #6276ba;">)</span><span style="color: #907373;">)</span><span style="color: #709870;">)</span>
+      <span style="color: #709870;">(</span>ex-info <span style="color: #4E9A06;">"MKL error."</span> <span style="color: #907373;">{</span><span style="color: #F5666D;">:error-code</span> err<span style="color: #907373;">}</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">init-weights!</span> <span style="color: #7388d6;">[</span>w b<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>scal! <span style="color: #909183;">(</span>/ 1.0 <span style="color: #709870;">(</span>ncols w<span style="color: #709870;">)</span><span style="color: #909183;">)</span> <span style="color: #909183;">(</span>float-gaussian-sample! w<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>float-gaussian-sample! b<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">init-layer!</span> <span style="color: #7388d6;">[</span>layer!<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #909183;">[</span>w <span style="color: #709870;">(</span>weights layer!<span style="color: #709870;">)</span>
+        b <span style="color: #709870;">(</span>bias layer!<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span><span style="color: #A52A2A; font-weight: bold;">if</span> <span style="color: #709870;">(</span>= <span style="color: #F5666D;">:cpu</span> <span style="color: #907373;">(</span>device w<span style="color: #907373;">)</span><span style="color: #709870;">)</span>
+      <span style="color: #709870;">(</span>init-weights! w b<span style="color: #709870;">)</span>
+      <span style="color: #709870;">(</span>with-release <span style="color: #907373;">[</span>host-w <span style="color: #6276ba;">(</span>ge <span style="color: #858580;">(</span>native-factory w<span style="color: #858580;">)</span> <span style="color: #858580;">(</span>mrows w<span style="color: #858580;">)</span> <span style="color: #858580;">(</span>ncols w<span style="color: #858580;">)</span><span style="color: #6276ba;">)</span>
+                     host-b <span style="color: #6276ba;">(</span>vctr <span style="color: #858580;">(</span>native-factory b<span style="color: #858580;">)</span> <span style="color: #858580;">(</span>dim b<span style="color: #858580;">)</span><span style="color: #6276ba;">)</span><span style="color: #907373;">]</span>
+        <span style="color: #907373;">(</span>init-weights! host-w host-b<span style="color: #907373;">)</span>
+        <span style="color: #907373;">(</span>transfer! host-w w<span style="color: #907373;">)</span>
+        <span style="color: #907373;">(</span>transfer! host-b b<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span>
+    layer!<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">init!</span> <span style="color: #7388d6;">[</span>network!<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">doseq</span> <span style="color: #909183;">[</span>layer <span style="color: #709870;">(</span>layers network!<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>init-layer! layer<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  network!<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+I'm repeating the last example, which executes the learning algorithm on the GPU. Weights
+are still being generated on the CPU, but now by a fast internal implementation. What once
+took 80% of the running time, now takes 10%, which makes it good enough.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #2F8B58; font-weight: bold;">cuda</span>/with-default
+  <span style="color: #7388d6;">(</span>with-release <span style="color: #909183;">[</span>factory <span style="color: #709870;">(</span>cuda-float <span style="color: #907373;">(</span>current-context<span style="color: #907373;">)</span> default-stream<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>with-release <span style="color: #709870;">[</span>x <span style="color: #907373;">(</span>ge factory 10000 10000<span style="color: #907373;">)</span>
+                   y <span style="color: #907373;">(</span>entry! <span style="color: #6276ba;">(</span>ge factory 10 10000<span style="color: #6276ba;">)</span> 0.33<span style="color: #907373;">)</span>
+                   inference <span style="color: #907373;">(</span>time <span style="color: #6276ba;">(</span>init! <span style="color: #858580;">(</span>inference-network
+                                           factory 10000
+                                           <span style="color: #80a880;">[</span><span style="color: #887070;">(</span>fully-connected 5000 tanh<span style="color: #887070;">)</span>
+                                            <span style="color: #887070;">(</span>fully-connected 1000 sigmoid<span style="color: #887070;">)</span>
+                                            <span style="color: #887070;">(</span>fully-connected 10 sigmoid<span style="color: #887070;">)</span><span style="color: #80a880;">]</span><span style="color: #858580;">)</span><span style="color: #6276ba;">)</span><span style="color: #907373;">)</span>
+                   training <span style="color: #907373;">(</span>training-network inference x<span style="color: #907373;">)</span><span style="color: #709870;">]</span>
+      <span style="color: #709870;">(</span>time
+         <span style="color: #907373;">(</span>sgd training y quadratic-cost! 10 0.05<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+"Elapsed time: 209.036422 msecs"
+"Elapsed time: 2310.606784 msecs"
+</pre>
+
+<p>
+This might even be acceptable! I apologize (again!) for using some internal Neanderthal functions
+(that you're not supposed to) for this demonstration, but with these,
+ we improved the weight initialization performance
+<b>several dozen times</b> compared to JVM-based one, even without a GPU RNG.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org419bc30" class="outline-2">
+<h2 id="org419bc30">Check the final implementation</h2>
+<div class="outline-text-2" id="text-org419bc30">
+<p>
+I'll check the final implementation again, just to make sure that we haven'd made
+some grave mistake in adapting the code to be able to serve both CPU and GPU based networks.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>with-release <span style="color: #7388d6;">[</span>x <span style="color: #909183;">(</span>ge native-float 2 2 <span style="color: #709870;">[</span>0.3 0.9 0.3 0.9<span style="color: #709870;">]</span><span style="color: #909183;">)</span>
+               y <span style="color: #909183;">(</span>ge native-float 1 2 <span style="color: #709870;">[</span>0.50 0.50<span style="color: #709870;">]</span><span style="color: #909183;">)</span>
+               inference <span style="color: #909183;">(</span>init! <span style="color: #709870;">(</span>inference-network
+                                 native-float 2
+                                 <span style="color: #907373;">[</span><span style="color: #6276ba;">(</span>fully-connected 4 tanh<span style="color: #6276ba;">)</span>
+                                  <span style="color: #6276ba;">(</span>fully-connected 1 sigmoid<span style="color: #6276ba;">)</span><span style="color: #907373;">]</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span>
+               training <span style="color: #909183;">(</span>training-network inference x<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>sgd training y quadratic-cost! 2000 0.05<span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>transfer <span style="color: #909183;">(</span>inference x<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+nil#RealGEMatrix[float, mxn:1x2, layout:column, offset:0]
+   ▥       ↓       ↓       ┓
+   →       0.50    0.50
+   ┗                       ┛
+</pre>
+
+
+<p>
+It seems it works, although the example is so trivial, it easily saturates.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org54728b8" class="outline-2">
+<h2 id="org54728b8">Donations</h2>
+<div class="outline-text-2" id="text-org54728b8">
+<p>
+If you feel that you can afford to help, and wish to donate, I even created a special <i>Starbucks for two</i> tier
+at <a href="https://www.patreon.com/draganrocks">patreon.com/draganrocks</a>. You can do something even cooler: <a href="https://www.patreon.com/posts/22476035">adopt a pet function</a>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org2a5fd42" class="outline-2">
+<h2 id="org2a5fd42">The next article</h2>
+<div class="outline-text-2" id="text-org2a5fd42">
+<p>
+We finally have a somewhat complete API and its implementation. There are optimizations to add, but
+even without that, it should be useful for experimenting. With a handful of lines of code, we can create the
+network, and train in on some data. Is it going to learn well? I guess it will, at least when the task is simple.
+</p>
+
+<p>
+Well, then, let's try it and learn a regression on some simple function in the next article!
+</p>
+</div>
+</div>
+
+<div id="outline-container-org676d9cf" class="outline-2">
+<h2 id="org676d9cf">Thank you</h2>
+<div class="outline-text-2" id="text-org676d9cf">
+<p>
+<a href="https://www.clojuriststogether.org/news/q1-2019-funding-announcement/">Clojurists Together</a> financially supported writing this series. Big thanks to all Clojurians who contribute,
+and thank you for reading and discussing this series.
+</p>
+</div>
+</div>
