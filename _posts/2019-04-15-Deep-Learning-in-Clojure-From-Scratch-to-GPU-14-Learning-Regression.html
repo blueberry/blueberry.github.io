@@ -1,0 +1,1057 @@
+---
+date: 2019-04-15
+tags:
+- Deep Learning
+- Neanderthal
+- MKL
+- Clojure
+- CUDA
+- OpenCL
+author: dragan
+layout: post
+title: Deep Learning from Scratch to GPU - 14 - Learning a Regression
+excerpt: A great moment has arrived. We are going to apply our neural networks implementation to a regression problem. The network is going to learn a known function, which enables us to see how well it learns, and why it doesn't do a great job. We are also going to get some hints for improvements. But, hey, it works!
+categories:
+- Deep Learning
+- Neanderthal
+- MKL
+- Clojure
+- CUDA
+- OpenCL
+---
+<p>
+A great moment has arrived. We are going to apply our neural networks implementation to a regression problem. The network is going to learn a known function, which enables us to see how well it learns, and why it doesn't do a great job. We are also going to get some hints for improvements. But, hey, it works!
+</p>
+
+<p>
+If you haven't yet, read my introduction to this series in <a href="./Deep-Learning-in-Clojure-From-Scratch-to-GPU-0-Why-Bother">Deep Learning in Clojure from Scratch to GPU - Part 0 - Why Bother?</a>.
+</p>
+
+<p>
+The previous article, Part 13, is here: <a href="./Deep-Learning-in-Clojure-From-Scratch-to-GPU-13-Initializing-Weights">Initializing Weights</a>.
+</p>
+
+<p>
+To run the code, you need a Clojure project with <a href="https://neanderthal.uncomplicate.org">Neanderthal</a> (<iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=neanderthal&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>) included as a dependency.
+If you're in a hurry, you can clone <a href="https://github.com/uncomplicate/neanderthal/blob/master/examples/hello-world/">Neanderthal Hello World project</a>.
+</p>
+
+<p>
+Don't forget to read at least some introduction from <a href="http://neuralnetworksanddeeplearning.com/">Neural Networks and Deep Learning</a>,
+start up the REPL from your favorite Clojure development environment, and let's continue with the tutorial.
+</p>
+
+<div id="outline-container-org4316a0c" class="outline-2">
+<h2 id="org4316a0c">Neural networks approximate functions</h2>
+<div class="outline-text-2" id="text-org4316a0c">
+<p>
+When we step over the hype, what neural networks do is they approximate functions. Neural networks
+learn to do that based on a lot of examples taken out from the function's output.
+The real use case is to learn to approximate functions that would be impossible to explicitly implement
+in practice.
+</p>
+
+<p>
+Their key ability is to approximate <i>unknown</i> functions. When I know a set of rules that transfer
+inputs to outputs, I can think of many ways of implementing that in programming languages, and
+all these ways are more efficient than using neural networks. If I don't know the process
+that transfers the inputs to the outputs, I can't program it explicitly. If the process is known,
+but the rules are numerous, and it is not feasible to elicit them, that could be hard to implement, too.
+</p>
+
+<p>
+A typical example familiar to programmers would be an expert system.
+Expert systems were a promising area of AI several
+decades ago. The idea is to find an expert for a certain area, help her define the rules she is
+using when making some decisions, program there rules in fancy DSLs with if/then/else flavor, and profit.
+It turns out that expert time is expensive. Also, experts use lots of intuition; some rules work, but not
+always, with lots of 'however's. On top of that, the probabilistic nature of life kicks in, so
+you can't completely rely even on the rules that you can define.
+</p>
+
+<p>
+Let's say that I would like to analyze traffic of a website to defend against malicious visitors.
+I consulted with an expert, and he told me most of the known ways of detecting these. I implement some filters:
+if the user is from this range of IP addresses, if he uses a web browser with a certain user agent, if
+he comes via a proxy, if&#x2026; Lots of rules are possible, and they would filter a lot of unwanted traffic.
+They would also filter some wanted traffic. But, most importantly, the attackers also know a lots
+of detection rules, so they would adapt to pass these rules.
+</p>
+
+<p>
+The approach that neural networks take is implicit. If I feed past data to the network, and label
+good and bad visitors, <i>without saying why the good are good and the bad are bad</i> the network can figure out
+how to recognize them on its own. Even better, it can figure out how to recognize traffic that it has never seen.
+Of course, it may not do it perfectly, but it can learn this sort of stuff well enough.
+</p>
+
+<p>
+To summarize, if I have lots of input/output examples, I can train a neural network to approximate
+the <i>unknown</i> function that produced these examples.
+</p>
+
+<p>
+We are going to do something less ambitious than the website traffic filtering in this article.
+We are going to train a neural network
+on a <i>known</i> function. It is obvious that neural networks are not the right tool for that job, since
+it is much easier and precise to code the function in Clojure right away.
+It is a great first example, though, since it makes it possible to easily see what the network is doing.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org4ebcd61" class="outline-2">
+<h2 id="org4ebcd61">Generating artificial data</h2>
+<div class="outline-text-2" id="text-org4ebcd61">
+<p>
+Since we are simulating the data, we know the exact function that produces it. I will use
+the function \(f(\mathbf{x}) = sin(x_0) + cos(x_1) + tanh(x_2) + {x_3}^2\) as an easy example.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span>uncomplicate.neanderthal.real <span style="color: #F5666D;">:as</span> real<span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>uncomplicate.neanderthal.math <span style="color: #F5666D;">:as</span> math<span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>uncomplicate.neanderthal.core <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>col view-vctr cols<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+The implementation in Clojure is straightforward. The function takes a Neanderthal vector as an input,
+and calculates a number according to the formula shown above.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">my-fn</span> <span style="color: #2E3436; background-color: #EDEDED;">^</span><span style="color: #2F8B58; font-weight: bold;">double</span> <span style="color: #7388d6;">[</span>xs<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>+ <span style="color: #909183;">(</span><span style="color: #2F8B58; font-weight: bold;">math</span>/sin <span style="color: #709870;">(</span><span style="color: #2F8B58; font-weight: bold;">real</span>/entry xs 0<span style="color: #709870;">)</span><span style="color: #909183;">)</span>
+     <span style="color: #909183;">(</span><span style="color: #2F8B58; font-weight: bold;">math</span>/cos <span style="color: #709870;">(</span><span style="color: #2F8B58; font-weight: bold;">real</span>/entry xs 1<span style="color: #709870;">)</span><span style="color: #909183;">)</span>
+     <span style="color: #909183;">(</span><span style="color: #2F8B58; font-weight: bold;">math</span>/tanh <span style="color: #709870;">(</span><span style="color: #2F8B58; font-weight: bold;">real</span>/entry xs 2<span style="color: #709870;">)</span><span style="color: #909183;">)</span>
+     <span style="color: #909183;">(</span><span style="color: #2F8B58; font-weight: bold;">math</span>/sqr <span style="color: #709870;">(</span><span style="color: #2F8B58; font-weight: bold;">real</span>/entry xs 3<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Here's the function in action. I give it a vector, an it returns the resulting number.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>my-fn <span style="color: #7388d6;">(</span>vctr native-float <span style="color: #909183;">[</span>0.3 0.1 0.9 0.33<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+nil2.1157222504237048
+</pre>
+
+
+<p>
+Now I need lots of data that comes from this function. I would like if this data represented some domain well,
+so I am going to generate a lot of random vectors. Since I already have a usable <code>rand-uniform</code> function that
+I wrote in the previous article, I'll use it in combination with <a href="https://fluokitten.uncomplicate.org/codox/uncomplicate.fluokitten.core.html#var-fmap.21"><code>fmap!</code></a> to populate a matrix with 10000 examples.
+If you're wondering how I jumped from talking about vectors to populating a matrix, remember that
+the columns of a matrix are vectors. It is more efficient to work with a bunch of vectors stuffed in a matrix, than
+to keep them in a Clojure sequence.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>fmap! rand-uniform <span style="color: #7388d6;">(</span>ge native-float 4 10000<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+nil#RealGEMatrix[float, mxn:4x10000, layout:column, offset:0]
+   ▥       ↓       ↓       ↓       ↓       ↓       ┓
+   →       0.69    0.60    ⁙       0.76    0.25
+   →       0.49    0.08    ⁙       0.05    0.32
+   →       0.35    0.31    ⁙       0.29    0.83
+   →       0.03    0.50    ⁙       0.26    0.49
+   ┗                                               ┛
+</pre>
+
+
+<p>
+The columns of this matrix are the inputs that we are feeding to the function that generates the "fake" data.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>map my-fn <span style="color: #7388d6;">(</span>cols <span style="color: #909183;">(</span>fmap! rand-uniform <span style="color: #709870;">(</span>ge native-float 4 10<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+nil(2.1075943923498737 2.1200940934733445 2.28641391448637 2.3282734715382625 2.6057539083298047 2.692321322967708 1.5812371635412812 2.4879016728441905 2.4969644208941015 2.0235401608373755)
+</pre>
+
+
+<p>
+These are precise results calculated by the real, known, function <code>my-fn</code> with the data provided in the matrix that
+we had generated. The nice bonus of using a known function is that we can always generate more data, either for learning
+or for testing. Do not forget that in the real world, if the function is known, there is no need to learn
+its approximation from data.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org05c04c6" class="outline-2">
+<h2 id="org05c04c6">Learning to approximate</h2>
+<div class="outline-text-2" id="text-org05c04c6">
+<p>
+In the previous example, I have created 10 observations for a function. There are data analysis methods
+that can learn something from such a small sample, but neural networks require more. I'll just assume
+that 10 thousand observations is enough in this case, but this is only an arbitrary chosen size.
+I hope this is going to be enough.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">x-train</span> <span style="color: #7388d6;">(</span>fmap! rand-uniform <span style="color: #909183;">(</span>ge native-float 4 10000<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure">x-train
+</pre>
+</div>
+
+<pre class="example">
+#RealGEMatrix[float, mxn:4x10000, layout:column, offset:0]
+    ▥       ↓       ↓       ↓       ↓       ↓       ┓
+    →       0.70    0.76    ⁙       0.84    0.79
+    →       0.06    0.49    ⁙       0.39    0.24
+    →       0.44    0.72    ⁙       0.18    0.65
+    →       0.02    0.28    ⁙       0.85    0.61
+    ┗                                               ┛
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">y-train</span> <span style="color: #7388d6;">(</span>ge native-float 1 10000 <span style="color: #909183;">(</span>map my-fn <span style="color: #709870;">(</span>cols x-train<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure">y-train
+</pre>
+</div>
+
+<pre class="example">
+#RealGEMatrix[float, mxn:1x10000, layout:column, offset:0]
+    ▥       ↓       ↓       ↓       ↓       ↓       ┓
+    →       2.05    2.27    ⁙       2.57    2.63
+    ┗                                               ┛
+</pre>
+
+<p>
+I have generated 10 thousand observations and I know the exact value of the function at these
+particular points, <code>y-train</code>. I now create a neural network consisting of five fully connected layers.
+The input layer is the data matrix. Since each input vector has four dimensions, the input
+layer will have four neurons. The hidden layers have 16, 64, and 8 neurons, respectively. The activation functions
+are sigmoid, tanh, and tanh, respectively. I have chosen these completely arbitrarily. Not only that
+this is not the optimal choice, but I don't even have a way to tell what the optimal architecture
+for any random function would be. That's one of the catches in neural networks, and many other
+AI methods. Since the network should approximate a real-valued function the output will be one-dimensional.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">inference</span> <span style="color: #7388d6;">(</span>init! <span style="color: #909183;">(</span>inference-network
+                       native-float 4
+                       <span style="color: #709870;">[</span><span style="color: #907373;">(</span>fully-connected 16 sigmoid<span style="color: #907373;">)</span>
+                        <span style="color: #907373;">(</span>fully-connected 64 tanh<span style="color: #907373;">)</span>
+                        <span style="color: #907373;">(</span>fully-connected 8 tanh<span style="color: #907373;">)</span>
+                        <span style="color: #907373;">(</span>fully-connected 1 sigmoid<span style="color: #907373;">)</span><span style="color: #709870;">]</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">training</span> <span style="color: #7388d6;">(</span>training-network inference x-train<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Let's check whether the network seems to be properly initialized before we run the
+learning algorithm.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>weights <span style="color: #7388d6;">(</span>first <span style="color: #909183;">(</span>layers inference<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealGEMatrix[float, mxn:16x4, layout:column, offset:0]
+    ▥       ↓       ↓       ↓       ↓       ┓
+    →      -0.04    0.14    0.27   -0.03
+    →      -0.00    0.38    0.22   -0.25
+    →       ⁙       ⁙       ⁙       ⁙
+    →      -0.26   -0.31   -0.12    0.31
+    →      -0.33   -0.25    0.23   -0.11
+    ┗                                       ┛
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>weights <span style="color: #7388d6;">(</span>second <span style="color: #909183;">(</span>layers inference<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealGEMatrix[float, mxn:64x16, layout:column, offset:0]
+    ▥       ↓       ↓       ↓       ↓       ↓       ┓
+    →      -0.02    0.04    ⁙       0.13   -0.04
+    →       0.02    0.05    ⁙      -0.10   -0.01
+    →       ⁙       ⁙       ⁙       ⁙       ⁙
+    →       0.02    0.04    ⁙      -0.11    0.09
+    →       0.06    0.10    ⁙      -0.02   -0.01
+    ┗                                               ┛
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>weights <span style="color: #7388d6;">(</span>last <span style="color: #909183;">(</span>layers inference<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealGEMatrix[float, mxn:1x8, layout:column, offset:0]
+    ▥       ↓       ↓       ↓       ↓       ↓       ┓
+    →       0.28    0.11    ⁙       0.03    0.04
+    ┗                                               ┛
+</pre>
+
+<p>
+These matrices contain relatively small numbers around zero. This looks right.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>sgd training y-train quadratic-cost! <span style="color: #7388d6;">[</span><span style="color: #909183;">[</span>1 0.05<span style="color: #909183;">]</span> <span style="color: #909183;">[</span>1000 0.03<span style="color: #909183;">]</span> <span style="color: #909183;">[</span>100 0.01<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+(1.4530567312903702 0.6852846934110391 0.6851082117576618)
+</pre>
+
+<p>
+I run the algorithm for 1101 epochs with a few different learning rates.
+I've chosen these values completely arbitrarily, and I do <i>not</i> know whether
+they are a good, bad, or a mediocre choice. To see whether the track I'm on is any good,
+I have to rely on the value of the cost function. What I can see from the result,
+the starting value was 1.32, and it decreased to 0.68. This is not necessarily great,
+but it is a good sign.
+</p>
+
+<p>
+The cost itself only shows me that the algorithm goes in the right direction,
+we need a more direct way to see how well it works. What's more familiar to a programmer
+than a unit test? Since I know the real function, it is easy to compare its results
+with the results from the neural networks. I won't make it formal yet. I'll just
+generate a few random observations that we will use <i>for testing only</i>. <i>It is extremely
+important that the network does not see these observations during training</i>.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">x-test</span> <span style="color: #7388d6;">(</span>fmap! rand-uniform <span style="color: #909183;">(</span>ge native-float 4 5<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">y-test</span> <span style="color: #7388d6;">(</span>ge native-float 1 5 <span style="color: #909183;">(</span>map my-fn <span style="color: #709870;">(</span>cols x-test<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Let's see what the network says.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>inference x-test<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealGEMatrix[float, mxn:1x5, layout:column, offset:0]
+    ▥       ↓       ↓       ↓       ↓       ↓       ┓
+    →       1.00    1.00    1.00    1.00    1.00
+    ┗                                               ┛
+</pre>
+
+<p>
+Whoops. This doesn't look very useful. The network should have returned something close to
+ <code>y-test</code> values:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure">y-test
+</pre>
+</div>
+
+<pre class="example">
+#RealGEMatrix[float, mxn:1x5, layout:column, offset:0]
+    ▥       ↓       ↓       ↓       ↓       ↓       ┓
+    →       2.28    2.15    3.38    2.52    2.19
+    ┗                                               ┛
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org21141fe" class="outline-2">
+<h2 id="org21141fe">Regression requires linear output</h2>
+<div class="outline-text-2" id="text-org21141fe">
+<p>
+The network returned a vector of ones because the output activation is the sigmoid function.
+Since the expected values are larger than 1, the output is saturated. Sigmoid is
+often spotted in the output layer of neural networks in various tutorials. That's because
+most tutorials start with classification examples, and often deal with classification of photos.
+There, the network usually has as many output neurons as there are categories that the output gets
+classified into, and it is expected that one neuron has a value close to one, while the others are
+closer to zero. Here, however, we are doing a different kind of task: regression.
+</p>
+
+<p>
+In our case, there is only one neuron in the output, and it should directly return the value of the
+approximation. We do not want to mess up with the signal at the output, and do not need to do any activation there.
+Since we still need to fit that functionality into the existing architecture, we create a kind of
+do-nothing activation, similar to Clojure's <code>identity</code> function. The derivative of this linear function is a constant one.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">deftype</span> <span style="color: #2F8B58; font-weight: bold;">LinearActivation</span> <span style="color: #7388d6;">[]</span>
+  Activation
+  <span style="color: #7388d6;">(</span>activ <span style="color: #909183;">[</span>_ z a!<span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>copy! z a!<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>prime <span style="color: #909183;">[</span>this z!<span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>entry! z! 1<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">linear</span>
+  <span style="color: #7388d6;">(</span><span style="color: #909183;">[]</span>
+   <span style="color: #909183;">(</span><span style="color: #A52A2A; font-weight: bold;">fn</span> <span style="color: #709870;">[</span>_<span style="color: #709870;">]</span> <span style="color: #709870;">(</span>-&gt;LinearActivation<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span><span style="color: #909183;">[</span>z!<span style="color: #909183;">]</span>
+    z!<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+We fix the network and repeat the process.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">inference</span> <span style="color: #7388d6;">(</span>init! <span style="color: #909183;">(</span>inference-network
+                       native-float 4
+                       <span style="color: #709870;">[</span><span style="color: #907373;">(</span>fully-connected 16 sigmoid<span style="color: #907373;">)</span>
+                        <span style="color: #907373;">(</span>fully-connected 64 tanh<span style="color: #907373;">)</span>
+                        <span style="color: #907373;">(</span>fully-connected 8 tanh<span style="color: #907373;">)</span>
+                        <span style="color: #907373;">(</span>fully-connected 1 linear<span style="color: #907373;">)</span><span style="color: #709870;">]</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">training</span> <span style="color: #7388d6;">(</span>training-network inference x-train<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Checking the inference on the untrained network, we, unsurprisingly, get useless answers.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>inference x-test<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealGEMatrix[float, mxn:1x5, layout:column, offset:0]
+    ▥       ↓       ↓       ↓       ↓       ↓       ┓
+    →       0.51    0.51    0.51    0.51    0.51
+    ┗                                               ┛
+</pre>
+
+<p>
+One epoch later, we see that the cost is quite high.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>sgd training y-train quadratic-cost! 1 0.05<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+1.3255932671876625
+</pre>
+
+<p>
+We repeat the inference, only to see that the network didn't learn much, but it has changed.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>inference x-test<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealGEMatrix[float, mxn:1x5, layout:column, offset:0]
+    ▥       ↓       ↓       ↓       ↓       ↓       ┓
+    →       0.80    0.80    0.80    0.80    0.80
+    ┗                                               ┛
+</pre>
+
+<p>
+Another epoch, and the cost decreased.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>sgd training y-train quadratic-cost! 1 0.05<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+0.9166161838265136
+</pre>
+
+<p>
+As expected, the inference is still bad.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>inference x-test<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealGEMatrix[float, mxn:1x5, layout:column, offset:0]
+    ▥       ↓       ↓       ↓       ↓       ↓       ┓
+    →       1.05    1.05    1.05    1.05    1.05
+    ┗                                               ┛
+</pre>
+
+<p>
+Is something like 10 epochs enough to see some improvement?
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>sgd training y-train quadratic-cost! 10 0.05<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+0.11156441768060976
+</pre>
+
+<p>
+Hooray, now the loss decreased 10 times! How's the inference doing?
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>inference x-test<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealGEMatrix[float, mxn:1x5, layout:column, offset:0]
+    ▥       ↓       ↓       ↓       ↓       ↓       ┓
+    →       2.02    2.02    2.02    2.02    2.02
+    ┗                                               ┛
+</pre>
+
+<p>
+It doesn't seem to be any better. Let's do a 100 epochs more.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>sgd training y-train quadratic-cost! 100 0.05<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+0.10893812269722111
+</pre>
+
+<p>
+The loss doesn't seem to go much lower. The inference is still bad.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>inference x-test<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealGEMatrix[float, mxn:1x5, layout:column, offset:0]
+    ▥       ↓       ↓       ↓       ↓       ↓       ┓
+    →       2.07    2.07    2.07    2.07    2.07
+    ┗                                               ┛
+</pre>
+
+<p>
+Maybe the learning rate is too big. Let's decrease it a bit.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>sgd training y-train quadratic-cost! 100 0.03<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+0.10892282792763508
+</pre>
+
+<p>
+The loss seems to stay at the same level, and the inference hasn't improved.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>inference x-test<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealGEMatrix[float, mxn:1x5, layout:column, offset:0]
+    ▥       ↓       ↓       ↓       ↓       ↓       ┓
+    →       2.07    2.07    2.07    2.07    2.07
+    ┗                                               ┛
+</pre>
+
+<p>
+I'll try with 1000 epochs, and yet lower learning rate.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>sgd training y-train quadratic-cost! 1000 0.01<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+0.10887324749642284
+</pre>
+
+<p>
+It hasn't helped at all.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>inference x-test<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealGEMatrix[float, mxn:1x5, layout:column, offset:0]
+    ▥       ↓       ↓       ↓       ↓       ↓       ┓
+    →       2.07    2.07    2.07    2.07    2.07
+    ┗                                               ┛
+</pre>
+
+<p>
+Maybe I need to vary the learning rate a bit. Let's try that.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>sgd training y-train quadratic-cost! <span style="color: #7388d6;">[</span><span style="color: #909183;">[</span>100 0.03<span style="color: #909183;">][</span>100 0.01<span style="color: #909183;">][</span>100 0.005<span style="color: #909183;">][</span>100 0.001<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+(0.10885866925871306 0.10885377446494822 0.10885131820990937 0.10885081984270364)
+</pre>
+
+<p>
+We can see that, as the learning progresses, the cost stays roughly the same, which means
+that the network just strolls around, but can't progress much.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>inference x-test<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealGEMatrix[float, mxn:1x5, layout:column, offset:0]
+    ▥       ↓       ↓       ↓       ↓       ↓       ┓
+    →       2.07    2.07    2.07    2.07    2.07
+    ┗                                               ┛
+</pre>
+
+<p>
+Before throwing the towel, let's remember that the task that we are doing here is not
+classification, when it is enough that the network learns to discriminate between a few, or several,
+discrete categories. Here we are doing regression, which is more difficult, since the network
+has to learn to approximate the actual real value of the function. Maybe I need to give it a more time.
+Let's see what it can do with 40000 epochs.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>time <span style="color: #7388d6;">(</span>sgd training y-train quadratic-cost! 40000 0.05<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+"Elapsed time: 116679.184528 msecs"
+0.002820095415000833
+</pre>
+
+<p>
+Now the cost is significantly lower. Let's hope that it can be directly seen when we test the inference.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>inference x-test<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealGEMatrix[float, mxn:1x5, layout:column, offset:0]
+    ▥       ↓       ↓       ↓       ↓       ↓       ┓
+    →       2.23    2.12    3.28    2.41    2.12
+    ┗                                               ┛
+</pre>
+
+<p>
+Right! Much closer to the real values. We can never expect to get the exact floating point values
+that the real function is returning, especially not with the test observations that the network hasn't seen
+during the learning phase, but the difference is within an acceptable range.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>axpy! -1 y-test <span style="color: #7388d6;">(</span>inference x-test<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealGEMatrix[float, mxn:1x5, layout:column, offset:0]
+    ▥       ↓       ↓       ↓       ↓       ↓       ┓
+    →      -0.05   -0.03   -0.10   -0.11   -0.07
+    ┗                                               ┛
+</pre>
+
+<p>
+If we wanted to improve the approximation, we should probably train the network for longer. However,
+do not assume that more training leads to better approximation. As the learning progresses, the
+network will generally decrease the cost, but after some time, some local optimum is reached, and the cost
+may oscillate, or even start to increase. There is no guarantee when or if the network will reach some optimal state.
+</p>
+
+<p>
+Fortunately, we do not even want to decrease the cost too much. In practice, that might indicate <i>overfitting</i>.
+The network that is optimized for the training data too much, might work poorly on the data that it hasn't seen
+during the learning process, and this is exactly the data that we want it to work well with.
+</p>
+
+<p>
+These are high-level things to worry about. For now, it is enough to see that our network works,
+and to get a feeling of how difficult the task of training is. We needed a huge number of epochs to
+get acceptable results, and may need even more to get something good. And we have a really tight implementation,
+without much resource waste. Imagine how long it would take with something that was less optimized.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org96eafb3" class="outline-2">
+<h2 id="org96eafb3">GPU</h2>
+<div class="outline-text-2" id="text-org96eafb3">
+<p>
+On the CPU, this particular network took 2 minutes to learn something useful. Since GPU can be order(s) of
+magnitude faster, they should take few seconds. Right?
+</p>
+</div>
+
+<div id="outline-container-org33c2b23" class="outline-3">
+<h3 id="org33c2b23">Nvidia GPU with CUDA</h3>
+<div class="outline-text-3" id="text-org33c2b23">
+<p>
+Let's try with our CUDA-based implementation.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #2F8B58; font-weight: bold;">cuda</span>/with-default
+  <span style="color: #7388d6;">(</span>with-release <span style="color: #909183;">[</span>factory <span style="color: #709870;">(</span>cuda-float <span style="color: #907373;">(</span>current-context<span style="color: #907373;">)</span> default-stream<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>with-release <span style="color: #709870;">[</span>cu-x-train <span style="color: #907373;">(</span>ge factory 4 10000<span style="color: #907373;">)</span>
+                   cu-y-train <span style="color: #907373;">(</span>ge factory 1 10000<span style="color: #907373;">)</span>
+                   inference <span style="color: #907373;">(</span>init! <span style="color: #6276ba;">(</span>inference-network
+                                     factory 4
+                                     <span style="color: #858580;">[</span><span style="color: #80a880;">(</span>fully-connected 16 sigmoid<span style="color: #80a880;">)</span>
+                                      <span style="color: #80a880;">(</span>fully-connected 64 tanh<span style="color: #80a880;">)</span>
+                                      <span style="color: #80a880;">(</span>fully-connected 8 tanh<span style="color: #80a880;">)</span>
+                                      <span style="color: #80a880;">(</span>fully-connected 1 linear<span style="color: #80a880;">)</span><span style="color: #858580;">]</span><span style="color: #6276ba;">)</span><span style="color: #907373;">)</span>
+                   training <span style="color: #907373;">(</span>training-network inference cu-x-train<span style="color: #907373;">)</span><span style="color: #709870;">]</span>
+      <span style="color: #709870;">(</span>transfer! x-train cu-x-train<span style="color: #709870;">)</span>
+      <span style="color: #709870;">(</span>transfer! y-train cu-y-train<span style="color: #709870;">)</span>
+      <span style="color: #709870;">(</span>time
+         <span style="color: #907373;">(</span>sgd training cu-y-train quadratic-cost! 40000 0.05<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+"Elapsed time: 23251.819897 msecs"
+0.0028752992499551057
+</pre>
+
+<p>
+23 seconds! Faster than on the CPU, but as much as we hoped. It's worth remembering that
+<i>the size of the task have to be demanding</i> to see these orders of magnitudes in speedup. With
+relatively small matrices, it's good that the GPU engine wasn't even slower than the CPU!
+</p>
+</div>
+</div>
+
+<div id="outline-container-org9f1055a" class="outline-3">
+<h3 id="org9f1055a">AMD GPU with OpenCL OpenCL</h3>
+<div class="outline-text-3" id="text-org9f1055a">
+<p>
+You probably remember that our implementation for older AMD hardware and drivers had some
+performance issues.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #2F8B58; font-weight: bold;">opencl</span>/with-default
+  <span style="color: #7388d6;">(</span>with-release <span style="color: #909183;">[</span>factory <span style="color: #709870;">(</span>opencl-float <span style="color: #0084C8; font-weight: bold;">*context*</span> <span style="color: #0084C8; font-weight: bold;">*command-queue*</span><span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>with-release <span style="color: #709870;">[</span>cl-x-train <span style="color: #907373;">(</span>ge factory 4 10000<span style="color: #907373;">)</span>
+                   cl-y-train <span style="color: #907373;">(</span>ge factory 1 10000<span style="color: #907373;">)</span>
+                   inference <span style="color: #907373;">(</span>init! <span style="color: #6276ba;">(</span>inference-network
+                                     factory 4
+                                     <span style="color: #858580;">[</span><span style="color: #80a880;">(</span>fully-connected 16 sigmoid<span style="color: #80a880;">)</span>
+                                      <span style="color: #80a880;">(</span>fully-connected 64 tanh<span style="color: #80a880;">)</span>
+                                      <span style="color: #80a880;">(</span>fully-connected 8 tanh<span style="color: #80a880;">)</span>
+                                      <span style="color: #80a880;">(</span>fully-connected 1 linear<span style="color: #80a880;">)</span><span style="color: #858580;">]</span><span style="color: #6276ba;">)</span><span style="color: #907373;">)</span>
+                   training <span style="color: #907373;">(</span>training-network inference cl-x-train<span style="color: #907373;">)</span><span style="color: #709870;">]</span>
+      <span style="color: #709870;">(</span>transfer! x-train cl-x-train<span style="color: #709870;">)</span>
+      <span style="color: #709870;">(</span>transfer! y-train cl-y-train<span style="color: #709870;">)</span>
+      <span style="color: #709870;">(</span>finish!<span style="color: #709870;">)</span>
+      <span style="color: #709870;">(</span>time
+         <span style="color: #907373;">(</span>last <span style="color: #6276ba;">(</span>sgd training cl-y-train quadratic-cost! <span style="color: #858580;">(</span>repeat 40000 <span style="color: #80a880;">[</span>1 0.05<span style="color: #80a880;">]</span><span style="color: #858580;">)</span><span style="color: #6276ba;">)</span><span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+"Elapsed time: 559357.909222 msecs"
+0.002766931535136348
+</pre>
+
+<p>
+This is terrible. It is even slower than the CPU. The reason is that the engine is optimized for large matrices,
+and can not find a way to saturate hardware potentials it has with such small chunks of data that it's being fed.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orge05ff3f" class="outline-2">
+<h2 id="orge05ff3f">Smaller is often better</h2>
+<div class="outline-text-2" id="text-orge05ff3f">
+<p>
+We have seen that the brute force can help with efficiency, but eventually hits the wall. Since the architecture
+of the network was arbitrary, maybe we can get better results with a <i>smaller</i> network. As I am interested
+in experimenting with different sizes, I am only interested in how the cost behaves. I'll use the engine
+that seems to be the fastest with this task.
+</p>
+
+<p>
+Let's try a 4-8-16-4-1 network. Since it is smaller, I hope that a smaller number of epochs would be enough.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #2F8B58; font-weight: bold;">cuda</span>/with-default
+  <span style="color: #7388d6;">(</span>with-release <span style="color: #909183;">[</span>factory <span style="color: #709870;">(</span>cuda-float <span style="color: #907373;">(</span>current-context<span style="color: #907373;">)</span> default-stream<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>with-release <span style="color: #709870;">[</span>cu-x-train <span style="color: #907373;">(</span>ge factory 4 10000<span style="color: #907373;">)</span>
+                   cu-y-train <span style="color: #907373;">(</span>ge factory 1 10000<span style="color: #907373;">)</span>
+                   inference <span style="color: #907373;">(</span>init! <span style="color: #6276ba;">(</span>inference-network
+                                     factory 4
+                                     <span style="color: #858580;">[</span><span style="color: #80a880;">(</span>fully-connected 8 sigmoid<span style="color: #80a880;">)</span>
+                                      <span style="color: #80a880;">(</span>fully-connected 16 tanh<span style="color: #80a880;">)</span>
+                                      <span style="color: #80a880;">(</span>fully-connected 4 tanh<span style="color: #80a880;">)</span>
+                                      <span style="color: #80a880;">(</span>fully-connected 1 linear<span style="color: #80a880;">)</span><span style="color: #858580;">]</span><span style="color: #6276ba;">)</span><span style="color: #907373;">)</span>
+                   training <span style="color: #907373;">(</span>training-network inference cu-x-train<span style="color: #907373;">)</span><span style="color: #709870;">]</span>
+      <span style="color: #709870;">(</span>transfer! x-train cu-x-train<span style="color: #709870;">)</span>
+      <span style="color: #709870;">(</span>transfer! y-train cu-y-train<span style="color: #709870;">)</span>
+      <span style="color: #709870;">(</span>time
+         <span style="color: #907373;">(</span>sgd training cu-y-train quadratic-cost! 4000 0.05<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+"Elapsed time: 2049.335159 msecs"
+0.004670825056062358
+</pre>
+
+<p>
+4000 epochs took 2 seconds, and the error seems low enough to indicate that the network leaned something.
+</p>
+
+<p>
+Does it learn more in 40000 epochs? Not that much, it seems.
+</p>
+
+<pre class="example">
+"Elapsed time: 20982.76644 msecs"
+0.003014854083318096
+</pre>
+
+<p>
+From this, I conclude that although the GPU didn't took less time to compute these smaller layers,
+the learning algorithm itself got better results since smaller space can be explored with fewer steps.
+</p>
+
+<p>
+Let's try the same code with an even smaller network: 2 hidden layers with 8 and 4 neurons.
+</p>
+
+<pre class="example">
+"Elapsed time: 1527.71754 msecs"
+0.1007463554173708
+</pre>
+
+<p>
+What about changing the structure so the first hidden layer has 4 and the second layer has 8 neurons?
+</p>
+
+<pre class="example">
+"Elapsed time: 1539.367704 msecs"
+0.004476395398100112
+</pre>
+
+<p>
+Lucky me, this 4-8 network can learn with similar cost as the larger 8-16-4, or the much larger
+16-64-8 networks.
+</p>
+
+<p>
+Let's try this small network with OpenCL.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #2F8B58; font-weight: bold;">opencl</span>/with-default
+  <span style="color: #7388d6;">(</span>with-release <span style="color: #909183;">[</span>factory <span style="color: #709870;">(</span>opencl-float <span style="color: #0084C8; font-weight: bold;">*context*</span> <span style="color: #0084C8; font-weight: bold;">*command-queue*</span><span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>with-release <span style="color: #709870;">[</span>cl-x-train <span style="color: #907373;">(</span>ge factory 4 10000<span style="color: #907373;">)</span>
+                   cl-y-train <span style="color: #907373;">(</span>ge factory 1 10000<span style="color: #907373;">)</span>
+                   inference <span style="color: #907373;">(</span>init! <span style="color: #6276ba;">(</span>inference-network
+                                     factory 4
+                                     <span style="color: #858580;">[</span><span style="color: #80a880;">(</span>fully-connected 4 sigmoid<span style="color: #80a880;">)</span>
+                                      <span style="color: #80a880;">(</span>fully-connected 8 tanh<span style="color: #80a880;">)</span>
+                                      <span style="color: #80a880;">(</span>fully-connected 1 linear<span style="color: #80a880;">)</span><span style="color: #858580;">]</span><span style="color: #6276ba;">)</span><span style="color: #907373;">)</span>
+                   training <span style="color: #907373;">(</span>training-network inference cl-x-train<span style="color: #907373;">)</span><span style="color: #709870;">]</span>
+      <span style="color: #709870;">(</span>transfer! x-train cl-x-train<span style="color: #709870;">)</span>
+      <span style="color: #709870;">(</span>transfer! y-train cl-y-train<span style="color: #709870;">)</span>
+      <span style="color: #709870;">(</span>finish!<span style="color: #709870;">)</span>
+      <span style="color: #709870;">(</span>time
+         <span style="color: #907373;">(</span>last <span style="color: #6276ba;">(</span>sgd training cl-y-train quadratic-cost! <span style="color: #858580;">(</span>repeat 4000 <span style="color: #80a880;">[</span>1 0.05<span style="color: #80a880;">]</span><span style="color: #858580;">)</span><span style="color: #6276ba;">)</span><span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+"Elapsed time: 27948.357329 msecs"
+0.09556360326748764
+</pre>
+
+<p>
+I expect the CPU engine to work particularly well with these small networks, since it doesn't rely on
+parallelization that much.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">inference-881</span> <span style="color: #7388d6;">(</span>init! <span style="color: #909183;">(</span>inference-network
+                           native-float 4
+                           <span style="color: #709870;">[</span><span style="color: #907373;">(</span>fully-connected 8 sigmoid<span style="color: #907373;">)</span>
+                            <span style="color: #907373;">(</span>fully-connected 8 tanh<span style="color: #907373;">)</span>
+                            <span style="color: #907373;">(</span>fully-connected 1 linear<span style="color: #907373;">)</span><span style="color: #709870;">]</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">training-881</span> <span style="color: #7388d6;">(</span>training-network inference-881 x-train<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>time <span style="color: #7388d6;">(</span>sgd training-881 y-train quadratic-cost! 4000 0.05<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+"Elapsed time: 2843.762284 msecs"
+0.004605395143619535
+</pre>
+
+<p>
+Let's test the inference of this 4-8 network trained with 4000 epochs.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>inference-881 x-test<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealGEMatrix[float, mxn:1x5, layout:column, offset:0]
+    ▥       ↓       ↓       ↓       ↓       ↓       ┓
+    →       2.29    2.17    3.08    2.40    2.16
+    ┗                                               ┛
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-clojure">y-test
+</pre>
+</div>
+
+<pre class="example">
+#RealGEMatrix[float, mxn:1x5, layout:column, offset:0]
+    ▥       ↓       ↓       ↓       ↓       ↓       ┓
+    →       2.28    2.15    3.38    2.52    2.19
+    ┗                                               ┛
+</pre>
+
+<p>
+Finally, let's compare the network's answers with the known outputs of the <i>known</i> function it approximates.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>axpy! -1 y-test <span style="color: #7388d6;">(</span>inference-881 x-test<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealGEMatrix[float, mxn:1x5, layout:column, offset:0]
+    ▥       ↓       ↓       ↓       ↓       ↓       ┓
+    →       0.00    0.02   -0.30   -0.12   -0.03
+    ┗                                               ┛
+</pre>
+
+<p>
+It seems acceptable, at least for these baby steps.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orga7cc365" class="outline-2">
+<h2 id="orga7cc365">Donations</h2>
+<div class="outline-text-2" id="text-orga7cc365">
+<p>
+If you feel that you can afford to help, and wish to donate, I even created a special <i>Starbucks for two</i> tier
+at <a href="https://www.patreon.com/draganrocks">patreon.com/draganrocks</a>. You can do something even cooler: <a href="https://www.patreon.com/posts/22476035">adopt a pet function</a>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgdcdb57d" class="outline-2">
+<h2 id="orgdcdb57d">The next article</h2>
+<div class="outline-text-2" id="text-orgdcdb57d">
+<p>
+After quite a few articles we created an implementation that is complete enough to be able to
+be used for demo purposes. Depending on whether you expected some miracle, or you had already known
+how difficult are the problems that machine learning is applied to, you might be under-impressed or
+you are jumping from joy right now.
+</p>
+
+<p>
+The bottom line is that our implementation works quite efficiently, but is not as effective as we
+would like it to be. Since I can be quite confident that the code we wrote is quite tight, it's
+time to see whether we can improve the algorithm itself.
+</p>
+
+<p>
+As we identified that the algorithm is fragile in regards to actual weight values, it makes sense
+to implement a way to keep them in check, so they stay in a zone where the gradient descent can progress well.
+We have also seen that the algorithm can spend a lot of time chasing local optimums. It may be
+a good idea if we can improve it to jump over pebbles and boulders in search for the valleys, and stop only
+in front of mountain peaks.
+</p>
+
+<p>
+We will implement a few obvious improvements to the stochastic gradient descent that could be said
+to work well universally, and then we will revisit this same example for comparison. After we address
+the low hanging fruit, we may even try to learn some useful things from some real data, instead
+of simulation.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org7c0e387" class="outline-2">
+<h2 id="org7c0e387">Thank you</h2>
+<div class="outline-text-2" id="text-org7c0e387">
+<p>
+<a href="https://www.clojuriststogether.org/news/q1-2019-funding-announcement/">Clojurists Together</a> financially supported writing this series. Big thanks to all Clojurians who contribute,
+and thank you for reading and discussing this series.
+</p>
+</div>
+</div>
