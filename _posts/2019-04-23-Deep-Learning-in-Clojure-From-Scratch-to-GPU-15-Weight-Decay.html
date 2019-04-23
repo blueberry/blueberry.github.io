@@ -1,0 +1,883 @@
+---
+date: 2019-04-23
+tags:
+- Deep Learning
+- Neanderthal
+- MKL
+- Clojure
+- CUDA
+- OpenCL
+author: dragan
+layout: post
+title: Deep Learning from Scratch to GPU - 15 - Weight Decay
+excerpt: In this article we explore a simple but useful technique for keeping weights from growing too big. Weight Decay is useful as a regularization technique that improves generalization, and can help with improving even the basic learning on the technical level.
+categories:
+- Deep Learning
+- Neanderthal
+- MKL
+- Clojure
+- CUDA
+- OpenCL
+---
+<p>
+In this article we explore a simple but useful technique for keeping weights from growing too big. Weight Decay is useful as a regularization technique that improves generalization, and can help with improving even the basic learning on the technical level.
+</p>
+
+<p>
+If you haven't yet, read my introduction to this series in <a href="./Deep-Learning-in-Clojure-From-Scratch-to-GPU-0-Why-Bother">Deep Learning in Clojure from Scratch to GPU - Part 0 - Why Bother?</a>.
+</p>
+
+<p>
+The previous article, Part 14, is here: <a href="./Deep-Learning-in-Clojure-From-Scratch-to-GPU-14-Learning-Regression">Learning a Regression</a>.
+</p>
+
+<p>
+To run the code, you need a Clojure project with <a href="https://neanderthal.uncomplicate.org">Neanderthal</a> (<iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=neanderthal&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>) included as a dependency.
+If you're in a hurry, you can clone <a href="https://github.com/uncomplicate/neanderthal/blob/master/examples/hello-world/">Neanderthal Hello World project</a>.
+</p>
+
+<p>
+Don't forget to read at least some introduction from <a href="http://neuralnetworksanddeeplearning.com/">Neural Networks and Deep Learning</a>,
+start up the REPL from your favorite Clojure development environment, and let's continue with the tutorial.
+</p>
+
+<p>
+First, the usual requires of the namespaces we're going to use.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span>uncomplicate.commons.core
+           <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>with-release <span style="color: #A52A2A; font-weight: bold;">let-release</span> Releaseable release<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>uncomplicate.clojurecuda.core <span style="color: #F5666D;">:as</span> cuda
+           <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>current-context default-stream synchronize!<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>uncomplicate.clojurecl.core <span style="color: #F5666D;">:as</span> opencl
+           <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span><span style="color: #0084C8; font-weight: bold;">*context*</span> <span style="color: #0084C8; font-weight: bold;">*command-queue*</span> finish!<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>uncomplicate.neanderthal
+           <span style="color: #909183;">[</span>core <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>mrows ncols dim raw view view-ge vctr copy row
+                         entry! axpy! copy! scal! mv! transfer! transfer
+                         mm! rk! view-ge vctr ge trans nrm2 zero axpby! amax<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>math <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>sqr<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>vect-math <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>tanh! linear-frac! sqr! mul! cosh! inv!<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>native <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>fge native-float<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>cuda <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>cuda-float<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>opencl <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>opencl-float<span style="color: #709870;">]</span><span style="color: #909183;">]</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>import 'clojure.lang.IFn<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div id="outline-container-org9340fee" class="outline-2">
+<h2 id="org9340fee">Runaway weights</h2>
+<div class="outline-text-2" id="text-org9340fee">
+<p>
+When we discussed weight initialization, we saw that large weights can
+saturate the activation function. We solved that problem by
+initializing weights with an appropriate normal distribution,
+centered around zero, with a small standard deviation. Most
+weights start much smaller than 1, with an occasional larger value.
+</p>
+
+<p>
+If we don't control the weight size during the learning process,
+one or several of them can become large. A large weight combined with
+a large learning rate might lead to even larger weights, and quickly
+enough, matrix multiplication of these large matrices can exhaust the capacity of floating point numbers.
+Our matrices become full of <code>NaN</code>. The network can't recover from that state.
+</p>
+
+<p>
+Let's see this on the regression task we examined in the previous
+article.
+</p>
+
+<p>
+First, we generate some training data.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">x-train</span> <span style="color: #7388d6;">(</span>fmap! rand-uniform <span style="color: #909183;">(</span>ge native-float 4 10000<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure">x-train
+</pre>
+</div>
+
+<pre class="example">
+#RealGEMatrix[float, mxn:4x10000, layout:column, offset:0]
+    ▥       ↓       ↓       ↓       ↓       ↓       ┓
+    →       0.42    0.64    ⁙       0.96    0.88
+    →       0.00    0.59    ⁙       0.29    0.71
+    →       0.46    0.34    ⁙       0.50    0.49
+    →       0.45    0.77    ⁙       0.32    0.74
+    ┗                                               ┛
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">y-train</span> <span style="color: #7388d6;">(</span>ge native-float 1 10000 <span style="color: #909183;">(</span>map my-fn <span style="color: #709870;">(</span>cols x-train<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure">y-train
+</pre>
+</div>
+
+<pre class="example">
+#RealGEMatrix[float, mxn:1x10000, layout:column, offset:0]
+    ▥       ↓       ↓       ↓       ↓       ↓       ┓
+    →       2.04    2.34    ⁙       2.34    2.53
+    ┗                                               ┛
+</pre>
+
+<p>
+Next, we create a neural network and a training engine.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">inference</span> <span style="color: #7388d6;">(</span>init! <span style="color: #909183;">(</span>inference-network
+                       native-float 4
+                       <span style="color: #709870;">[</span><span style="color: #907373;">(</span>fully-connected 32 sigmoid<span style="color: #907373;">)</span>
+                        <span style="color: #907373;">(</span>fully-connected 16 tanh<span style="color: #907373;">)</span>
+                        <span style="color: #907373;">(</span>fully-connected 1 linear<span style="color: #907373;">)</span><span style="color: #709870;">]</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">training</span> <span style="color: #7388d6;">(</span>training-network inference x-train<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Here's what happens with a large learning rate, 0.5, even if I train the network for only 5
+epochs.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>sgd training y-train quadratic-cost! 5 0.3<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+7.1628803287245795
+</pre>
+
+<p>
+The cost is suspiciously large. Call it a couple times more if necessary.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>sgd training y-train quadratic-cost! 15 0.3<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+1481239.1710476684
+</pre>
+
+<p>
+Note that the cost skyrocketed beyond one million!
+</p>
+
+<p>
+Let's see the weight values.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>weights <span style="color: #7388d6;">(</span>first <span style="color: #909183;">(</span>layers inference<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#RealGEMatrix[float, mxn:32x4, layout:column, offset:0]
+    ▥       ↓       ↓       ↓       ↓       ┓
+    →      73.71   91.31   59.00   50.57
+    →     -25.35  -26.44  -25.18  -21.80
+    →       ⁙       ⁙       ⁙       ⁙
+    →     720.67  742.89  744.95  814.44
+    →     -89.35  -89.37  -89.73  -85.80
+    ┗                                       ┛
+</pre>
+
+<p>
+These numbers are not that big, but this is only because we do not
+have space to display all entries of the weight matrix. We can use
+Neanderthal's <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-amax"><code>amax</code></a> function to find out the largest absolute values
+of weights at each layer.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>map amax <span style="color: #7388d6;">(</span>map weights <span style="color: #909183;">(</span>layers inference<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+(950.06134 753.5348 393.80255)
+</pre>
+
+<p>
+The largest weight for the first layer is 950! This is
+an indication that the learning rate is too big. The learning process
+is hopping from mountain slope to mountain slope, not being
+fine-grained enough to step into the valleys.
+</p>
+
+<p>
+Try to run this for hundreds of epochs, and you'll see weight matrices
+full of <code>NaN</code> values.
+</p>
+
+<p>
+Obviously, a smaller learning rate would help here, but in general,
+we do not know what is the appropriate learning rate. We would like
+to make the learning process more robust.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org9db6f16" class="outline-2">
+<h2 id="org9db6f16">Weight decay (L2 Regularization)</h2>
+<div class="outline-text-2" id="text-org9db6f16">
+<p>
+Weight decay is a form of regularization. Regularization is one of the
+techniques for decreasing overfitting and improving generalization.
+This particular example can not demonstrate overfitting, since the
+function we're learning can give us lots of useful training data, so I
+will discuss overfitting when we build up this infrastructure a bit
+more, and tackle tougher problems.
+</p>
+
+<p>
+On the technical level, weight decay reduces overfitting by
+controlling the growth of weight values, which we need to make this
+example work at all.
+</p>
+
+<p>
+As we discussed in an earlier article, <a href="./Deep-Learning-in-Clojure-From-Scratch-to-GPU-7-Learning-and-Backpropagation#orgb8dc17a">Learning and Backpropagation</a>, the learning
+algorithm we are using is centered around the quest to minimize the cost function.
+So far, we have been using the quadratic cost function, so I'll base the discussion
+on the same formula. The base cost function and the weight regularization addition
+in general can be based on some other formulas, too.
+</p>
+
+<p>
+Here's the existing cost function that we are minimizing.
+</p>
+
+<p>
+\(C(w,b) \equiv \frac{1}{2n} \sum\limits_x \lVert \mathbf{y}_x - \mathbf{a}_x \lVert ^2\)
+</p>
+
+<p>
+The idea of weight decay is that we add a component that depends on weights to this function.
+</p>
+
+<p>
+For example, something like this:
+</p>
+
+<p>
+\(C(w,b) \equiv \frac{1}{2n} \sum\limits_x \lVert \mathbf{y}_x - \mathbf{a}_x \lVert ^2 + \frac{\lambda}{2n}\sum\limits_w w^2\)
+</p>
+
+<p>
+More generally, if we denote the vanilla cost function with \(C_0\), and the weight component as
+\(C_w\), the regularized cost function \(C\) is computed as \(C = C_0 + C_w\). When \(C_w = \frac{\lambda}{2n}\sum\limits_w w^2\)
+we are doing the <i>L<sup>2</sup> Regularization</i>.
+</p>
+
+<p>
+The value of \(C\) is always larger than the value of \(C_0\), since we are assuming that
+there are at least some weights that are different from zero, and we are summing their squares.
+Intuitively, the \(C_w\) will be smaller when the absolute values of weights are smaller, so this
+component favors small weights, ideally zeros. On the other hand the \(C_0\) component favors weights
+that minimize the base cost, which are typically weights that are different than zero. The complete
+cost function balances these two tendencies, weighted by the coefficient \(\lambda\).
+</p>
+
+<p>
+The question is now how this change in the cost function reflects on the backpropagation algorithm
+and the derivative. Fortunately, the derivative of a sum is the sum of the derivatives.
+This is wonderful news. Our backpropagation implementation can stay the same. The gradient with respect
+to weights is now:
+</p>
+
+<p>
+\(\nabla{C} \equiv (\frac{\partial{C}}{\partial{w_1}},\frac{\partial{C}}{\partial{w_2}},\dots) = \nabla{C_0} + \frac{\lambda}{n} w\)
+</p>
+
+<p>
+The gradient with respect to biases stays the same, since it does not depend on weights.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org38948f7" class="outline-2">
+<h2 id="org38948f7">Implementing weight decay</h2>
+<div class="outline-text-2" id="text-org38948f7">
+<p>
+Let's implement this change.
+</p>
+
+<p>
+After \(\nabla{C_0}\) has been calculated, it is stored in the matrix <code>v</code> in the <code>FullyConnectedTraining</code> type.
+</p>
+
+<p>
+After we do a few calculations with the old value of <code>w</code>, at the end of the <code>backward</code> method,
+we updated <code>w</code> by adding <code>v</code> to it.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>axpy! 1.0 v w<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+The new update should be done with \(\nabla{C} = \nabla{C_0} + \frac{\lambda}{n} w\).
+Weights should be updated with \(\nabla{C_0}\) (<code>v</code>), as before, <i>and</i> with weights scaled by \(\frac{\eta\lambda}{n}\).
+</p>
+
+<p>
+\(w \rightarrow w - \eta \nabla{C_0} - \frac{\eta\lambda}{n} w = (1  - \frac{\eta\lambda}{n}) w - \eta \nabla{C_0}\).
+</p>
+
+<p>
+We can not implement this with <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-axpy.21"><code>axpy!</code></a>, since it does not support coefficient scaling for the second matrix,
+only for the first. Fortunately, the function <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-axpby.21"><code>axpby!</code></a> does support coefficient scaling for both matrix operands.
+</p>
+
+<p>
+In terms of <a href="https://neanderthal.uncomplicate.org/codox/uncomplicate.neanderthal.core.html#var-axpby.21"><code>axpby!</code></a>, the old implementation was:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>axpby! 1.0 v 1.0 w<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Instead of with 1.0, weight decay scales <code>w</code> with the coefficient \(1  - \frac{\eta\lambda}{n}\). We have
+already computed \(-\frac{\eta}{n}\) and stored it in the <code>eta-avg</code>. The updated implementation just
+adds <code>lambda</code> into the picture.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>axpby! 1.0 v <span style="color: #7388d6;">(</span>inc <span style="color: #909183;">(</span>* eta-avg <span style="color: #709870;">(</span>double lambda<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span> w<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Modifying one line of code implemented weight decay for us? We didn't
+even have to introduce new memory objects, protocols, functions,
+calls? That's right, none of that! Isn't Clojure amazing?
+</p>
+
+<p>
+Here's the improved implementation of <code>FullyConnectedTraining</code>.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">deftype</span> <span style="color: #2F8B58; font-weight: bold;">FullyConnectedTraining</span> <span style="color: #7388d6;">[</span>v w b a-1 z a ones activ-fn first?<span style="color: #7388d6;">]</span>
+  Releaseable
+  <span style="color: #7388d6;">(</span>release <span style="color: #909183;">[</span>_<span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>release v<span style="color: #909183;">)</span>
+    <span style="color: #909183;">(</span>release w<span style="color: #909183;">)</span>
+    <span style="color: #909183;">(</span>release b<span style="color: #909183;">)</span>
+    <span style="color: #909183;">(</span>release a-1<span style="color: #909183;">)</span>
+    <span style="color: #909183;">(</span>release z<span style="color: #909183;">)</span>
+    <span style="color: #909183;">(</span>release a<span style="color: #909183;">)</span>
+    <span style="color: #909183;">(</span>release ones<span style="color: #909183;">)</span>
+    <span style="color: #909183;">(</span>release activ-fn<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  Parameters
+  <span style="color: #7388d6;">(</span>weights <span style="color: #909183;">[</span>_<span style="color: #909183;">]</span> w<span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>bias <span style="color: #909183;">[</span>_<span style="color: #909183;">]</span> b<span style="color: #7388d6;">)</span>
+  Transfer
+  <span style="color: #7388d6;">(</span>input <span style="color: #909183;">[</span>_<span style="color: #909183;">]</span> a-1<span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>output <span style="color: #909183;">[</span>_<span style="color: #909183;">]</span> a<span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>ones <span style="color: #909183;">[</span>_<span style="color: #909183;">]</span> ones<span style="color: #7388d6;">)</span>
+  Backprop
+  <span style="color: #7388d6;">(</span>forward <span style="color: #909183;">[</span>_<span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>activ activ-fn <span style="color: #709870;">(</span>rk! -1.0 b ones <span style="color: #907373;">(</span>mm! 1.0 w a-1 0.0 z<span style="color: #907373;">)</span><span style="color: #709870;">)</span> a<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span>backward <span style="color: #909183;">[</span>_ <span style="color: #709870;">[</span>eta lambda<span style="color: #709870;">]</span><span style="color: #909183;">]</span> <span style="color: #204A87;">;; </span><span style="color: #204A87;">We need lambda in addition to eta</span>
+    <span style="color: #909183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #709870;">[</span>eta-avg <span style="color: #907373;">(</span>- <span style="color: #6276ba;">(</span>/ <span style="color: #858580;">(</span>double eta<span style="color: #858580;">)</span> <span style="color: #858580;">(</span>dim ones<span style="color: #858580;">)</span><span style="color: #6276ba;">)</span><span style="color: #907373;">)</span><span style="color: #709870;">]</span>
+      <span style="color: #709870;">(</span>mul! <span style="color: #907373;">(</span>prime activ-fn z<span style="color: #907373;">)</span> a<span style="color: #709870;">)</span>
+      <span style="color: #709870;">(</span>mm! eta-avg z <span style="color: #907373;">(</span>trans a-1<span style="color: #907373;">)</span> 0.0 v<span style="color: #709870;">)</span>
+      <span style="color: #709870;">(</span><span style="color: #A52A2A; font-weight: bold;">when-not</span> first? <span style="color: #907373;">(</span>mm! 1.0 <span style="color: #6276ba;">(</span>trans w<span style="color: #6276ba;">)</span> z 0.0 a-1<span style="color: #907373;">)</span><span style="color: #709870;">)</span>
+      <span style="color: #709870;">(</span>mv! eta-avg z ones 1.0 b<span style="color: #709870;">)</span>
+      <span style="color: #709870;">(</span>axpby! 1.0 v <span style="color: #907373;">(</span>inc <span style="color: #6276ba;">(</span>* eta-avg <span style="color: #858580;">(</span>double lambda<span style="color: #858580;">)</span><span style="color: #6276ba;">)</span><span style="color: #907373;">)</span> w<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+We need to re-evaluate the constructor so that it picks up the new
+deftype. Otherwise, <code>training-layer</code> doesn't require any change.
+I just modified the construction of <code>v</code> to be <code>zero</code> instead of <code>raw</code>,
+although it doesn't have any effect on weight decay,
+since it will be important in the next article.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">training-layer</span>
+  <span style="color: #7388d6;">(</span><span style="color: #909183;">[</span>inference-layer input ones-vctr first?<span style="color: #909183;">]</span>
+   <span style="color: #909183;">(</span><span style="color: #A52A2A; font-weight: bold;">let-release</span> <span style="color: #709870;">[</span>w <span style="color: #907373;">(</span>view <span style="color: #6276ba;">(</span>weights inference-layer<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span>
+                 v <span style="color: #907373;">(</span>zero w<span style="color: #907373;">)</span>
+                 b <span style="color: #907373;">(</span>view <span style="color: #6276ba;">(</span>bias inference-layer<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span>
+                 a-1 <span style="color: #907373;">(</span>view input<span style="color: #907373;">)</span>
+                 z <span style="color: #907373;">(</span>ge w <span style="color: #6276ba;">(</span>mrows w<span style="color: #6276ba;">)</span> <span style="color: #6276ba;">(</span>dim ones-vctr<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span>
+                 a <span style="color: #907373;">(</span>raw z<span style="color: #907373;">)</span>
+                 o <span style="color: #907373;">(</span>view ones-vctr<span style="color: #907373;">)</span><span style="color: #709870;">]</span>
+     <span style="color: #709870;">(</span>-&gt;FullyConnectedTraining v w b a-1 z a o <span style="color: #907373;">(</span><span style="color: #6276ba;">(</span>activation-fn inference-layer<span style="color: #6276ba;">)</span> z<span style="color: #907373;">)</span> first?<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span><span style="color: #909183;">[</span>inference-layer input ones-vctr<span style="color: #909183;">]</span>
+   <span style="color: #909183;">(</span>training-layer inference-layer input ones-vctr <span style="color: #F5666D;">true</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  <span style="color: #7388d6;">(</span><span style="color: #909183;">[</span>inference-layer previous-backprop<span style="color: #909183;">]</span>
+   <span style="color: #909183;">(</span>training-layer inference-layer
+                   <span style="color: #709870;">(</span>output previous-backprop<span style="color: #709870;">)</span>
+                   <span style="color: #709870;">(</span>ones previous-backprop<span style="color: #709870;">)</span>
+                   <span style="color: #F5666D;">false</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgfa57e5b" class="outline-2">
+<h2 id="orgfa57e5b">Weight decay keeps the weights in check</h2>
+<div class="outline-text-2" id="text-orgfa57e5b">
+<p>
+The network is constructed in the same way as before, as the few
+changes that we have made were internal implementation details.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">inference-l2</span> <span style="color: #7388d6;">(</span>init! <span style="color: #909183;">(</span>inference-network
+                           native-float 4
+                           <span style="color: #709870;">[</span><span style="color: #907373;">(</span>fully-connected 32 sigmoid<span style="color: #907373;">)</span>
+                            <span style="color: #907373;">(</span>fully-connected 16 tanh<span style="color: #907373;">)</span>
+                            <span style="color: #907373;">(</span>fully-connected 1 linear<span style="color: #907373;">)</span><span style="color: #709870;">]</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">training-l2</span> <span style="color: #7388d6;">(</span>training-network inference-l2 x-train<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+The <code>sgd</code> function signature stayed unchanged, but the semantics is a bit
+different. Instead of only the learning rate <code>eta</code>, it accepts
+a Clojure vector that contains at least <code>eta</code> and <code>lambda</code>.
+</p>
+
+<p>
+I'll test it with the same small number of epochs, 5, and large
+learning rate 0.3. I chose a large-ish lambda of 0.9 by considering the
+formula \(1  - \frac{\eta\lambda}{n}\) that takes in the consideration the batch size.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>sgd training-l2 y-train quadratic-cost! 5 <span style="color: #7388d6;">[</span>0.3 0.9<span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+1.7236447462826152
+</pre>
+
+<p>
+Following the previous example, I'll run it further.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>sgd training-l2 y-train quadratic-cost! 15 <span style="color: #7388d6;">[</span>0.3 0.9<span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+0.1106800062466209
+</pre>
+
+<p>
+It works. The cost function stayed small. Let's see how the weights are doing.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>map amax <span style="color: #7388d6;">(</span>map weights <span style="color: #909183;">(</span>layers inference-l2<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+(0.6338241 0.19060016 0.60441613)
+</pre>
+
+<p>
+The weights are quite small, in a very safe zone between 0 and 1.
+</p>
+
+<p>
+This contained the weight growth. However, when you try this, it may prove that
+the weights were randomly initialized in a way that the they still grow.
+For the sake of this exercise, re-create the network and try again. This illustrates
+an important point with neural networks and machine learning in general: the hyper-parameters
+are brittle, and the algorithm depends on how well they were chosen. The problem:
+there is no guaranteed way to choose them other than experience, luck, and a bit of trial and error.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>sgd training-l2 y-train quadratic-cost! 150 <span style="color: #7388d6;">[</span>0.3 0.9<span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+0.07075539496243
+</pre>
+
+<p>
+Another 150 epochs later, the cost has shrunk.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>map amax <span style="color: #7388d6;">(</span>map weights <span style="color: #909183;">(</span>layers inference-l2<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+(0.67901236 0.47297716 0.7296158)
+</pre>
+
+<p>
+The weights are still small.
+</p>
+
+<p>
+Let's try an additional thousand.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>sgd training-l2 y-train quadratic-cost! 1000 <span style="color: #7388d6;">[</span>0.3 0.9<span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+0.004285580638051033
+</pre>
+
+<p>
+The cost improved a lot. But it didn't have to. When you try this, the network might have found a cosy place,
+and all other nice states that it finds are not much better.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>map amax <span style="color: #7388d6;">(</span>map weights <span style="color: #909183;">(</span>layers inference-l2<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+(1.0893276 1.3150218 1.2590612)
+</pre>
+
+<p>
+The weights are somewhat bigger, but still small. As expected,
+training the network for a longer time discovered that some connections
+have more influence. However, consider that these are the largest
+weights in the whole network, and this small increase has been
+compensated by a decrease in other weights. On balance, the whole
+matrix stays in a safe zone where matrix multiplication does not lead
+to runaway weight increase.
+</p>
+
+<p>
+Just to be sure, I'll run this for additional 1000 epochs.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>sgd training-l2 y-train quadratic-cost! 1000 <span style="color: #7388d6;">[</span>0.3 0.9<span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+0.003962985249223311
+</pre>
+
+<p>
+Cost decreased further.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>map amax <span style="color: #7388d6;">(</span>map weights <span style="color: #909183;">(</span>layers inference-l2<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+(1.0714844 1.3105394 1.2935557)
+</pre>
+
+<p>
+But the weights remained small. This stuff works!
+</p>
+</div>
+</div>
+
+<div id="outline-container-orge8fbab6" class="outline-2">
+<h2 id="orge8fbab6">Overfitting and Generalization</h2>
+<div class="outline-text-2" id="text-orge8fbab6">
+<p>
+We have trained the network, and we know the cost when doing the inference
+<i>on the training data</i>. This is a good indicator, but the real
+measurement of how the network works is the cost <i>on the test data that
+network has never seen during the training</i>.
+</p>
+
+<p>
+What typically happens is that a network does much better with
+training data than with the test data. If the network works well with
+the test data, and other data that is has never seen before, we say
+that it <i>generalizes</i> well. One common problem arises when we train the
+network too much, so that it does exceptionally well on the training
+data, but poorly on the test data. That would be the case of
+<i>overfitting</i>.
+</p>
+
+<p>
+This time, I'll use the same number of data points in the testing data
+set, as I had used for training.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">x-test</span> <span style="color: #7388d6;">(</span>fmap! rand-uniform <span style="color: #909183;">(</span>ge native-float 4 10000<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure">x-test
+</pre>
+</div>
+
+<pre class="example">
+: nil#RealGEMatrix[float, mxn:4x10000, layout:column, offset:0]
+:    ▥       ↓       ↓       ↓       ↓       ↓       ┓
+:    →       0.08    0.08    ⁙       0.18    0.75
+:    →       0.04    0.13    ⁙       0.39    0.12
+:    →       0.18    0.24    ⁙       0.71    0.09
+:    →       0.79    0.40    ⁙       0.69    0.26
+:    ┗                                               ┛
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">y-test</span> <span style="color: #7388d6;">(</span>ge native-float 1 10000 <span style="color: #909183;">(</span>map my-fn <span style="color: #709870;">(</span>cols x-test<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure">y-test
+</pre>
+</div>
+
+<pre class="example">
+: nil#RealGEMatrix[float, mxn:1x10000, layout:column, offset:0]
+:    ▥       ↓       ↓       ↓       ↓       ↓       ┓
+:    →       1.89    1.47    ⁙       2.20    1.83
+:    ┗                                               ┛                                             ┛
+</pre>
+
+<p>
+Let's check how the infered data looks like.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>inference-l2 x-test<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+: nil#RealGEMatrix[float, mxn:1x10000, layout:column, offset:0]
+:    ▥       ↓       ↓       ↓       ↓       ↓       ┓
+:    →       1.91    1.55    ⁙       2.16    1.85
+:    ┗                                               ┛
+</pre>
+
+<p>
+Compare that to the actual values of the function that generated the data.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure">y-test
+</pre>
+</div>
+
+<pre class="example">
+: nil#RealGEMatrix[float, mxn:1x10000, layout:column, offset:0]
+:    ▥       ↓       ↓       ↓       ↓       ↓       ┓
+:    →       1.89    1.47    ⁙       2.20    1.83
+:    ┗                                               ┛
+</pre>
+
+<p>
+Finally, let's formally compare the network's answers with the known outputs of
+the <i>known</i> function it approximates, by calculating the cost that we
+used for training. Note that the network was trained on other data
+points and it has never seen these particular data points from the
+test set.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>quadratic-cost! <span style="color: #7388d6;">(</span>axpy! -1 y-test <span style="color: #909183;">(</span>inference-l2 x-test<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+0.004082752853777902
+</pre>
+
+<p>
+In this particular example, the train and test data is generated from
+the same simulation process, so we were not able to demonstrate
+overfitting. You might decide that the network works well or poorly for
+your needs, but it generalizes well. The performance was the same on
+the test and train data sets.
+</p>
+
+<p>
+This particular network generalizes well with or without
+regularization. However, although we did not need weight decay to
+improve generalization, it helped us as a technique for controlling
+weight values, which proved very useful!
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgdac6bb2" class="outline-2">
+<h2 id="orgdac6bb2">Microbenchmarks</h2>
+<div class="outline-text-2" id="text-orgdac6bb2">
+<p>
+As usual, we will test how well our implementation works in terms of performance.
+This is something that I'd recommend doing regularly while developing high performance software.
+It can help you spot performance regressions and learn new stuff before it becomes too complex to track down.
+</p>
+</div>
+
+<div id="outline-container-org1187ddb" class="outline-3">
+<h3 id="org1187ddb">Intel i7-4790k CPU (2013)</h3>
+<div class="outline-text-3" id="text-org1187ddb">
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>time <span style="color: #7388d6;">(</span>sgd training-l2 y-train quadratic-cost! 1000 <span style="color: #909183;">[</span>0.1 0.01<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+"Elapsed time: 5940.058072 msecs"
+0.0045072531225305735
+</pre>
+
+<p>
+Not so bad for an old CPU.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org49d2290" class="outline-3">
+<h3 id="org49d2290">Nvidia GTX 1080Ti (2017)</h3>
+<div class="outline-text-3" id="text-org49d2290">
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #2F8B58; font-weight: bold;">cuda</span>/with-default
+  <span style="color: #7388d6;">(</span>with-release <span style="color: #909183;">[</span>factory <span style="color: #709870;">(</span>cuda-float <span style="color: #907373;">(</span>current-context<span style="color: #907373;">)</span> default-stream<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>with-release <span style="color: #709870;">[</span>cu-x-train <span style="color: #907373;">(</span>ge factory 4 10000<span style="color: #907373;">)</span>
+                   cu-y-train <span style="color: #907373;">(</span>ge factory 1 10000<span style="color: #907373;">)</span>
+                   inference <span style="color: #907373;">(</span>init! <span style="color: #6276ba;">(</span>inference-network
+                                     factory 4
+                                     <span style="color: #858580;">[</span><span style="color: #80a880;">(</span>fully-connected 32 sigmoid<span style="color: #80a880;">)</span>
+                                      <span style="color: #80a880;">(</span>fully-connected 16 tanh<span style="color: #80a880;">)</span>
+                                      <span style="color: #80a880;">(</span>fully-connected 1 linear<span style="color: #80a880;">)</span><span style="color: #858580;">]</span><span style="color: #6276ba;">)</span><span style="color: #907373;">)</span>
+                   training <span style="color: #907373;">(</span>training-network inference cu-x-train<span style="color: #907373;">)</span><span style="color: #709870;">]</span>
+      <span style="color: #709870;">(</span>transfer! x-train cu-x-train<span style="color: #709870;">)</span>
+      <span style="color: #709870;">(</span>transfer! y-train cu-y-train<span style="color: #709870;">)</span>
+      <span style="color: #709870;">(</span>time
+         <span style="color: #907373;">(</span>sgd training cu-y-train quadratic-cost! 4000 <span style="color: #6276ba;">[</span>0.1 0.01<span style="color: #6276ba;">]</span><span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+"Elapsed time: 1495.782635 msecs"
+0.0038985687214939846
+</pre>
+
+<p>
+As expected after previous measurements, the engine backed by cuBLAS is faster than the CPU engine even for these small layers.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orge4d3e82" class="outline-3">
+<h3 id="orge4d3e82">AMD Radeon R9 290X (2013)</h3>
+<div class="outline-text-3" id="text-orge4d3e82">
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #2F8B58; font-weight: bold;">opencl</span>/with-default
+  <span style="color: #7388d6;">(</span>with-release <span style="color: #909183;">[</span>factory <span style="color: #709870;">(</span>opencl-float <span style="color: #0084C8; font-weight: bold;">*context*</span> <span style="color: #0084C8; font-weight: bold;">*command-queue*</span><span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>with-release <span style="color: #709870;">[</span>cl-x-train <span style="color: #907373;">(</span>ge factory 4 10000<span style="color: #907373;">)</span>
+                   cl-y-train <span style="color: #907373;">(</span>ge factory 1 10000<span style="color: #907373;">)</span>
+                   inference <span style="color: #907373;">(</span>init! <span style="color: #6276ba;">(</span>inference-network
+                                     factory 4
+                                     <span style="color: #858580;">[</span><span style="color: #80a880;">(</span>fully-connected 32 sigmoid<span style="color: #80a880;">)</span>
+                                      <span style="color: #80a880;">(</span>fully-connected 16 tanh<span style="color: #80a880;">)</span>
+                                      <span style="color: #80a880;">(</span>fully-connected 1 linear<span style="color: #80a880;">)</span><span style="color: #858580;">]</span><span style="color: #6276ba;">)</span><span style="color: #907373;">)</span>
+                   training <span style="color: #907373;">(</span>training-network inference cl-x-train<span style="color: #907373;">)</span><span style="color: #709870;">]</span>
+      <span style="color: #709870;">(</span>transfer! x-train cl-x-train<span style="color: #709870;">)</span>
+      <span style="color: #709870;">(</span>transfer! y-train cl-y-train<span style="color: #709870;">)</span>
+      <span style="color: #709870;">(</span>finish!<span style="color: #709870;">)</span>
+      <span style="color: #709870;">(</span>time
+         <span style="color: #907373;">(</span>last <span style="color: #6276ba;">(</span>sgd training cl-y-train quadratic-cost! <span style="color: #858580;">(</span>repeat 4000 <span style="color: #80a880;">[</span>1 <span style="color: #887070;">[</span>0.1 0.01<span style="color: #887070;">]</span><span style="color: #80a880;">]</span><span style="color: #858580;">)</span><span style="color: #6276ba;">)</span><span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+"Elapsed time: 27597.814035 msecs"
+0.003629327010316956
+</pre>
+
+<p>
+Unfortunately, the current problems in the OpenCL-based engine backend with varying sizes during
+matrix multiplications, rules out OpenCL for smaller matrices. Since that backend is open-source,
+I expect this problem to be solved reasonably soon.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org16c815b" class="outline-2">
+<h2 id="org16c815b">Donations</h2>
+<div class="outline-text-2" id="text-org16c815b">
+<p>
+If you feel that you can afford to help, and wish to donate, I even created a special <i>Starbucks for two</i> tier
+at <a href="https://www.patreon.com/draganrocks">patreon.com/draganrocks</a>. You can do something even cooler: <a href="https://www.patreon.com/posts/22476035">adopt a pet function</a>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgf7afe0f" class="outline-2">
+<h2 id="orgf7afe0f">The next article</h2>
+<div class="outline-text-2" id="text-orgf7afe0f">
+<p>
+I pretty much like how we have demonstrated a quite important
+regularization technique in this article. Although we haven't applied
+it for what it's mainly used - improving generalization - we have
+applied it to something that is ever easier to see. We used weight
+decay to demonstrate how to control the size of the weights in a
+domain that ensures stable numeric computation.
+</p>
+
+<p>
+The best part is that the implementation of this feature was trivial,
+thanks to Clojure's elegance and the spartan way of carefully
+crafting the implementation with optimal matrix operations guided by Neanderthal.
+</p>
+
+<p>
+In the next article, we will see a technique that helps the network to
+learn faster, measured in epochs: momentum. Will we be able to
+achieve that with another simple change? We'll see. Stay tuned&#x2026;
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgd993327" class="outline-2">
+<h2 id="orgd993327">Thank you</h2>
+<div class="outline-text-2" id="text-orgd993327">
+<p>
+<a href="https://www.clojuriststogether.org/news/q1-2019-funding-announcement/">Clojurists Together</a> financially supported writing this series. Big thanks to all Clojurians who contribute,
+and thank you for reading and discussing this series.
+</p>
+</div>
+</div>
