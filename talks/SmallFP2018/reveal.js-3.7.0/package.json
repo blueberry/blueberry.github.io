@@ -2,7 +2,7 @@
   "name": "reveal.js",
   "version": "3.7.0",
   "description": "The HTML Presentation Framework",
-  "homepage": "http://revealjs.com",
+  "homepage": "https://revealjs.com",
   "subdomain": "revealjs",
   "main": "js/reveal.js",
   "scripts": {
@@ -13,7 +13,7 @@
   "author": {
     "name": "Hakim El Hattab",
     "email": "hakim.elhattab@gmail.com",
-    "web": "http://hakim.se"
+    "web": "https://hakim.se"
   },
   "repository": {
     "type": "git",
