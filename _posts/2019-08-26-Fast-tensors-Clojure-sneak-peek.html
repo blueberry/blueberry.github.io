@@ -1,0 +1,331 @@
+---
+date: 2019-08-26
+tags:
+- Deep Learning
+- Neanderthal
+- MKL-DNN
+- Clojure
+- Deep Diamond
+author: dragan
+layout: post
+title: Fast Tensors in Clojure - a Sneak Peek
+excerpt: Placeholder
+categories:
+- Deep Learning
+- Neanderthal
+- MKL-DNN
+- Clojure
+- Deep Diamond
+---
+<p>
+I hope that many Clojurists are wondering about the progress of the <a href="http://aiprobook.com">books that I'm writing</a>:
+"Where are the new chapters?" "Are you <i>doing</i> something?" "I'd like new chapters, please!"
+(I mean: I <i>hope</i> you're saying that. It means that you care!)
+</p>
+
+<p>
+There's a lot going on behind the scenes, since I am not only writing the books;
+at the same time I have to create the software to write about. For example,
+a slim and super-fast deep learning library.
+</p>
+
+<p>
+I call it <b>Deep Diamond</b>, and here's a sneak peek of some basic things from my trusty REPL.
+</p>
+
+<p>
+Let's create a 4D tensor \(x\). If you've ever used  <a href="https://neanderthal.uncomplicate.org">Neanderthal</a> (<iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=neanderthal&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>),
+you already expect this to
+be as straightforward as creating any plain Clojure structure. Just evaluate the <code>tensor</code> function,
+and provide the shape of the tensor in all dimensions (<code>[2 3 2 4]</code>), the data type of its
+entries (<code>:float</code>), and the layout of its four dimensions in the one-dimensional raw memory (:nchw).
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #4c83ff;">def</span> <span style="color: #ff69b4;">x</span> <span style="color: #006400;">(</span>tensor <span style="color: #ff1493;">[</span>2 3 2 4<span style="color: #ff1493;">]</span> <span style="color: #96CBFE;">:float</span> <span style="color: #96CBFE;">:nchw</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<p>
+We can be interested in its basic properties, such as its shape.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>shape x<span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+=&gt; [2 3 2 4]
+</pre>
+
+<p>
+Shape is always consistently reported in the canonical \(abcdefg\dots\) order, which corresponds
+to <code>nchw</code> in 4D case, regardless of the layout of the dimensions.
+</p>
+
+<p>
+Another key information is the data type of the entries.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>data-type x<span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+=&gt; :float
+</pre>
+
+<p>
+All tensors can be viewed as Neanderthal vectors, which gives us a convenient way
+to compute operations that are not implemented in low-level performance tensor
+libraries, but are provided by Neanderthal.
+</p>
+
+<p>
+Via Neanderthal, we can inspect the values of tensor entries.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>view x<span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+=&gt;
+#RealBlockVector[float, n:48, offset: 0, stride:1]
+[   0.00    0.00    0.00    ⋯      0.00    0.00 ]
+</pre>
+
+<p>
+We did not do anything to set particular values of this tensor, so all entries are zero.
+Fortunately, Neanderthal's <code>transfer!</code> function can be used to transfer a Clojure sequence
+to the tensor \(x\).
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>transfer! <span style="color: #006400;">(</span>range<span style="color: #006400;">)</span> x<span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+=&gt;
+#RealBlockVector[float, n:48, offset: 0, stride:1]
+[   0.00    1.00    2.00    ⋯     46.00   47.00 ]
+</pre>
+
+<p>
+What if we need to transfer the data from one tensor to another?
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #4c83ff;">def</span> <span style="color: #ff69b4;">y</span> <span style="color: #006400;">(</span>tensor <span style="color: #ff1493;">[</span>2 3 2 4<span style="color: #ff1493;">]</span> <span style="color: #96CBFE;">:float</span> <span style="color: #96CBFE;">:nhwc</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<p>
+Notice how \(x\) and \(y\) have different layouts: <code>nhwc</code> vs <code>nchw</code>.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>transfer! x y<span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+=&gt;
+class clojure.lang.ExceptionInfoclass clojure.lang.ExceptionInfoExecution error
+(ExceptionInfo) at uncomplicate.commons.utils/dragan-says-ex (utils.clj:101).
+
+Dragan says: You need a specialized transformer to transfer these two MKL-DNN tensors.
+</pre>
+
+<p>
+If we let Neanderthal blindly transfer the underlying entries, the \(h\), \(w\), and \(c\)
+dimensions of \(y\) would have been mixed up. Deep Diamond warns us about that, with
+two possible options. If we wanted to disregard layout, we could transfer <code>(view x)</code> to <code>(view y)</code>.
+Since we want to take different layouts into account, we should create a specialized transformer
+offered by Deep Diamond.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #4c83ff;">def</span> <span style="color: #ff69b4;">transf</span> <span style="color: #006400;">(</span>transformer x y<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<p>
+This function implements an optimized reordering transformation between these two tensors.
+Invoke it to do the in-place transformation.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>transf<span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<p>
+The entries have been transferred, with the proper order of dimensions.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>view y<span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+=&gt;
+#RealBlockVector[float, n:48, offset: 0, stride:1]
+[   0.00    8.00   16.00    ⋯     39.00   47.00 ]
+</pre>
+
+<p>
+When the layouts are compatible, Neanderthal's <code>transfer!</code> lets us use it
+without the need for special transformer functions.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #4c83ff;">def</span> <span style="color: #ff69b4;">z</span> <span style="color: #006400;">(</span>tensor <span style="color: #ff1493;">[</span>2 3 2 4<span style="color: #ff1493;">]</span> <span style="color: #96CBFE;">:float</span> <span style="color: #96CBFE;">:nchw</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<span style="color: #8b0000;">(</span>transfer! x z<span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+=&gt;
+#'user/z#RealBlockVector[float, n:48, offset: 0, stride:1]
+[   0.00    1.00    2.00    ⋯     46.00   47.00 ]
+</pre>
+
+<p>
+All Vector Spaces functions work with tensor views, if you know what you're doing.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>scal! 100 <span style="color: #006400;">(</span>view y<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+=&gt;
+#RealBlockVector[float, n:48, offset: 0, stride:1]
+[   0.00  800.00 1600.00    ⋯   3900.00 4700.00 ]
+</pre>
+
+<p>
+After we have scaled \(y\), we can try out the reverse transformation,
+and move these values to \(x\).
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #006400;">(</span>revert transf<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<span style="color: #8b0000;">(</span>view x<span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+=&gt;
+#RealBlockVector[float, n:48, offset: 0, stride:1]
+[   0.00  100.00  200.00    ⋯   4600.00 4700.00 ]
+</pre>
+
+<p>
+The <code>trainsfer!</code> function works even when logical layouts are different,
+but the physical layout is the same, such as between <code>:nchw</code>, which is
+typically used for inputs of neural network layers, and the corresponding
+layout used for weights, <code>:oihw</code>.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #4c83ff;">def</span> <span style="color: #ff69b4;">w</span> <span style="color: #006400;">(</span>tensor <span style="color: #ff1493;">[</span>2 3 2 4<span style="color: #ff1493;">]</span> <span style="color: #96CBFE;">:float</span> <span style="color: #96CBFE;">:oihw</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<span style="color: #8b0000;">(</span>transfer! x w<span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+=&gt;
+#RealBlockVector[float, n:48, offset: 0, stride:1]
+[   0.00  100.00  200.00    ⋯   4600.00 4700.00 ]
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>= x w<span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+true
+</pre>
+
+<p>
+I planned to write a short article as an appetizer, but somehow it started getting
+too long, as usual. So, lets rest :). What are we supposed to be doing with these tensors anyway?
+</p>
+
+<p>
+You can expect this to work:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>network input-tz
+         <span style="color: #006400;">[</span><span style="color: #ff1493;">(</span>fully-connected <span style="color: #ffff00;">[</span>1000 64<span style="color: #ffff00;">]</span> <span style="color: #96CBFE;">:relu</span><span style="color: #ff1493;">)</span>
+          <span style="color: #ff1493;">(</span>fully-connected <span style="color: #ffff00;">[</span>1000 64<span style="color: #ffff00;">]</span> <span style="color: #96CBFE;">:elu</span><span style="color: #ff1493;">)</span>
+          <span style="color: #ff1493;">(</span>fully-connected <span style="color: #ffff00;">[</span>1000 2<span style="color: #ffff00;">]</span> <span style="color: #96CBFE;">:logistic</span><span style="color: #ff1493;">)</span><span style="color: #006400;">]</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<p>
+Expect typical tensor operations: inner products, convolutions, neural network layers,
+learning optimization algorithms, optimized CPU execution, optimized GPU execution, and all that.
+</p>
+
+<p>
+Deep Diamond is almost as lean as Neanderthal, with a high level Clojure API that
+does everything automatically. You rarely need to open the hood, plug into the lower levels,
+and get your hands dirty, but when you do, there is a progression of ways
+to do exactly what you need at the level of control that you need.
+</p>
+
+<p>
+Everything in Clojure, and everything optimized to squeeze full performance of the
+state of the art low-level deep learning performance libraries provided by Intel and Nvidia.
+</p>
+
+<p>
+So, you like it? Please mention the books online and offline and spread the word!
+</p>
+
+<p>
+You're skeptical? Is Deep Diamond possible? I'd love to hear your questions!
+</p>
+
+<p>
+Don't like it? Please voice your opinion and be specific. I'd love to hear how I can make this better!
+</p>
+
+<p>
+So, where can you download it? Once it is released, Deep Diamond will be <a href="https://github.com/uncomplicate/deep-diamond">available on GitHub</a> (<iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=deep-diamond&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>),
+so you might star the project if you'd like to follow the progress. (There is more development,
+and API polishing that I'd like to do, and an upstream library is still in the snapshot phase, so please be patient).
+</p>
+
+<p>
+I'm funding the work on this library with the books that you can subscribe to, and there
+is also Patreon where you can give the direct support for the software itself.
+</p>
+
+<p>
+I am also thinking of applying to Clojurists Together with Deep Diamond, so if you're
+donating there, and you think that this project can be a valuable contribution to the
+Clojure ecosystem, it would be nice to mention Uncomplicate Deep Diamond in the surveys.
+</p>
+
+<p>
+Anyway, <i>Deep Diamond will be fully open sourced under the EPL license, for everyone</i>.
+You do not have to support it to have full access to it. Your support would be highly appreciated,
+since it really <i>does</i> help.
+</p>
+
+<p>
+Impatient to try this? Everything you learn through my series on Deep Learning from Scratch to GPU
+applies to Deep Diamond, so fire up your REPL and brush up your linear algebra and DL basics first, please :)
+</p>
