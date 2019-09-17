@@ -1,0 +1,247 @@
+---
+date: 2019-09-18
+tags:
+- CUDA
+- Neanderthal
+- Clojure
+- CUDA
+author: dragan
+layout: post
+title: A Common Gotcha with Asynchronous GPU Computing
+excerpt: There is one important thing we have to keep in mind. GPU computing routines are asynchronous by default! In some common situations, it can surprise even an experienced developer (yes, humans are fallible).
+categories:
+- CUDA
+- Neanderthal
+- Clojure
+- CUDA
+---
+<p>
+For the most part, computing libraries such as  <a href="https://neanderthal.uncomplicate.org">Neanderthal</a> (<iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=neanderthal&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>)
+abstract the complexity of GPU computing. When you have high-level linear algebra operations,
+such as <code>mm!</code> (matrix multiply), <code>nrm2</code> (vector/matrix norm), or <code>sum</code>, you do not have to
+worry about compiling kernels, loading modules, sending operations to the right stream in
+the right context, handling stream execution errors, and a bunch of other details.
+The code we write and test on the CPU can be executed on the GPU!
+</p>
+
+<p>
+However, there is one <i>important</i> thing we have to keep in mind: GPU computing
+routines are asynchronous by default! Most of the time we see the benefits of
+such behavior, but in some common situations, it can surprise even
+an experienced developer (yes, humans are fallible).
+</p>
+
+<p>
+Suppose we have some code that uses a costly matrix multiplication operation.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>with-release <span style="color: #7388d6;">[</span>cpu-a <span style="color: #909183;">(</span>entry! <span style="color: #709870;">(</span>fge 100 100<span style="color: #709870;">)</span> 0.01<span style="color: #909183;">)</span>
+               cpu-b <span style="color: #909183;">(</span>entry! <span style="color: #709870;">(</span>fge 100 100<span style="color: #709870;">)</span> 0.02<span style="color: #909183;">)</span>
+               cpu-c <span style="color: #909183;">(</span>entry! <span style="color: #709870;">(</span>fge 100 100<span style="color: #709870;">)</span> 0.02<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>time <span style="color: #909183;">(</span><span style="color: #A52A2A; font-weight: bold;">dotimes</span> <span style="color: #709870;">[</span>i 100<span style="color: #709870;">]</span>
+          <span style="color: #709870;">(</span>mm! 1.0 cpu-a cpu-b 0.0 cpu-c<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+"Elapsed time: 1.153745 msecs"
+</pre>
+
+<p>
+We called the <code>mm!</code> operation 100 times in a loop and measured the execution time.
+A bit over 1 millisecond in total, or 10 microseconds per operation.
+</p>
+
+<p>
+We decided that, although it is quite fast, it's not fast enough for our
+customer's requirements. There's an opportunity to use powerful GPU accelerators,
+and we read in their specs that they can achieve quite a performance boost over Intel CPUs.
+Since we do not have to adjust the code to run on the GPU (that is, not that much),
+we quickly write a few tests to see whether the platform switch is worth the effort.
+</p>
+
+<p>
+The following code is a port of the previous example to the Nvidia GPU.
+It is a bit different since GPU context has to be created and managed.
+It is possible to further abstract these differences away, but I wanted to keep this
+example straightforward and obvious.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>with-default
+  <span style="color: #7388d6;">(</span>with-default-engine
+    <span style="color: #909183;">(</span>with-release <span style="color: #709870;">[</span>gpu-a <span style="color: #907373;">(</span>entry! <span style="color: #6276ba;">(</span>cuge 100 100<span style="color: #6276ba;">)</span> 0.01<span style="color: #907373;">)</span>
+                   gpu-b <span style="color: #907373;">(</span>entry! <span style="color: #6276ba;">(</span>cuge 100 100<span style="color: #6276ba;">)</span> 0.02<span style="color: #907373;">)</span>
+                   gpu-c <span style="color: #907373;">(</span>entry! <span style="color: #6276ba;">(</span>cuge 100 100<span style="color: #6276ba;">)</span> 0.02<span style="color: #907373;">)</span><span style="color: #709870;">]</span>
+<span style="color: #204A87;">;; </span><span style="color: #204A87;">sunchronize! makes sure that measurement is not initiated</span>
+<span style="color: #204A87;">;; </span><span style="color: #204A87;">until the GPU stream is ready</span>
+      <span style="color: #709870;">(</span>synchronize!<span style="color: #709870;">)</span>
+      <span style="color: #709870;">(</span>time
+       <span style="color: #907373;">(</span><span style="color: #A52A2A; font-weight: bold;">dotimes</span> <span style="color: #6276ba;">[</span>i 100<span style="color: #6276ba;">]</span>
+         <span style="color: #6276ba;">(</span>mm! 1.0 gpu-a gpu-b 0.0 gpu-c<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+"Elapsed time: 0.796928 msecs"
+</pre>
+
+<p>
+With the same size and computation complexity, we got a modest speedup.
+What is the problem? We expected a boost! We ask around, and see that communication
+with the GPU driver carries a fixed overhead. GPU pays off with more expensive operations.
+</p>
+
+<p>
+OK, then; let's give it some monster matrices.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>with-default
+  <span style="color: #7388d6;">(</span>with-default-engine
+    <span style="color: #909183;">(</span>with-release <span style="color: #709870;">[</span>gpu-a <span style="color: #907373;">(</span>entry! <span style="color: #6276ba;">(</span>cuge 10000 10000<span style="color: #6276ba;">)</span> 0.01<span style="color: #907373;">)</span>
+                   gpu-b <span style="color: #907373;">(</span>entry! <span style="color: #6276ba;">(</span>cuge 10000 10000<span style="color: #6276ba;">)</span> 0.02<span style="color: #907373;">)</span>
+                   gpu-c <span style="color: #907373;">(</span>entry! <span style="color: #6276ba;">(</span>cuge 10000 10000<span style="color: #6276ba;">)</span> 0.02<span style="color: #907373;">)</span><span style="color: #709870;">]</span>
+      <span style="color: #709870;">(</span>synchronize!<span style="color: #709870;">)</span>
+      <span style="color: #709870;">(</span>time
+       <span style="color: #907373;">(</span><span style="color: #A52A2A; font-weight: bold;">dotimes</span> <span style="color: #6276ba;">[</span>i 100<span style="color: #6276ba;">]</span>
+         <span style="color: #6276ba;">(</span>mm! 1.0 gpu-a gpu-b 0.0 gpu-c<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+"Elapsed time: 2.232541 msecs"
+</pre>
+
+<p>
+Whow, we increased matrix sizes by a lot, and the GPU didn't even sweat.
+It finished in almost the same time as before!
+</p>
+
+<p>
+What happens on the CPU, do large matrices slow it down?
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>with-release <span style="color: #7388d6;">[</span>cpu-a <span style="color: #909183;">(</span>entry! <span style="color: #709870;">(</span>fge 10000 10000<span style="color: #709870;">)</span> 0.01<span style="color: #909183;">)</span>
+               cpu-b <span style="color: #909183;">(</span>entry! <span style="color: #709870;">(</span>fge 10000 10000<span style="color: #709870;">)</span> 0.02<span style="color: #909183;">)</span>
+               cpu-c <span style="color: #909183;">(</span>entry! <span style="color: #709870;">(</span>fge 10000 10000<span style="color: #709870;">)</span> 0.02<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>time <span style="color: #909183;">(</span>mm! 1.0 cpu-a cpu-b 0.0 cpu-c<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+"Elapsed time: 6557.759385 msecs"
+</pre>
+
+<p>
+We excitedly tell everyone decide to transfer all computations to the GPU,
+since what took days to complete on the CPU, will complete in seconds according
+to our calculations.
+</p>
+
+<p>
+A skeptical colleague is not so sure!
+</p>
+
+<p>
+We are reminded that (many) GPU operations are <i>asynchronous</i>.
+</p>
+
+<p>
+Our <code>mm!</code> operation does have the same signature on GPU and CPU, but while on the
+CPU it's synchronous, on the GPU is <i>asynchronous</i>. Simply put, on the GPU, calling
+<code>mm!</code> means "I acknowledge that I received your request for matrix multiplication and I have
+put it in the computation queue", and not "I have completed the matrix multiplication that you've
+requested", as it means on the CPU.
+</p>
+
+<p>
+When we measured it in the last example, we just measured how fast the GPU
+can receive the requests for the <code>mm!</code> operation. Not surprisingly, the size of the
+arguments does not make much difference there.
+</p>
+
+<p>
+To measure how fast the GPU can <i>complete</i> the operation, we must synchronize
+the queue.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>with-default
+  <span style="color: #7388d6;">(</span>with-default-engine
+    <span style="color: #909183;">(</span>with-release <span style="color: #709870;">[</span>gpu-a <span style="color: #907373;">(</span>entry! <span style="color: #6276ba;">(</span>cuge 10000 10000<span style="color: #6276ba;">)</span> 0.01<span style="color: #907373;">)</span>
+                   gpu-b <span style="color: #907373;">(</span>entry! <span style="color: #6276ba;">(</span>cuge 10000 10000<span style="color: #6276ba;">)</span> 0.02<span style="color: #907373;">)</span>
+                   gpu-c <span style="color: #907373;">(</span>entry! <span style="color: #6276ba;">(</span>cuge 10000 10000<span style="color: #6276ba;">)</span> 0.02<span style="color: #907373;">)</span><span style="color: #709870;">]</span>
+      <span style="color: #709870;">(</span>synchronize!<span style="color: #709870;">)</span>
+      <span style="color: #709870;">(</span>time
+       <span style="color: #907373;">(</span><span style="color: #A52A2A; font-weight: bold;">dotimes</span> <span style="color: #6276ba;">[</span>i 100<span style="color: #6276ba;">]</span>
+         <span style="color: #6276ba;">(</span>mm! 1.0 gpu-a gpu-b 0.0 gpu-c<span style="color: #6276ba;">)</span>
+         <span style="color: #6276ba;">(</span>synchronize!<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+"Elapsed time: 17117.724387 msecs"
+</pre>
+
+<p>
+Ouch! Instead of 2 microseconds for 100 invocations, we get 17 <i>seconds</i>.
+That's 171 <i>milli</i> seconds per operation, not 20 <i>micro</i> seconds. Disappointed? We should not be!
+It's almost 40 times faster than the 6.5 seconds we measured on the CPU.
+For large matrices, it usually does make sense to use GPU; for medium sized it depends.
+</p>
+
+<p>
+If we only work with small-ish data, it never pays off to use GPU. Never? Well,
+that depends, too. We can <i>group</i> small chunks into larger units that can be
+computed in batches, but that is out of scope of this article.
+</p>
+
+<p>
+Anyway, suppose that we have decided that it pays off to add GPU engine to our project.
+The code is similar, but there are enough differences. This call to <code>synchronize!</code> bothers
+us, since it is CUDA-specific.
+</p>
+
+<p>
+Fortunately, most of the time we do not need to synchronize streams,
+and even when we do have to, we do not have to do it explicitly.
+There are operations available on both CPU and GPU, that <i>implicitly</i> synchronize the stream.
+</p>
+
+<p>
+For example, summary matrix and vector operations such as <code>sum</code>, <code>nrm2</code>, <code>dot</code>,
+etc, which compute a scalar result, implicitly synchronize the stream.
+The operations that transfer data between CPU and GPU are synchronous by default, too.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>with-default
+  <span style="color: #7388d6;">(</span>with-default-engine
+    <span style="color: #909183;">(</span>with-release <span style="color: #709870;">[</span>gpu-a <span style="color: #907373;">(</span>entry! <span style="color: #6276ba;">(</span>cuge 10000 10000<span style="color: #6276ba;">)</span> 0.01<span style="color: #907373;">)</span>
+                   gpu-b <span style="color: #907373;">(</span>entry! <span style="color: #6276ba;">(</span>cuge 10000 10000<span style="color: #6276ba;">)</span> 0.02<span style="color: #907373;">)</span>
+                   gpu-c <span style="color: #907373;">(</span>entry! <span style="color: #6276ba;">(</span>cuge 10000 10000<span style="color: #6276ba;">)</span> 0.02<span style="color: #907373;">)</span><span style="color: #709870;">]</span>
+      <span style="color: #204A87;">;; </span><span style="color: #204A87;">(synchronize!)</span>
+      <span style="color: #709870;">(</span>time
+       <span style="color: #907373;">(</span><span style="color: #A52A2A; font-weight: bold;">dotimes</span> <span style="color: #6276ba;">[</span>i 100<span style="color: #6276ba;">]</span>
+         <span style="color: #6276ba;">(</span>mm! 1.0 gpu-a gpu-b 0.0 gpu-c<span style="color: #6276ba;">)</span>
+         <span style="color: #6276ba;">(</span>asum gpu-c<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+;; "Elapsed time: 17211.007038 msecs"
+</pre>
+
+<div id="outline-container-org45c604c" class="outline-2">
+<h2 id="org45c604c">Source code for this article</h2>
+<div class="outline-text-2" id="text-org45c604c">
+<p>
+The leiningen project with full source code is available at <a href="https://www.patreon.com/posts/30045483">draganrocks Patreon page.</a>
+You can choose one of pre-selected tiers, or pledge any amount that you can afford
+to support <a href="https://github.com/uncomplicate">https://github.com/uncomplicate</a> open-source Clojure libraries.
+</p>
+</div>
+</div>
