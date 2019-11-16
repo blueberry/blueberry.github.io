@@ -1,0 +1,1316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title><br><font color = "OrangeRed">Interactive</font> <font color = "Crimson">Programming</font><br> for  <font color = "DodgerBlue">Artificial Intelligence</font></title>
+<meta name="author" content="(Dragan Djuric)"/>
+<style type="text/css">
+.underline { text-decoration: underline; }
+</style>
+<link rel="stylesheet" href="./reveal.js-3.8.0/css/reveal.css"/>
+
+<link rel="stylesheet" href="./reveal.js-3.8.0/css/theme/beige.css" id="theme"/>
+
+<link rel="stylesheet" href="noborder.css"/>
+
+<!-- If the query includes 'print-pdf', include the PDF print sheet -->
+<script>
+    if( window.location.search.match( /print-pdf/gi ) ) {
+        var link = document.createElement( 'link' );
+        link.rel = 'stylesheet';
+        link.type = 'text/css';
+        link.href = './reveal.js-3.8.0/css/print/pdf.css';
+        document.getElementsByTagName( 'head' )[0].appendChild( link );
+    }
+</script>
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+<section id="sec-title-slide"><h2><br><font color = "OrangeRed">Interactive</font> <font color = "Crimson">Programming</font><br> for  <font color = "DodgerBlue">Artificial Intelligence</font></h2><h3>Dragan Djuric</h3><strong><a href="mailto:dragandj@gmail.com">dragandj@gmail.com</a></strong>
+</section>
+<aside class="notes">
+<p>
+Hello, my name is Dragan Djuric, and I'm here to present a topic we all love: programming.
+And, not just any regular kind of programming, but the cool one: interactive programming.
+I know, interactive programming is old news. How about interactive programming for Artificial Intelligence?
+I hope that's interesting enough.
+</p>
+
+</aside>
+
+<section>
+<section id="slide-org36de764">
+<h2 id="org36de764">Dragan Djuric</h2>
+<ul>
+<li>University of Belgrade</li>
+<li>Clojure since <b>2009</b></li>
+
+<li>books: <a href="http://aiprobook.com">http://aiprobook.com</a></li>
+<li>donations <a href="https://patreon.com/draganrocks">http://patreon.com/draganrocks</a></li>
+<li>blog <a href="http://dragan.rocks">http://dragan.rocks</a></li>
+
+<li><a href="http://uncomplicate.org">http://uncomplicate.org</a></li>
+
+<li>twitter <a href="https://twitter.com/draganrocks">@draganrocks</a></li>
+
+</ul>
+
+<aside class="notes">
+<p>
+Here's my contact details, in case you'd like to find out more. I am a professor of software engineering at
+the University of Belgrade. I've been using Clojure as my primary programming language since 2009,
+I teach it since 2010. You can find me on github, and you can find lots of related Clojure articles on my blog.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-org0f44071">
+<h3 id="org0f44071">A cure for theory-phobia</h3>
+<img class="stretch" src="dlfp-cover.png">
+
+<aside class="notes">
+<p>
+What is Interactive Programming for Artificial Intelligence?
+</p>
+
+<p>
+It is a book series on topics related to AI/ML/DL written with programmers in mind.
+The flagsip book is Deep Learning for Programmers.
+</p>
+
+<p>
+It's a miracle cure for some theory phobias.
+We, the programmers, learn best by coding, not by reading dry theory.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgabbf054">
+<h3 id="orgabbf054">A cure for math-phobia</h3>
+<img class="stretch" src="lafp-cover.png">
+
+<aside class="notes">
+<p>
+There's another cure for the math-phobia that many programmers have.
+You are not alone. But, <b>applied</b> math is not hard when you approach it from
+the programming-based angle!
+</p>
+
+<p>
+Math, and linear algebra in particular, is what powers fast implementations
+of many Machine Learning algorithms.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-org34bcdef">
+<h3 id="org34bcdef">More books will follow!</h3>
+<aside class="notes">
+<p>
+More books will follow, and I already have a few in mind.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-org48d6c98">
+<h4 id="org48d6c98">Interactive GPU Programming with CUDA</h4>
+<aside class="notes">
+<p>
+This one teaches how to get the full speed and power of Nvidia's GPUs to speed up
+numerical computations, which are at the hart of ML algos.
+</p>
+
+</aside>
+
+<p class="fragment (appear)">
+Based on Clojure, of course!
+</p>
+
+</section>
+<section id="slide-orgf83ce9b">
+<h4 id="orgf83ce9b">Interactive GPU Programming with OpenCL</h4>
+<aside class="notes">
+<p>
+You might prefer to do it with an open standard instead of CUDA and
+run it on AMD's GPUs, or Intel CPUs?
+</p>
+
+</aside>
+
+<p class="fragment (appear)">
+Helped by Clojure, certainly!
+</p>
+
+</section>
+<section id="slide-orgdbf9b3a">
+<h4 id="orgdbf9b3a">Bayesian Data Analysis for Programmers</h4>
+<aside class="notes">
+<p>
+I'm a fan of the Bayesian approach to data analysis,
+and would love to write a book that opens the door for programmers
+to discover the fascinating topic of automatic probabilistic
+decision making.
+</p>
+
+</aside>
+
+<p class="fragment (appear)">
+Anyone doubt that Clojure will power this?
+</p>
+
+</section>
+<section id="slide-org99c6096">
+<h4 id="org99c6096">Let's not look that far into the future</h4>
+<aside class="notes">
+<p>
+It's already too much. I have more ideas, but this is overwhelming
+even without additional tasks.
+</p>
+
+</aside>
+
+<p class="fragment (appear)">
+But I'm not short of ideas!
+</p>
+
+</section>
+</section>
+<section>
+<section id="slide-orgf7422b4">
+<h2 id="orgf7422b4">What?</h2>
+<aside class="notes">
+<p>
+I've thrown around a few buzzwords. I think I owe you some explanations.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgd74229e">
+<h3 id="orgd74229e"><font color = "DodgerBlue">Artificial Intelligence</font></h3>
+<ul>
+<li class="fragment appear">field of study
+<ul>
+<li>artificial devices</li>
+<li>perceive environment</li>
+<li>take actions towards achieving goals</li>
+
+</ul></li>
+<li class="fragment appear">Mimic cognitive functions
+<ul>
+<li>"learning"</li>
+<li>"problem solving"</li>
+<li><del>feelings?</del> (Do Androids Dream of the Electric Sheep?)</li>
+
+</ul></li>
+
+</ul>
+
+<p class="fragment (appear)">
+Magic?
+</p>
+
+<aside class="notes">
+<p>
+Artificial Intelligence is a field of study with a particularly elusive definition.
+Most definitions agree on it being about artificial devices that perceive their
+environment and take actions with the aim of achieving some goals. Broad enough.
+</p>
+
+<p>
+These machines appear to be "intelligent" by mimicking human cognitive functions
+such as ability to learn from the input and solve problems.
+</p>
+
+<p>
+SF literature would even go to far to involve feelings, but that's SF.
+</p>
+
+<p>
+So, is it magic, then?
+</p>
+
+</aside>
+
+</section>
+<section id="slide-org358967f">
+<h4 id="org358967f">AI Effect</h4>
+<ul>
+<li>Deep Blue plays chess</li>
+<li>Siri talks with humans</li>
+<li>Waymo car drives itself</li>
+<li>Algorithms trade by themselves</li>
+
+</ul>
+
+<p class="fragment (appear)">
+Tesler's theorem:
+"AI is whatever hasn't been done yet"
+</p>
+
+<aside class="notes">
+<p>
+Many AI tasks are not perceived as AI once they are solved. Computers learned
+to play chess decades ago. Remember Deep Blue beating the world chess champion
+20 years ago? Today's software talks with us, and sees us, in a sense, accomplishes
+complex goals, and, yet, we are not satisfied.
+</p>
+
+<p>
+We say: "Yeah, but chess is not tough enough.", or "I can easily outsmart Siri.", or
+"Ha! Than one car crashed once!", or "That one trading algorithm lost some money (against other algos)."
+</p>
+
+</aside>
+
+</section>
+<section id="slide-org716044a">
+<h4 id="org716044a">AI Winter</h4>
+<ul>
+<li>Boom/bust cycles</li>
+
+<li>grand objectives vs intractability</li>
+
+<li>connectionist vs. logic-based</li>
+<li>symbolic vs. statistical learning</li>
+<li>integrative</li>
+
+</ul>
+
+<p class="fragment (appear)">
+Even Lisp was AI once
+</p>
+
+<aside class="notes">
+<p>
+Since AI is hyped so much at the moment, you've might heard about AI Winter.
+</p>
+
+<p>
+During the last 60 years, AI-related research lived through several boom/bust cycles,
+where some cool prototypes lead to over-promising grand objectives, which lead to
+huge funding grants, then hit the technological limits. The government becomes disillusioned,
+cuts all funds, and the hype turns into depression, thus AI Winter.
+</p>
+
+<p>
+After some time, a new cycle starts with a different approach, and repeats.
+</p>
+
+<p>
+The good things is that, once the dust settles, there are things that work,
+we just don't consider it AI once the magic wears out.
+</p>
+
+<p>
+Even LISP was developed as AI
+</p>
+
+</aside>
+
+</section>
+<section id="slide-org8faf535">
+<h4 id="org8faf535">Machine Learning</h4>
+<ul>
+<li>popular and successful</li>
+<li>subset of AI (vs. logic based)</li>
+<li>probability &amp; statistics</li>
+
+</ul>
+
+<aside class="notes">
+<p>
+Most of today's successes in AI are in a sub-field called machine learning.
+</p>
+
+<p>
+Machine learning is about algorithms that learn to perform a specific task
+without being given explicit instructions.
+</p>
+
+<p>
+They usually involve using statistical inference to extract patterns from
+existing data and build a model that can then be used to make predictions
+on new data.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-org1534c81">
+<h4 id="org1534c81">Deep Learning</h4>
+<ul>
+<li>a fancy name for Neural Networks</li>
+<li>just multi-layered ones</li>
+<li>and with novel structures</li>
+
+</ul>
+
+<aside class="notes">
+<p>
+Deep Learning is just a re-branding of Neural Networks, which were part
+of one of the boom/bust cycles, and became unfashionable.
+</p>
+
+<p>
+Once the hardware caught up, the unscalable toys of yesteryear
+became magic wands. They just had to be renamed for people to even
+consider them.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-org6a704e6">
+<h4 id="org6a704e6">Neural Networks</h4>
+<ul>
+<li>NN &ne; neurons in human brain</li>
+<li>linear layers + non-linear activation functions</li>
+<li>matrix multiplication + vectorized functions</li>
+<li>+ a way to find useful numbers to put in these matrices</li>
+
+</ul>
+
+<aside class="notes">
+<p>
+Neural networks do not really consist of neurons, nor they resemble
+biological neurons beyond mere analogy. They are literally matrix multiplications
+interposed with non-linear vectorized activation functions.
+</p>
+
+<p>
+The key challenge is finding efficient ways to populate
+the matrices with useful values. This is the thing that has
+to be automatically learned from data and is conceptually simple,
+but fragile in practice.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgae3c962">
+<h3 id="orgae3c962">Programming</h3>
+<ul>
+<li>About Clojure&#x2026; or not?</li>
+<li>Implementation of AI techniques</li>
+<li>Integration into other software</li>
+<li>Often an afterthought in AI</li>
+
+</ul>
+
+<aside class="notes">
+<p>
+These books and tools are about the <b>programming</b> aspect of
+AI. Are they about Clojure? As much as Clojure community wants
+to resurrect Lisp as the original AI programming language!
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgba2246d">
+<h3 id="orgba2246d">Interactive</h3>
+<ul>
+<li>Python: only the model is interactive</li>
+<li>Clojure: the whole system</li>
+
+<li>Frameworks vs libraries</li>
+<li>REPL</li>
+<li><b>Calling pre-built code</b> vs <b>development</b></li>
+
+</ul>
+
+<aside class="notes">
+<p>
+Finally, the <b>Interactive</b> part in Interactive Programming for AI.
+Python is also inteactive, but only on the surface. Since the key parts
+are implemented in C++, we can <b>use</b> interactively what is already there,
+but it is difficult to <b>develop new things</b> interactively.
+</p>
+
+<p>
+In my vision, Clojure to Python AI tools have similar relation
+as Clojure to Spring framework. Here are simple but powerful libraries:
+combine them freely in any way you like!
+</p>
+
+</aside>
+
+</section>
+</section>
+<section>
+<section id="slide-orge8deb3b">
+<h2 id="orge8deb3b">Who?</h2>
+<aside class="notes">
+<p>
+Who would be the target audience for Clojure in that role?
+</p>
+
+</aside>
+
+</section>
+<section id="slide-org1ec5683">
+<h3 id="org1ec5683">Data scientists &amp; Analysts?</h3>
+<ul>
+<li class="fragment appear">Interactive  😄 &check;</li>
+<li class="fragment appear">Artificial Intelligence 😲</li>
+<li class="fragment appear">Programming? 😕</li>
+
+</ul>
+
+<aside class="notes">
+<p>
+Data scientists? Analysts?
+</p>
+
+<p>
+They like their tools being interactive.
+</p>
+
+<p>
+They might find many AI techniques useful, or at least interesting.
+</p>
+
+<p>
+They famously create bad code. However, they do not care that much about that; yet.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orga4a9549">
+<h3 id="orga4a9549">AI researchers?</h3>
+<ul>
+<li class="fragment appear">Artificial Intelligence 😁 &check;</li>
+<li class="fragment appear">Interactive  😪</li>
+<li class="fragment appear">Programming? 😴</li>
+
+</ul>
+
+<aside class="notes">
+<p>
+AI researchers?
+</p>
+
+<p>
+They are all about developing novel AI algorithms.
+</p>
+
+<p>
+The interactive part? They might care, but I don't feel that they are that much excited.
+</p>
+
+<p>
+The implementation part? Let the peasants do the dirty work, wake us when the bread is in the oven!
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgdb040fd">
+<h3 id="orgdb040fd">Programmers!</h3>
+<ul>
+<li class="fragment appear">Programming! 😋 &check;</li>
+<li class="fragment appear">Interactive! 😎 &check;</li>
+<li class="fragment appear">Artificial Intelligence! 😉</li>
+
+</ul>
+
+<aside class="notes">
+<p>
+Although Clojure might be a good fit for analysts and researchers,
+it is difficult to promote it over Python and R, since the audience is
+too much entrenched in the existing ecosystem that works.
+</p>
+
+<p>
+Programmers, on the other hand:
+</p>
+<ul>
+<li>care about the implementation aspects,</li>
+<li>love to hack on running programs</li>
+<li>do not know much about AI, but are curious people!</li>
+
+</ul>
+
+<p>
+Since they are just starting and do not have much prejudice, Clojure
+might offer something that other platforms do not!
+</p>
+
+</aside>
+
+</section>
+</section>
+<section>
+<section id="slide-orgdffaee6">
+<h2 id="orgdffaee6">Why?</h2>
+<p class="fragment (appear)">
+&#x2026; against all odds&#x2026;
+</p>
+
+<aside class="notes">
+<p>
+Why, against all odds?
+</p>
+
+</aside>
+
+
+</section>
+<section id="slide-org6a277ae">
+<h4 id="org6a277ae">LISP: The Original AI Language</h4>
+
+</section>
+<section id="slide-org5afbc07">
+<h4 id="org5afbc07">Clojure: The AI Language!</h4>
+<p class="fragment (appear)">
+Why not?
+</p>
+
+</section>
+<section id="slide-org67d43ba">
+<h4 id="org67d43ba">Cure the MATHfobia</h4>
+<ul>
+<li class="fragment appear">Learn by implementing AI techniques from scratch</li>
+<li class="fragment appear">integrate AI into the software toolbox</li>
+<li class="fragment appear">A great hobby!</li>
+
+</ul>
+
+</section>
+</section>
+<section>
+<section id="slide-org12bb70d">
+<h2 id="org12bb70d">How?</h2>
+<div class="outline-text-2" id="text-org12bb70d">
+</div>
+</section>
+<section id="slide-org0ed51ba">
+<h3 id="org0ed51ba">Uncomplicate</h3>
+<p>
+<a href="https://uncomplicate.org">https://uncomplicate.org</a>
+</p>
+
+<p>
+Clojure on top of hardware optimized routines
+</p>
+
+</section>
+<section id="slide-org6d6eea4">
+<h4 id="org6d6eea4">Neanderthal</h4>
+
+
+</section>
+<section id="slide-org7534a3d">
+<h4 id="org7534a3d">Deep Diamond</h4>
+<p>
+Clojurists Together
+</p>
+
+</section>
+<section id="slide-orgac6da8f">
+<h4 id="orgac6da8f">Bayadera</h4>
+
+</section>
+<section id="slide-org71eb1f1">
+<h4 id="org71eb1f1">ClojureCUDA</h4>
+
+</section>
+<section id="slide-org2b1bd83">
+<h4 id="org2b1bd83">ClojureCL</h4>
+
+</section>
+<section id="slide-orgf51c249">
+<h3 id="orgf51c249">Visualization</h3>
+<aside class="notes">
+<p>
+People are working on tools that complement this.
+</p>
+
+</aside>
+
+<p>
+ClojureScript on top of mainstream JS visualization libraries
+</p>
+
+<p>
+&check;
+</p>
+
+</section>
+<section id="slide-org694850c">
+<h4 id="org694850c">Oz</h4>
+<p>
+Data visualizations in Clojure
+</p>
+
+</section>
+<section id="slide-org1b47609">
+<h4 id="org1b47609">Saite/Hanami</h4>
+<p>
+Interactive arts and charts plotting
+</p>
+
+</section>
+<section id="slide-org89b2313">
+<h3 id="org89b2313">Java-based tools</h3>
+<aside class="notes">
+<p>
+And, of, course, if you already know what you're doing
+and you just want to get the job done with software that
+already has the functionality that you need, Java interop is straightforward.
+</p>
+
+<p>
+But, at this point it stops being fun, since it is difficult to
+hack on it and create NEW things. You are pretty limited to what's
+already there.
+</p>
+
+</aside>
+
+<p>
+Useful? Yes.
+</p>
+
+<p>
+But, at this point it stops being fun
+</p>
+
+</section>
+<section id="slide-org4dbdb80">
+<h4 id="org4dbdb80">MXNet</h4>
+<p>
+Clojure bindings for MXNet Deep Learning framework
+</p>
+
+<p class="fragment (appear)">
+However:
+</p>
+<ul>
+<li class="fragment appear">Clojure</li>
+<li class="fragment appear">on top of Scala,</li>
+<li class="fragment appear">on top of Java,</li>
+<li class="fragment appear">on top of C++,</li>
+<li class="fragment appear">on top of CUDA or Intel binaries&#x2026;</li>
+
+</ul>
+
+</section>
+<section id="slide-orgb9fa4d4">
+<h4 id="orgb9fa4d4">Deeplearning4J</h4>
+<ul>
+<li class="fragment appear">Clojure,</li>
+<li class="fragment appear">on top of raw Java interop</li>
+<li class="fragment appear">on top of an unwieldy Java/C++ mix</li>
+<li class="fragment appear">on top of CUDA / Intel binaries</li>
+
+</ul>
+
+</section>
+</section>
+<section>
+<section id="slide-org4553cf2">
+<h2 id="org4553cf2">When?</h2>
+<p>
+We have already started and you are welcome to join right away!
+</p>
+
+</section>
+</section>
+<section>
+<section id="slide-org9990257">
+<h2 id="org9990257">From Scratch!</h2>
+<ul>
+<li>Learn by coding from scratch</li>
+<li>Try it on increasingly sophisticated DL tasks</li>
+<li>It doesn't have to be a Skynet to be useful!</li>
+
+</ul>
+
+<aside class="notes">
+<p>
+AI techniques that lose their magic aura once they become cracked
+may not be super-atractive to researchers, but they might enter
+the ideal phase in their lifecycle to become adopted as software
+tools!
+</p>
+
+<p>
+AI doesn't need to be super-impressive; there are many low
+hanging fruit in applying non-cutting-edge methods on humble problems.
+</p>
+
+<p>
+In the DLFP book, we start from scratch, build the tool itself,
+and as we go, we apply it on increasingly challenging problems.
+</p>
+
+<p>
+Here's how a simple interactive session of teaching the network to predict
+house prices based on past values looks like in the book.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-org21b11db">
+<h3 id="org21b11db">Load the data</h3>
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><code trim><span style="color: #8b0000;">(</span><span style="color: #4c83ff;">def</span> <span style="color: #ff69b4;">boston-housing-raw</span>
+  <span style="color: #006400;">(</span><span style="color: #4c83ff;">-&gt;</span> <span style="color: #ff1493;">(</span><span style="color: #afd8af;">io</span>/resource <span style="color: #61CE3C;">"boston-housing-prices/boston-housing.csv"</span><span style="color: #ff1493;">)</span>
+      <span style="color: #ff1493;">(</span>slurp<span style="color: #ff1493;">)</span>
+      <span style="color: #ff1493;">(</span><span style="color: #afd8af;">csv</span>/read-csv<span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+
+<span style="color: #8b0000;">(</span>take 2 boston-housing-raw<span style="color: #8b0000;">)</span>
+</code></pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="fragment (appear)"><code trim><span style="color: #8b0000;">(</span><span style="color: #006400;">[</span><span style="color: #61CE3C;">"crim"</span> <span style="color: #61CE3C;">"zn"</span> <span style="color: #61CE3C;">"indus"</span> <span style="color: #61CE3C;">"chas"</span> <span style="color: #61CE3C;">"nox"</span> <span style="color: #61CE3C;">"rm"</span> <span style="color: #61CE3C;">"age"</span>
+  <span style="color: #61CE3C;">"dis"</span> <span style="color: #61CE3C;">"rad"</span> <span style="color: #61CE3C;">"tax"</span> <span style="color: #61CE3C;">"ptratio"</span> <span style="color: #61CE3C;">"b"</span> <span style="color: #61CE3C;">"lstat"</span> <span style="color: #61CE3C;">"medv"</span><span style="color: #006400;">]</span>
+ <span style="color: #006400;">[</span><span style="color: #61CE3C;">"0.00632"</span> <span style="color: #61CE3C;">"18"</span> <span style="color: #61CE3C;">"2.31"</span> <span style="color: #61CE3C;">"0"</span> <span style="color: #61CE3C;">"0.538"</span> <span style="color: #61CE3C;">"6.575"</span> <span style="color: #61CE3C;">"65.2"</span>
+  <span style="color: #61CE3C;">"4.09"</span> <span style="color: #61CE3C;">"1"</span> <span style="color: #61CE3C;">"296"</span> <span style="color: #61CE3C;">"15.3"</span> <span style="color: #61CE3C;">"396.9"</span> <span style="color: #61CE3C;">"4.98"</span> <span style="color: #61CE3C;">"24"</span><span style="color: #006400;">]</span><span style="color: #8b0000;">)</span>
+</code></pre>
+</div>
+
+<aside class="notes">
+<p>
+We load the data from the CSV file using plain Clojure. There
+might be specialized tools for this task, but I heavily enforce
+the KISS principle and introduce something only when it is needed,
+so the reader understands not only HOW, but WHY, it is done..
+</p>
+
+<p>
+For this data source, plain Clojure works all right.
+</p>
+
+<p>
+The data records 14  measurements for each of 500 areas in Boston,
+including zone, age, and median house value. The data is from 1978, don't
+be confused by values around $20.000.
+</p>
+
+<p>
+Our task is to create a machine that predicts medv based on other data,
+for future cases when we don't know medv.
+</p>
+
+<p>
+This problem is called regression.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-org5c1e24f">
+<h3 id="org5c1e24f">Convert it to numbers</h3>
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><code trim><span style="color: #8b0000;">(</span><span style="color: #4c83ff;">def</span> <span style="color: #ff69b4;">boston-housing</span>
+  <span style="color: #006400;">(</span><span style="color: #4c83ff;">-&gt;&gt;</span> <span style="color: #ff1493;">(</span>drop 1 boston-housing-raw<span style="color: #ff1493;">)</span>
+       <span style="color: #ff1493;">(</span>map #<span style="color: #ffff00;">(</span>mapv <span style="color: #00ff00;">(</span><span style="color: #4c83ff;">fn</span> <span style="color: #add8e6;">[</span><span style="color: #d3d3d3; background-color: #000000;">^</span><span style="color: #afd8af;">String</span> x<span style="color: #add8e6;">]</span> <span style="color: #add8e6;">(</span><span style="color: #afd8af;">Double</span>/valueOf x<span style="color: #add8e6;">)</span><span style="color: #00ff00;">)</span> <span style="color: #ff69b4;">%</span><span style="color: #ffff00;">)</span><span style="color: #ff1493;">)</span>
+       <span style="color: #ff1493;">(</span>shuffle<span style="color: #ff1493;">)</span>
+       <span style="color: #ff1493;">(</span><span style="color: #4c83ff;">doall</span><span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+
+<span style="color: #8b0000;">(</span>take 2 boston-housing-raw<span style="color: #8b0000;">)</span>
+</code></pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="fragment (appear)"><code trim>=&gt;
+<span style="color: #8b0000;">(</span><span style="color: #006400;">[</span>2.14918 0.0 19.58 0.0 0.871 5.709 98.5 1.6232 5.0 403.0 14.7 261.95 15.79 19.4<span style="color: #006400;">]</span>
+ <span style="color: #006400;">[</span>9.18702 0.0 18.1 0.0 0.7 5.536 100.0 1.5804 24.0 666.0 20.2 396.9 23.6 11.3<span style="color: #006400;">]</span><span style="color: #8b0000;">)</span>
+</code></pre>
+</div>
+
+<aside class="notes">
+<p>
+Neural networks work with numbers. Luckily, for this data,
+the transformation from strings is straightforward. Again, plain Clojure
+sequences do the job.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-org54ee554">
+<h3 id="org54ee554">Transfer it to tensors</h3>
+<div class="org-src-container">
+
+<pre  class="fragment (appear)"><code trim><span style="color: #8b0000;">(</span><span style="color: #4c83ff;">def</span> <span style="color: #ff69b4;">x-train</span> <span style="color: #006400;">(</span><span style="color: #4c83ff;">-&gt;&gt;</span> <span style="color: #ff1493;">(</span>take 404 boston-housing<span style="color: #ff1493;">)</span>
+                  <span style="color: #ff1493;">(</span>map <span style="color: #ffff00;">(</span>partial take 13<span style="color: #ffff00;">)</span><span style="color: #ff1493;">)</span>
+                  <span style="color: #ff1493;">(</span>transfer native-float<span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</code></pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="fragment (appear)"><code trim>#RealGEMatrix<span style="color: #8b0000;">[</span>float, mxn:13x404, layout<span style="color: #96CBFE;">:column</span>, offset:0<span style="color: #8b0000;">]</span>
+   &#9637;       &#8595;       &#8595;       &#8595;       &#8595;       &#8595;       &#9491;
+   &#8594;       2.15    9.19    &#8281;       0.52    1.63
+   &#8594;       0.00    0.00    &#8281;       0.00    0.00
+   &#8594;       &#8281;       &#8281;       &#8281;       &#8281;       &#8281;
+   &#8594;     261.95  396.90    &#8281;     388.45  396.90
+   &#8594;      15.79   23.60    &#8281;       9.54   34.41
+   &#9495;                                               &#9499;
+</code></pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="fragment (appear)"><code trim><span style="color: #8b0000;">(</span><span style="color: #4c83ff;">def</span> <span style="color: #ff69b4;">y-train</span> <span style="color: #006400;">(</span><span style="color: #4c83ff;">-&gt;&gt;</span> <span style="color: #ff1493;">(</span>take 404 boston-housing<span style="color: #ff1493;">)</span>
+                  <span style="color: #ff1493;">(</span>map <span style="color: #ffff00;">(</span>partial drop 13<span style="color: #ffff00;">)</span><span style="color: #ff1493;">)</span>
+                  <span style="color: #ff1493;">(</span>transfer native-float<span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</code></pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="fragment (appear)"><code trim>#RealGEMatrix<span style="color: #8b0000;">[</span>float, mxn:1x404, layout<span style="color: #96CBFE;">:column</span>, offset:0<span style="color: #8b0000;">]</span>
+   &#9637;       &#8595;       &#8595;       &#8595;       &#8595;       &#8595;       &#9491;
+   &#8594;      19.40   11.30    &#8281;      25.10   14.40
+   &#9495;                                               &#9499;
+</code></pre>
+</div>
+
+<aside class="notes">
+<p>
+Now, it's time to put these numbers into the appropriate high-performance
+tensors. We take one part of the data for training, and transfer it into
+Neanderthal's matrices, which are 2-d tensors. We don't need anything more sophisticated
+for this example, so we keep it simple.
+</p>
+
+<p>
+We end up with the matrix of all inputs and the matrix of all expected outputs.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-org58e3787">
+<h3 id="org58e3787">Create the Neural Network</h3>
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><code trim><span style="color: #8b0000;">(</span><span style="color: #4c83ff;">def</span> <span style="color: #ff69b4;">inference</span>
+  <span style="color: #006400;">(</span>inference-network native-float 13
+                     <span style="color: #ff1493;">[</span><span style="color: #ffff00;">(</span>fully-connected 64 relu<span style="color: #ffff00;">)</span>
+                      <span style="color: #ffff00;">(</span>fully-connected 64 relu<span style="color: #ffff00;">)</span>
+                      <span style="color: #ffff00;">(</span>fully-connected 1 linear<span style="color: #ffff00;">)</span><span style="color: #ff1493;">]</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<span style="color: #8b0000;">(</span>init! inference<span style="color: #8b0000;">)</span>
+</code></pre>
+</div>
+
+<p class="fragment (appear)">
+13 &times; 64 + 64 &times; 64 + 64 &times; 1 = 4992 weights
+</p>
+
+<aside class="notes">
+<p>
+Creating the network itself is rather easy, since we employed
+Clojure's awesomeness to implement a nice API.
+</p>
+
+<p>
+The DLFP book explains in detail what to do, when, and how.
+</p>
+
+<p>
+One hint about why Neural Networks were difficult to apply for
+a long time: even though this is a small network, it does have 5000
+parameters to learn from data, through many iterations!
+</p>
+
+</aside>
+
+</section>
+<section id="slide-org45db639">
+<h3 id="org45db639">Prepare it for training</h3>
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><code trim><span style="color: #8b0000;">(</span><span style="color: #4c83ff;">def</span> <span style="color: #ff69b4;">x-minibatch</span> <span style="color: #006400;">(</span>ge x-train <span style="color: #ff1493;">(</span>mrows x-train<span style="color: #ff1493;">)</span> 16<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<span style="color: #8b0000;">(</span><span style="color: #4c83ff;">def</span> <span style="color: #ff69b4;">adam</span> <span style="color: #006400;">(</span>training-network inference x-minibatch adam-layer<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</code></pre>
+</div>
+
+<aside class="notes">
+<p>
+We created the network that can do the inference once it is filled with
+the right values, but we have to provide the learning infrastructure.
+</p>
+
+<p>
+We implement this step by step in the book, and provide the API that
+does everything once a few key informations are specified.
+</p>
+
+<p>
+In this case, we will use Stochastic Gradient Descent with Adaptive Moments,
+short: ADAM.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgd6a77a6">
+<h3 id="orgd6a77a6">Train!</h3>
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><code trim><span style="color: #8b0000;">(</span>time <span style="color: #006400;">(</span>sgd-train adam x-train y-train quadratic-cost! 80 <span style="color: #ff1493;">[</span>0.005<span style="color: #ff1493;">]</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</code></pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="fragment (appear)"><code trim><span style="color: #61CE3C;">"Elapsed time: 260.730503 msecs"</span>
+=&gt; 3.2175311257890655
+</code></pre>
+</div>
+
+<aside class="notes">
+<p>
+The training itself is fully automatic. The network is unleashed on the
+data, and it learns how to guess that kind of data well.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-org55a5a4d">
+<h3 id="org55a5a4d">Provide new, unseen data</h3>
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><code trim><span style="color: #8b0000;">(</span><span style="color: #4c83ff;">def</span> <span style="color: #ff69b4;">x-test</span> <span style="color: #006400;">(</span><span style="color: #4c83ff;">-&gt;&gt;</span> <span style="color: #ff1493;">(</span>drop 404 boston-housing<span style="color: #ff1493;">)</span>
+                 <span style="color: #ff1493;">(</span>map <span style="color: #ffff00;">(</span>partial take 13<span style="color: #ffff00;">)</span><span style="color: #ff1493;">)</span>
+                 <span style="color: #ff1493;">(</span>transfer native-float<span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</code></pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><code trim>#RealGEMatrix<span style="color: #8b0000;">[</span>float, mxn:13x102, layout<span style="color: #96CBFE;">:column</span>, offset:0<span style="color: #8b0000;">]</span>
+   &#9637;       &#8595;       &#8595;       &#8595;       &#8595;       &#8595;       &#9491;
+   &#8594;      38.35    2.31    &#8281;       0.64    7.05
+   &#8594;       0.00    0.00    &#8281;       0.00    0.00
+   &#8594;       &#8281;       &#8281;       &#8281;       &#8281;       &#8281;
+   &#8594;     396.90  348.13    &#8281;     380.02    2.52
+   &#8594;      30.59   12.03    &#8281;      10.26   23.29
+   &#9495;                                               &#9499;
+</code></pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><code trim><span style="color: #8b0000;">(</span><span style="color: #4c83ff;">def</span> <span style="color: #ff69b4;">y-test</span> <span style="color: #006400;">(</span><span style="color: #4c83ff;">-&gt;&gt;</span> <span style="color: #ff1493;">(</span>drop 404 boston-housing<span style="color: #ff1493;">)</span>
+                 <span style="color: #ff1493;">(</span>map <span style="color: #ffff00;">(</span>partial drop 13<span style="color: #ffff00;">)</span><span style="color: #ff1493;">)</span>
+                 <span style="color: #ff1493;">(</span>transfer native-float<span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</code></pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><code trim>#RealGEMatrix<span style="color: #8b0000;">[</span>float, mxn:1x102, layout<span style="color: #96CBFE;">:column</span>, offset:0<span style="color: #8b0000;">]</span>
+   &#9637;       &#8595;       &#8595;       &#8595;       &#8595;       &#8595;       &#9491;
+   &#8594;       5.00   19.10    &#8281;      18.20   13.40
+   &#9495;                                               &#9499;
+</code></pre>
+</div>
+
+<aside class="notes">
+<p>
+When we grade human students, we usually don't value how well they can parrot
+the text from the book back. We give them new problems, that are not too
+dissimilar from what they had seen before, and we see how well they perform.
+</p>
+
+<p>
+It's the same with NN. We saved a portion of original data, which
+the network has never seen during training, and use THAT for testing.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-org65a12ca">
+<h3 id="org65a12ca">Test it on unseen data</h3>
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><code trim><span style="color: #8b0000;">(</span>mean-absolute-cost! <span style="color: #006400;">(</span>axpy! -1 y-test <span style="color: #ff1493;">(</span>inference x-test<span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</code></pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="fragment (appear)"><code trim>=&gt; 2.790548885569853
+</code></pre>
+</div>
+
+<aside class="notes">
+<p>
+We test it by measuring the distance from network's guesses
+to the real values known to us but unknown to the network.
+</p>
+
+<p>
+In this case, the network is 2.7 thousands dollars off from the
+real value, on average, which is not bad.
+</p>
+
+<p>
+This problem is actually not a great fit for NNs, since it
+has few rows, so other statistical tools can be applied on it too.
+</p>
+
+<p>
+The key advantage of NNs is that they do not require much preparation
+and they do the analysis more or less automatically. Other techniques
+usually require more human involvement in tidying data up, even for
+such simple examples.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgbcc5202">
+<h3 id="orgbcc5202">6 lines of Code</h3>
+<div class="org-src-container">
+
+<pre  class="fragment (appear)"><code trim><span style="color: #8b0000;">(</span>backward <span style="color: #006400;">[</span>_ <span style="color: #ff1493;">[</span>t eta lambda rho1 rho2 epsilon<span style="color: #ff1493;">]</span><span style="color: #006400;">]</span>
+    <span style="color: #006400;">(</span><span style="color: #4c83ff;">let</span> <span style="color: #ff1493;">[</span>t <span style="color: #ffff00;">(</span>inc <span style="color: #00ff00;">(</span>long t<span style="color: #00ff00;">)</span><span style="color: #ffff00;">)</span>
+          eta <span style="color: #ffff00;">(</span>double <span style="color: #00ff00;">(</span><span style="color: #4c83ff;">or</span> eta 0.001<span style="color: #00ff00;">)</span><span style="color: #ffff00;">)</span>
+          lambda <span style="color: #ffff00;">(</span>double <span style="color: #00ff00;">(</span><span style="color: #4c83ff;">or</span> lambda 0.0<span style="color: #00ff00;">)</span><span style="color: #ffff00;">)</span>
+          rho1 <span style="color: #ffff00;">(</span>double <span style="color: #00ff00;">(</span><span style="color: #4c83ff;">or</span> rho1 0.9<span style="color: #00ff00;">)</span><span style="color: #ffff00;">)</span>
+          rho2 <span style="color: #ffff00;">(</span>double <span style="color: #00ff00;">(</span><span style="color: #4c83ff;">or</span> rho2 0.999<span style="color: #00ff00;">)</span><span style="color: #ffff00;">)</span>
+          epsilon <span style="color: #ffff00;">(</span>double <span style="color: #00ff00;">(</span><span style="color: #4c83ff;">or</span> epsilon 1e-6<span style="color: #00ff00;">)</span><span style="color: #ffff00;">)</span>
+          eta-avg <span style="color: #ffff00;">(</span>- <span style="color: #00ff00;">(</span>/ <span style="color: #add8e6;">(</span>double eta<span style="color: #add8e6;">)</span> <span style="color: #add8e6;">(</span>dim ones<span style="color: #add8e6;">)</span><span style="color: #00ff00;">)</span><span style="color: #ffff00;">)</span><span style="color: #ff1493;">]</span>
+      <span style="color: #ff1493;">(</span>mm! <span style="color: #ffff00;">(</span>/ 1.0 <span style="color: #00ff00;">(</span>dim ones<span style="color: #00ff00;">)</span><span style="color: #ffff00;">)</span> z <span style="color: #ffff00;">(</span>trans a-1<span style="color: #ffff00;">)</span> 0.0 g<span style="color: #ff1493;">)</span>
+      <span style="color: #ff1493;">(</span>axpby! <span style="color: #ffff00;">(</span>- 1.0 rho1<span style="color: #ffff00;">)</span> g rho1 s<span style="color: #ff1493;">)</span>
+      <span style="color: #ff1493;">(</span>axpby! <span style="color: #ffff00;">(</span>- 1.0 rho2<span style="color: #ffff00;">)</span> <span style="color: #ffff00;">(</span>sqr! g<span style="color: #ffff00;">)</span> rho2 r<span style="color: #ff1493;">)</span>
+      <span style="color: #ff1493;">(</span>linear-frac! <span style="color: #ffff00;">(</span>/ <span style="color: #00ff00;">(</span>- eta<span style="color: #00ff00;">)</span> <span style="color: #00ff00;">(</span>- 1.0 <span style="color: #add8e6;">(</span>pow rho1 t<span style="color: #add8e6;">)</span><span style="color: #00ff00;">)</span><span style="color: #ffff00;">)</span> s 0.0
+                    <span style="color: #ffff00;">(</span>/ 1.0 <span style="color: #00ff00;">(</span>sqrt <span style="color: #add8e6;">(</span>- 1.0 <span style="color: #ffa500;">(</span>pow rho2 t<span style="color: #ffa500;">)</span><span style="color: #add8e6;">)</span><span style="color: #00ff00;">)</span><span style="color: #ffff00;">)</span>
+                    <span style="color: #ffff00;">(</span>sqrt! r g<span style="color: #ffff00;">)</span> epsilon g<span style="color: #ff1493;">)</span>
+      <span style="color: #ff1493;">(</span><span style="color: #4c83ff;">when-not</span> first? <span style="color: #ffff00;">(</span>mm! 1.0 <span style="color: #00ff00;">(</span>trans w<span style="color: #00ff00;">)</span> z 0.0 a-1<span style="color: #ffff00;">)</span><span style="color: #ff1493;">)</span>
+      <span style="color: #ff1493;">(</span>mv! eta-avg z ones 1.0 b<span style="color: #ff1493;">)</span>
+      <span style="color: #ff1493;">(</span>axpby! 1.0 g <span style="color: #ffff00;">(</span>inc <span style="color: #00ff00;">(</span>* eta-avg lambda<span style="color: #00ff00;">)</span><span style="color: #ffff00;">)</span> w<span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</code></pre>
+</div>
+
+<aside class="notes">
+<p>
+So, we have created a nice NN tool that is faster that mainstream
+frameworks, if having less bells and whistles.
+</p>
+
+<p>
+And the key part of the implementation is these 6 lines of code!
+</p>
+
+<p>
+Isn't Clojure amazing? A quite sophisticated backpropagation learning algorithm
+with Adaptive Moments, weight decay etc. in mere 7 lines of quite readable code!
+</p>
+
+</aside>
+
+</section>
+</section>
+<section>
+<section id="slide-org2630400" data-background="./dlfp-dog-and-bird.png" data-background-size="35%" data-background-transition="fade" data-background-opacity="0.7">
+<h2 id="org2630400">‎</h2>
+<aside class="notes">
+<p>
+My idea is to provide both the tools and the literature
+that provide programmer-oriented path from zero to hero.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-org77b1e03">
+<h3 id="org77b1e03">the only AI book series for programmers</h3>
+<ul>
+<li class="fragment appear">interactive &amp; dynamic</li>
+<li class="fragment appear">step-by-step implementation</li>
+<li class="fragment appear">incredible performance, yet no C++ hell (!)</li>
+<li class="fragment appear">Intel &amp; AMD CPUs (DNNL)</li>
+<li class="fragment appear">Nvidia GPUs (CUDA and cuDNN)</li>
+<li class="fragment appear">AMD GPUs (yes, OpenCL too!)</li>
+<li class="fragment appear">Clojure (it's magic!)</li>
+<li class="fragment appear">Java Virtual Machine (without Java boilerplate!)</li>
+<li class="fragment appear">complete source code</li>
+<li class="fragment appear">beautiful typesetting</li>
+
+</ul>
+
+</section>
+<section id="slide-org71233ea" data-background="./lafp-dog-and-bird.png" data-background-size="35%" data-background-transition="fade" data-background-opacity="0.7">
+<h3 id="org71233ea">‎</h3>
+<aside class="notes">
+<p>
+Let's just contemplate about this slide for a moment :)
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgb5d1713">
+<h3 id="orgb5d1713">no middleman!</h3>
+<div class="outline-text-3" id="text-orgb5d1713">
+</div>
+</section>
+<section id="slide-org4dad608">
+<h4 id="org4dad608">Continuous improvement -  always up-to-date</h4>
+<aside class="notes">
+<p>
+This is not a static text that sits on your shelf. In the best tradition
+of software development, it will be continuously updated.
+</p>
+
+</aside>
+
+
+</section>
+<section id="slide-org1a0580d">
+<h4 id="org1a0580d">100% of the revenue goes towards my open-source work!</h4>
+
+</section>
+<section id="slide-org4054b99" data-background="./dlfp-dog-and-bird.png" data-background-size="35%" data-background-transition="fade" data-background-opacity="0.7">
+<h3 id="org4054b99">‎</h3>
+<aside class="notes">
+<p>
+Hey, dog &amp; bird can surf the waves!
+</p>
+
+</aside>
+
+
+</section>
+<section id="slide-org8b3505f">
+<h3 id="org8b3505f">the only AI book that walks the walk</h3>
+<div class="outline-text-3" id="text-org8b3505f">
+</div>
+</section>
+<section id="slide-orgef56b0e">
+<h4 id="orgef56b0e">complete, 100% executable code</h4>
+</section>
+<section id="slide-org3bd0201">
+<h4 id="org3bd0201">step-by-step instructions</h4>
+</section>
+<section id="slide-orgfb35000">
+<h4 id="orgfb35000">full path from theory to implementation <b>in actual code</b></h4>
+</section>
+<section id="slide-org142ec2a">
+<h4 id="org142ec2a">superfast implementation</h4>
+
+</section>
+<section id="slide-org3b9fafb" data-background="./lafp-dog-and-bird.png" data-background-size="35%" data-background-transition="fade" data-background-opacity="0.7">
+<h3 id="org3b9fafb">‎</h3>
+
+</section>
+<section id="slide-orgb32f34e">
+<h3 id="orgb32f34e">learn DL by implementing it from scratch</h3>
+<div class="outline-text-3" id="text-orgb32f34e">
+</div>
+</section>
+<section id="slide-org8af57eb">
+<h4 id="org8af57eb">classic neural networks using fast linear algebra</h4>
+</section>
+<section id="slide-org092cae0">
+<h4 id="org092cae0">build an optimized backpropagation algorithm step-by-step</h4>
+</section>
+<section id="slide-orgeb9abd0">
+<h4 id="orgeb9abd0">explore it on the CPU</h4>
+</section>
+<section id="slide-org03dd1a2">
+<h4 id="org03dd1a2">run it on the GPU!</h4>
+</section>
+<section id="slide-org23d0e82">
+<h4 id="org23d0e82">design an elegant neural network API</h4>
+</section>
+<section id="slide-orgb582d1c">
+<h4 id="orgb582d1c">add tensor support</h4>
+</section>
+<section id="slide-org7c51e26">
+<h4 id="org7c51e26">integrate with Intel's DNNL and Nvidia's cuDNN performance libraries</h4>
+</section>
+<section id="slide-org68d079b">
+<h4 id="org68d079b">learn the nuts and bolts</h4>
+</section>
+<section id="slide-org36da0a2">
+<h4 id="org36da0a2">build convolutional layers</h4>
+</section>
+<section id="slide-org36241db">
+<h4 id="org36241db">build RNN support</h4>
+</section>
+<section id="slide-org745d2e6">
+<h4 id="org745d2e6">understand how to use it to solve practical problems</h4>
+</section>
+<section id="slide-orgbd67159">
+<h4 id="orgbd67159">&#x2026;and much more!</h4>
+
+
+</section>
+</section>
+<section>
+<section id="slide-org96b0bc2">
+<h2 id="org96b0bc2">Software + Learning</h2>
+<ul>
+<li>Simple yet powerful libraries</li>
+<li>Full learning path: from theory to code</li>
+
+</ul>
+
+<section class="stretch">
+<img  src="dlfp-cover.png">
+<img  src="lafp-cover.png">
+</section>
+<p>
+Subscribe now at: <a href="https://aiprobook.com">https://aiprobook.com</a>
+</p>
+
+<aside class="notes">
+<p>
+If we provide these two key elements, Clojure might have some
+chance as The AI Programming Language
+</p>
+
+</aside>
+</section>
+</section>
+</div>
+</div>
+<script src="./reveal.js-3.8.0/js/reveal.js"></script>
+
+<script>
+// Full list of configuration options available here:
+// https://github.com/hakimel/reveal.js#configuration
+Reveal.initialize({
+hash:true,
+multiplex: {
+    secret: '', // null if client
+    id: '', // id, obtained from socket.io server
+    url: '' // Location of socket.io server
+},
+
+// Optional libraries used to extend on reveal.js
+dependencies: [
+ { src: './reveal.js-3.8.0/lib/js/classList.js', condition: function() { return !document.body.classList; } },
+ { src: './reveal.js-3.8.0/plugin/markdown/marked.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
+ { src: './reveal.js-3.8.0/plugin/markdown/markdown.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
+ { src: './reveal.js-3.8.0/plugin/zoom-js/zoom.js', async: true, condition: function() { return !!document.body.classList; } },
+ { src: './reveal.js-3.8.0/plugin/notes/notes.js', async: true, condition: function() { return !!document.body.classList; } }]
+});
+</script>
+</body>
+</html>
