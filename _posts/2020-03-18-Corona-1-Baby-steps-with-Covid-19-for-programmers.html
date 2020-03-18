@@ -325,7 +325,7 @@ But it's not all. How many observations of the <code>Confirmed</code> variable a
 </div>
 
 <pre class="example">
-class java.lang.ClassCastExceptionclass java.lang.ClassCastExceptionExecution error (ClassCastException) at dragan.rocks.covid-19.world/eval15734 (form-init8558230572914833950.clj:1).
+class java.lang.ClassCastExceptionclass java.lang.ClassCastExceptionExecution error (ClassCastException) at dragan.rocks.covid-19.world/eval15800 (form-init8558230572914833950.clj:1).
 java.lang.String cannot be cast to java.lang.Number
 </pre>
 
@@ -823,8 +823,8 @@ Now, let's see how Italy is holding. For a few weeks we've listened to really ba
 
 <div class="org-src-container">
 <pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #4c83ff;">defn</span> <span style="color: #ff1493;">extract-data</span> <span style="color: #006400;">[</span>country-code<span style="color: #006400;">]</span>
- <span style="color: #006400;">(</span>remove zero? <span style="color: #ff1493;">(</span>map #<span style="color: #ffff00;">(</span>nth <span style="color: #ff69b4;">%</span> 3<span style="color: #ffff00;">)</span>
-                    <span style="color: #ffff00;">(</span>take-countries world-data2 #<span style="color: #00ff00;">{</span>country-code<span style="color: #00ff00;">}</span><span style="color: #ffff00;">)</span><span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+ <span style="color: #006400;">(</span>drop-while zero? <span style="color: #ff1493;">(</span>map #<span style="color: #ffff00;">(</span>nth <span style="color: #ff69b4;">%</span> 3<span style="color: #ffff00;">)</span>
+                        <span style="color: #ffff00;">(</span>take-countries world-data2 #<span style="color: #00ff00;">{</span>country-code<span style="color: #00ff00;">}</span><span style="color: #ffff00;">)</span><span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
 </pre>
 </div>
 
@@ -895,7 +895,7 @@ Now, let's see how Italy is holding. For a few weeks we've listened to really ba
 </table>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>log-plot <span style="color: #006400;">(</span>extract-data <span style="color: #61CE3C;">"IT"</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>println <span style="color: #006400;">(</span>log-plot <span style="color: #ff1493;">(</span>extract-data <span style="color: #61CE3C;">"IT"</span><span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
 </pre>
 </div>
 
@@ -904,17 +904,18 @@ It hasn't started to slow down yet, although it looks like it is about to.
 </p>
 
 <pre class="example">
-10.36 ┤                                           ╭───
- 9.39 ┤                                      ╭────╯
- 8.42 ┤                                 ╭────╯
- 7.46 ┤                             ╭───╯
- 6.49 ┤                          ╭──╯
- 5.53 ┤                       ╭──╯
- 4.56 ┤                      ╭╯
- 3.59 ┤                      │
- 2.63 ┤                     ╭╯
- 1.66 ┤                     │
- 0.69 ┼─────────────────────╯
+dragan.rocks.covid-19.world=&gt; (println (log-plot (extract-data "IT")))
+   10.36 ┤                                           ╭───
+    9.39 ┤                                      ╭────╯
+    8.42 ┤                                 ╭────╯
+    7.46 ┤                             ╭───╯
+    6.49 ┤                          ╭──╯
+    5.53 ┤                       ╭──╯
+    4.56 ┤                      ╭╯
+    3.59 ┤                      │
+    2.63 ┤                     ╭╯
+    1.66 ┤                     │
+    0.69 ┼─────────────────────╯
 </pre>
 </div>
 </div>
@@ -998,7 +999,7 @@ are less bad.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>log-plot <span style="color: #006400;">(</span>extract-data <span style="color: #61CE3C;">"IT"</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>log-plot <span style="color: #006400;">(</span>extract-data <span style="color: #61CE3C;">"CN"</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
 </pre>
 </div>
 
