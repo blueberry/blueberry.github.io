@@ -80,9 +80,9 @@ The data is in a CSV file, so we require some useful namespaces for working with
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">ns</span> <span style="color: #2F8B58; font-weight: bold;">dragan.rocks.covid-19.world</span>
-  <span style="color: #006400;">(</span><span style="color: #F5666D;">:require</span> <span style="color: #ff1493;">[</span>clojure.java.io <span style="color: #F5666D;">:as</span> io<span style="color: #ff1493;">]</span>
-            <span style="color: #ff1493;">[</span>clojure.data.csv <span style="color: #F5666D;">:as</span> csv<span style="color: #ff1493;">]</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">ns</span> <span style="color: #2F8B58; font-weight: bold;">dragan.rocks.covid-19.world</span>
+  <span style="color: #7388d6;">(</span><span style="color: #F5666D;">:require</span> <span style="color: #909183;">[</span>clojure.java.io <span style="color: #F5666D;">:as</span> io<span style="color: #909183;">]</span>
+            <span style="color: #909183;">[</span>clojure.data.csv <span style="color: #F5666D;">:as</span> csv<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -99,7 +99,7 @@ a lazy sequence.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #2F8B58; font-weight: bold;">csv</span>/read-csv <span style="color: #006400;">(</span>slurp <span style="color: #ff1493;">(</span><span style="color: #2F8B58; font-weight: bold;">io</span>/resource <span style="color: #4E9A06;">"open-covid-19/output/world.csv"</span><span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #2F8B58; font-weight: bold;">csv</span>/read-csv <span style="color: #7388d6;">(</span>slurp <span style="color: #909183;">(</span><span style="color: #2F8B58; font-weight: bold;">io</span>/resource <span style="color: #4E9A06;">"open-covid-19/output/world.csv"</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -146,8 +146,8 @@ function for loading these files.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">read-open-covid</span> <span style="color: #006400;">[</span>csv-name<span style="color: #006400;">]</span>
-  <span style="color: #006400;">(</span><span style="color: #2F8B58; font-weight: bold;">csv</span>/read-csv <span style="color: #ff1493;">(</span>slurp <span style="color: #ffff00;">(</span><span style="color: #2F8B58; font-weight: bold;">io</span>/resource <span style="color: #00ff00;">(</span>format <span style="color: #4E9A06;">"open-covid-19/output/%s.csv"</span> csv-name<span style="color: #00ff00;">)</span><span style="color: #ffff00;">)</span><span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">read-open-covid</span> <span style="color: #7388d6;">[</span>csv-name<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span><span style="color: #2F8B58; font-weight: bold;">csv</span>/read-csv <span style="color: #909183;">(</span>slurp <span style="color: #709870;">(</span><span style="color: #2F8B58; font-weight: bold;">io</span>/resource <span style="color: #907373;">(</span>format <span style="color: #4E9A06;">"open-covid-19/output/%s.csv"</span> csv-name<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -159,7 +159,7 @@ copy and paste the code, it should run in <b>any</b> Clojure REPL setup.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">covid-world</span> <span style="color: #006400;">(</span>read-open-covid <span style="color: #4E9A06;">"world"</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">covid-world</span> <span style="color: #7388d6;">(</span>read-open-covid <span style="color: #4E9A06;">"world"</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 </div>
@@ -174,7 +174,7 @@ typically list that in the first line, and we access it as the first element in 
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>first covid-world<span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>first covid-world<span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -188,7 +188,7 @@ To see how example data looks like, let's take the second row.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>second covid-world<span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>second covid-world<span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -222,7 +222,7 @@ The answer to this question is so easy to get, that I'm out of inspiration for t
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>count world-data<span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>count world-data<span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -242,7 +242,7 @@ more fiddling in some other programming languages, but in Clojure it's bees knee
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>count <span style="color: #006400;">(</span>distinct <span style="color: #ff1493;">(</span>map second world-data<span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>count <span style="color: #7388d6;">(</span>distinct <span style="color: #909183;">(</span>map second world-data<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -256,7 +256,7 @@ So, is our data complete?
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>rem <span style="color: #006400;">(</span>count world-data<span style="color: #006400;">)</span> <span style="color: #006400;">(</span>count <span style="color: #ff1493;">(</span>distinct <span style="color: #ffff00;">(</span>map second world-data<span style="color: #ffff00;">)</span><span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>rem <span style="color: #7388d6;">(</span>count world-data<span style="color: #7388d6;">)</span> <span style="color: #7388d6;">(</span>count <span style="color: #909183;">(</span>distinct <span style="color: #709870;">(</span>map second world-data<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -287,7 +287,7 @@ using code.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>count <span style="color: #006400;">(</span>distinct <span style="color: #ff1493;">(</span>map first world-data<span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>count <span style="color: #7388d6;">(</span>distinct <span style="color: #909183;">(</span>map first world-data<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -301,8 +301,8 @@ Since there are 143 countries and 79 dates, ideally there would be this many obs
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>* <span style="color: #006400;">(</span>count <span style="color: #ff1493;">(</span>distinct <span style="color: #ffff00;">(</span>map first world-data<span style="color: #ffff00;">)</span><span style="color: #ff1493;">)</span><span style="color: #006400;">)</span>
-   <span style="color: #006400;">(</span>count <span style="color: #ff1493;">(</span>distinct <span style="color: #ffff00;">(</span>map second world-data<span style="color: #ffff00;">)</span><span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>* <span style="color: #7388d6;">(</span>count <span style="color: #909183;">(</span>distinct <span style="color: #709870;">(</span>map first world-data<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+   <span style="color: #7388d6;">(</span>count <span style="color: #909183;">(</span>distinct <span style="color: #709870;">(</span>map second world-data<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -320,12 +320,12 @@ But it's not all. How many observations of the <code>Confirmed</code> variable a
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>* <span style="color: #006400;">(</span>count <span style="color: #ff1493;">(</span>filter zero? <span style="color: #ffff00;">(</span>map #<span style="color: #00ff00;">(</span>nth <span style="color: #0084C8; font-weight: bold;">%</span> 3<span style="color: #00ff00;">)</span> world-data<span style="color: #ffff00;">)</span><span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>* <span style="color: #7388d6;">(</span>count <span style="color: #909183;">(</span>filter zero? <span style="color: #709870;">(</span>map #<span style="color: #907373;">(</span>nth <span style="color: #0084C8; font-weight: bold;">%</span> 3<span style="color: #907373;">)</span> world-data<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
 <pre class="example">
-class java.lang.ClassCastExceptionclass java.lang.ClassCastExceptionExecution error (ClassCastException) at dragan.rocks.covid-19.world/eval15849 (form-init8558230572914833950.clj:1).
+class java.lang.ClassCastExceptionclass java.lang.ClassCastExceptionExecution error (ClassCastException) at dragan.rocks.covid-19.world/eval15943 (form-init8558230572914833950.clj:1).
 java.lang.String cannot be cast to java.lang.Number
 </pre>
 
@@ -339,10 +339,10 @@ Let's convert these columns to proper types:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">world-data2</span>
-  <span style="color: #006400;">(</span>map <span style="color: #ff1493;">(</span><span style="color: #A52A2A; font-weight: bold;">fn</span> <span style="color: #ffff00;">[</span><span style="color: #00ff00;">[</span>d cc cn conf death<span style="color: #00ff00;">]</span><span style="color: #ffff00;">]</span>
-         <span style="color: #ffff00;">[</span>d cc cn <span style="color: #00ff00;">(</span><span style="color: #2F8B58; font-weight: bold;">Long</span>/parseLong conf<span style="color: #00ff00;">)</span> <span style="color: #00ff00;">(</span><span style="color: #2F8B58; font-weight: bold;">Long</span>/parseLong death<span style="color: #00ff00;">)</span><span style="color: #ffff00;">]</span><span style="color: #ff1493;">)</span>
-       world-data<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">world-data2</span>
+  <span style="color: #7388d6;">(</span>map <span style="color: #909183;">(</span><span style="color: #A52A2A; font-weight: bold;">fn</span> <span style="color: #709870;">[</span><span style="color: #907373;">[</span>d cc cn conf death<span style="color: #907373;">]</span><span style="color: #709870;">]</span>
+         <span style="color: #709870;">[</span>d cc cn <span style="color: #907373;">(</span><span style="color: #2F8B58; font-weight: bold;">Long</span>/parseLong conf<span style="color: #907373;">)</span> <span style="color: #907373;">(</span><span style="color: #2F8B58; font-weight: bold;">Long</span>/parseLong death<span style="color: #907373;">)</span><span style="color: #709870;">]</span><span style="color: #909183;">)</span>
+       world-data<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -352,7 +352,7 @@ Let's convert these columns to proper types:
 
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>* <span style="color: #006400;">(</span>count <span style="color: #ff1493;">(</span>filter zero? <span style="color: #ffff00;">(</span>map #<span style="color: #00ff00;">(</span>nth <span style="color: #0084C8; font-weight: bold;">%</span> 3<span style="color: #00ff00;">)</span> world-data2<span style="color: #ffff00;">)</span><span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>* <span style="color: #7388d6;">(</span>count <span style="color: #909183;">(</span>filter zero? <span style="color: #709870;">(</span>map #<span style="color: #907373;">(</span>nth <span style="color: #0084C8; font-weight: bold;">%</span> 3<span style="color: #907373;">)</span> world-data2<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -381,8 +381,8 @@ Anyway, let's see how many data is recorded at all per each day (<code>0</code> 
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">date-freqs</span>
-  <span style="color: #006400;">(</span>sort-by first <span style="color: #ff1493;">(</span>frequencies <span style="color: #ffff00;">(</span>map first world-data2<span style="color: #ffff00;">)</span><span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">date-freqs</span>
+  <span style="color: #7388d6;">(</span>sort-by first <span style="color: #909183;">(</span>frequencies <span style="color: #709870;">(</span>map first world-data2<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -442,8 +442,8 @@ we will use the second.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">country-freqs</span>
-  <span style="color: #006400;">(</span>sort-by first <span style="color: #ff1493;">(</span>frequencies <span style="color: #ffff00;">(</span>map second world-data2<span style="color: #ffff00;">)</span><span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">country-freqs</span>
+  <span style="color: #7388d6;">(</span>sort-by first <span style="color: #909183;">(</span>frequencies <span style="color: #709870;">(</span>map second world-data2<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -483,8 +483,8 @@ For, example, for this set of countries: <code>#{"IT" "FR" "ES" "CN"}</code>
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>filter <span style="color: #006400;">(</span><span style="color: #A52A2A; font-weight: bold;">fn</span> <span style="color: #ff1493;">[</span><span style="color: #ffff00;">[</span>_ code<span style="color: #ffff00;">]</span><span style="color: #ff1493;">]</span> <span style="color: #ff1493;">(</span>#<span style="color: #ffff00;">{</span><span style="color: #4E9A06;">"IT"</span> <span style="color: #4E9A06;">"FR"</span> <span style="color: #4E9A06;">"ES"</span> <span style="color: #4E9A06;">"CN"</span><span style="color: #ffff00;">}</span> code<span style="color: #ff1493;">)</span><span style="color: #006400;">)</span>
-        world-data2<span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>filter <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">fn</span> <span style="color: #909183;">[</span><span style="color: #709870;">[</span>_ code<span style="color: #709870;">]</span><span style="color: #909183;">]</span> <span style="color: #909183;">(</span>#<span style="color: #709870;">{</span><span style="color: #4E9A06;">"IT"</span> <span style="color: #4E9A06;">"FR"</span> <span style="color: #4E9A06;">"ES"</span> <span style="color: #4E9A06;">"CN"</span><span style="color: #709870;">}</span> code<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+        world-data2<span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -513,28 +513,28 @@ We'll write some convenient functions for computing the previously discussed val
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">take-countries</span> <span style="color: #006400;">[</span>data country-set<span style="color: #006400;">]</span>
-  <span style="color: #006400;">(</span>filter <span style="color: #ff1493;">(</span><span style="color: #A52A2A; font-weight: bold;">fn</span> <span style="color: #ffff00;">[</span><span style="color: #00ff00;">[</span>_ code<span style="color: #00ff00;">]</span><span style="color: #ffff00;">]</span> <span style="color: #ffff00;">(</span>country-set code<span style="color: #ffff00;">)</span><span style="color: #ff1493;">)</span> data<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">take-countries</span> <span style="color: #7388d6;">[</span>data country-set<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>filter <span style="color: #909183;">(</span><span style="color: #A52A2A; font-weight: bold;">fn</span> <span style="color: #709870;">[</span><span style="color: #907373;">[</span>_ code<span style="color: #907373;">]</span><span style="color: #709870;">]</span> <span style="color: #709870;">(</span>country-set code<span style="color: #709870;">)</span><span style="color: #909183;">)</span> data<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">date-freqs</span> <span style="color: #006400;">[</span>data<span style="color: #006400;">]</span>
-  <span style="color: #006400;">(</span>sort-by first <span style="color: #ff1493;">(</span>frequencies <span style="color: #ffff00;">(</span>map first data<span style="color: #ffff00;">)</span><span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">date-freqs</span> <span style="color: #7388d6;">[</span>data<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>sort-by first <span style="color: #909183;">(</span>frequencies <span style="color: #709870;">(</span>map first data<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">country-freqs</span> <span style="color: #006400;">[</span>data<span style="color: #006400;">]</span>
-  <span style="color: #006400;">(</span>sort-by first <span style="color: #ff1493;">(</span>frequencies <span style="color: #ffff00;">(</span>map second data<span style="color: #ffff00;">)</span><span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">country-freqs</span> <span style="color: #7388d6;">[</span>data<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>sort-by first <span style="color: #909183;">(</span>frequencies <span style="color: #709870;">(</span>map second data<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">my-countries</span>
-  <span style="color: #006400;">(</span>country-freqs
-   <span style="color: #ff1493;">(</span>take-countries world-data
-                   #<span style="color: #ffff00;">{</span><span style="color: #4E9A06;">"IT"</span> <span style="color: #4E9A06;">"FR"</span> <span style="color: #4E9A06;">"ES"</span> <span style="color: #4E9A06;">"CN"</span> <span style="color: #4E9A06;">"US"</span> <span style="color: #4E9A06;">"RS"</span> <span style="color: #4E9A06;">"DE"</span><span style="color: #ffff00;">}</span><span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">my-countries</span>
+  <span style="color: #7388d6;">(</span>country-freqs
+   <span style="color: #909183;">(</span>take-countries world-data
+                   #<span style="color: #709870;">{</span><span style="color: #4E9A06;">"IT"</span> <span style="color: #4E9A06;">"FR"</span> <span style="color: #4E9A06;">"ES"</span> <span style="color: #4E9A06;">"CN"</span> <span style="color: #4E9A06;">"US"</span> <span style="color: #4E9A06;">"RS"</span> <span style="color: #4E9A06;">"DE"</span><span style="color: #709870;">}</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -626,7 +626,7 @@ Great thanks to Mitch Talmadge for <a href="https://github.com/MitchTalmadge/ASC
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>import 'com.mitchtalmadge.asciidata.graph.ASCIIGraph<span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>import 'com.mitchtalmadge.asciidata.graph.ASCIIGraph<span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -636,8 +636,8 @@ there are before the first case (we are not interesting in plotting a flat line)
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>drop-while zero? <span style="color: #006400;">(</span>map #<span style="color: #ff1493;">(</span>nth <span style="color: #0084C8; font-weight: bold;">%</span> 3<span style="color: #ff1493;">)</span>
-                         <span style="color: #ff1493;">(</span>take-countries world-data2 #<span style="color: #ffff00;">{</span><span style="color: #4E9A06;">"RS"</span><span style="color: #ffff00;">}</span><span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>drop-while zero? <span style="color: #7388d6;">(</span>map #<span style="color: #909183;">(</span>nth <span style="color: #0084C8; font-weight: bold;">%</span> 3<span style="color: #909183;">)</span>
+                         <span style="color: #909183;">(</span>take-countries world-data2 #<span style="color: #709870;">{</span><span style="color: #4E9A06;">"RS"</span><span style="color: #709870;">}</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -676,9 +676,9 @@ there are before the first case (we are not interesting in plotting a flat line)
 </table>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">rs-data</span>
-  <span style="color: #006400;">(</span>drop-while zero? <span style="color: #ff1493;">(</span>map #<span style="color: #ffff00;">(</span>nth <span style="color: #0084C8; font-weight: bold;">%</span> 3<span style="color: #ffff00;">)</span>
-                         <span style="color: #ffff00;">(</span>take-countries world-data2 #<span style="color: #00ff00;">{</span><span style="color: #4E9A06;">"RS"</span><span style="color: #00ff00;">}</span><span style="color: #ffff00;">)</span><span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">rs-data</span>
+  <span style="color: #7388d6;">(</span>drop-while zero? <span style="color: #909183;">(</span>map #<span style="color: #709870;">(</span>nth <span style="color: #0084C8; font-weight: bold;">%</span> 3<span style="color: #709870;">)</span>
+                         <span style="color: #709870;">(</span>take-countries world-data2 #<span style="color: #907373;">{</span><span style="color: #4E9A06;">"RS"</span><span style="color: #907373;">}</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -687,7 +687,7 @@ Let's plot this.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>println <span style="color: #006400;">(</span>.plot <span style="color: #ff1493;">(</span><span style="color: #2F8B58; font-weight: bold;">ASCIIGraph</span>/fromSeries <span style="color: #ffff00;">(</span>double-array rs-data<span style="color: #ffff00;">)</span><span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>println <span style="color: #7388d6;">(</span>.plot <span style="color: #909183;">(</span><span style="color: #2F8B58; font-weight: bold;">ASCIIGraph</span>/fromSeries <span style="color: #709870;">(</span>double-array rs-data<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -775,8 +775,8 @@ of data, and we'll be able to put these nuclear options to use. For now, let's u
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">log</span> <span style="color: #2E3436; background-color: #EDEDED;">^</span><span style="color: #2F8B58; font-weight: bold;">double</span> <span style="color: #006400;">[</span><span style="color: #2E3436; background-color: #EDEDED;">^</span><span style="color: #2F8B58; font-weight: bold;">double</span> x<span style="color: #006400;">]</span>
-  <span style="color: #006400;">(</span><span style="color: #2F8B58; font-weight: bold;">Math</span>/log x<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">log</span> <span style="color: #2E3436; background-color: #EDEDED;">^</span><span style="color: #2F8B58; font-weight: bold;">double</span> <span style="color: #7388d6;">[</span><span style="color: #2E3436; background-color: #EDEDED;">^</span><span style="color: #2F8B58; font-weight: bold;">double</span> x<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span><span style="color: #2F8B58; font-weight: bold;">Math</span>/log x<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -790,8 +790,8 @@ Now, graph the logarithm of the function of interest.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>println <span style="color: #006400;">(</span>.plot <span style="color: #ff1493;">(</span><span style="color: #2F8B58; font-weight: bold;">ASCIIGraph</span>/fromSeries
-                 <span style="color: #ffff00;">(</span>double-array <span style="color: #00ff00;">(</span>map log rs-data<span style="color: #00ff00;">)</span><span style="color: #ffff00;">)</span><span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>println <span style="color: #7388d6;">(</span>.plot <span style="color: #909183;">(</span><span style="color: #2F8B58; font-weight: bold;">ASCIIGraph</span>/fromSeries
+                 <span style="color: #709870;">(</span>double-array <span style="color: #907373;">(</span>map log rs-data<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -822,14 +822,14 @@ Now, let's see how Italy is holding. For a few weeks we've listened to really ba
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">extract-data</span> <span style="color: #006400;">[</span>country-code<span style="color: #006400;">]</span>
- <span style="color: #006400;">(</span>drop-while zero? <span style="color: #ff1493;">(</span>map #<span style="color: #ffff00;">(</span>nth <span style="color: #0084C8; font-weight: bold;">%</span> 3<span style="color: #ffff00;">)</span>
-                        <span style="color: #ffff00;">(</span>take-countries world-data2 #<span style="color: #00ff00;">{</span>country-code<span style="color: #00ff00;">}</span><span style="color: #ffff00;">)</span><span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">extract-data</span> <span style="color: #7388d6;">[</span>country-code<span style="color: #7388d6;">]</span>
+ <span style="color: #7388d6;">(</span>drop-while zero? <span style="color: #909183;">(</span>map #<span style="color: #709870;">(</span>nth <span style="color: #0084C8; font-weight: bold;">%</span> 3<span style="color: #709870;">)</span>
+                        <span style="color: #709870;">(</span>take-countries world-data2 #<span style="color: #907373;">{</span>country-code<span style="color: #907373;">}</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>reverse <span style="color: #006400;">(</span>map log <span style="color: #ff1493;">(</span>extract-data <span style="color: #4E9A06;">"IT"</span><span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>reverse <span style="color: #7388d6;">(</span>map log <span style="color: #909183;">(</span>extract-data <span style="color: #4E9A06;">"IT"</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -895,7 +895,7 @@ Now, let's see how Italy is holding. For a few weeks we've listened to really ba
 </table>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>println <span style="color: #006400;">(</span>log-plot <span style="color: #ff1493;">(</span>extract-data <span style="color: #4E9A06;">"IT"</span><span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>println <span style="color: #7388d6;">(</span>log-plot <span style="color: #909183;">(</span>extract-data <span style="color: #4E9A06;">"IT"</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -928,7 +928,7 @@ And China already won this battle, and, I hope, war itself.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>reverse <span style="color: #006400;">(</span>map log <span style="color: #ff1493;">(</span>extract-data <span style="color: #4E9A06;">"CN"</span><span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>reverse <span style="color: #7388d6;">(</span>map log <span style="color: #909183;">(</span>extract-data <span style="color: #4E9A06;">"CN"</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -999,7 +999,7 @@ are less bad.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #8b0000;">(</span>log-plot <span style="color: #006400;">(</span>extract-data <span style="color: #4E9A06;">"CN"</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>log-plot <span style="color: #7388d6;">(</span>extract-data <span style="color: #4E9A06;">"CN"</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -1018,6 +1018,81 @@ nil
  5.30 ┤                  ╭─╯
  4.30 ┤    ╭─────────────╯
  3.30 ┼────╯
+</pre>
+
+<p>
+We can calculate each change explicitly, and see this directly.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">absolute-plot</span> <span style="color: #7388d6;">[</span>series-data<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>.plot <span style="color: #909183;">(</span><span style="color: #2F8B58; font-weight: bold;">ASCIIGraph</span>/fromSeries
+          <span style="color: #709870;">(</span>double-array series-data<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+
+<span style="color: #707183;">(</span>println <span style="color: #7388d6;">(</span>absolute-plot <span style="color: #909183;">(</span>map #<span style="color: #709870;">(</span>/ <span style="color: #0084C8; font-weight: bold;">%</span> 1000<span style="color: #709870;">)</span>
+                              <span style="color: #709870;">(</span>reduce <span style="color: #907373;">(</span><span style="color: #A52A2A; font-weight: bold;">fn</span> <span style="color: #6276ba;">[</span>acc x<span style="color: #6276ba;">]</span>
+                                        <span style="color: #6276ba;">(</span>conj acc <span style="color: #858580;">(</span>- x <span style="color: #80a880;">(</span>peek acc<span style="color: #80a880;">)</span><span style="color: #858580;">)</span><span style="color: #6276ba;">)</span><span style="color: #907373;">)</span>
+                                      <span style="color: #907373;">[</span>0<span style="color: #907373;">]</span>
+                                      <span style="color: #907373;">(</span>extract-data <span style="color: #4E9A06;">"CN"</span><span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+
+</pre>
+</div>
+
+<pre class="example">
+#'dragan.rocks.covid-19.world/absolute-plotnilBoxed math warning, *cider-repl dragan.rocks/org:localhost:45889(clj)*:5:31 - call: public static java.lang.Number clojure.lang.Numbers.divide(java.lang.Object,long).
+Boxed math warning, *cider-repl dragan.rocks/org:localhost:45889(clj)*:7:51 - call: public static java.lang.Number clojure.lang.Numbers.unchecked_minus(java.lang.Object,java.lang.Object).
+</pre>
+
+
+<pre class="example">
+46.69 ┤                                                              ╭╮╭╮╭╮╭╮╭╮╭╮╭╮╭╮
+45.69 ┤                                                          ╭╮╭╮││││││││││││││││
+44.70 ┤                                                      ╭╮╭╮││││││││││││││││││││
+43.71 ┤                                                    ╭╮││││││││││││││││││││││││
+42.71 ┤                                                  ╭╮││││││││││││││││││││││││││
+41.72 ┤                                                ╭╮││││││││││││││││││││││││││││
+40.73 ┤                                                ││││││││││││││││││││││││││││││
+39.73 ┤                                              ╭╮││││││││││││││││││││││││││││││
+38.74 ┤                                              ││││││││││││││││││││││││││││││││
+37.75 ┤                                              ││││││││││││││││││││││││││││││││
+36.75 ┤                                            ╭╮││││││││││││││││││││││││││││││││
+35.76 ┤                                            ││││││││││││││││││││││││││││││││││
+34.77 ┤                                            │││││││││││││││││││││││││││╰╯╰╯╰╯╰
+33.77 ┤                                            │││││││││││││││╰╯╰╯╰╯╰╯╰╯╰╯
+32.78 ┤                                            │││││││││╰╯╰╯╰╯
+31.79 ┤                                            │││││││╰╯
+30.79 ┤                                            │││││╰╯
+29.80 ┤                                            │││││
+28.81 ┤                                            │││╰╯
+27.81 ┤                                            │││
+26.82 ┤                                            │╰╯
+25.83 ┤                                            │
+24.83 ┤                                            │
+23.84 ┤                                            │
+22.85 ┤                                           ╭╯
+21.85 ┤                                          ╭╯
+20.86 ┤                                         ╭╯
+19.87 ┤                                         │
+18.87 ┤                                        ╭╯
+17.88 ┤                                       ╭╯
+16.89 ┤                                      ╭╯
+15.89 ┤                                      │
+14.90 ┤                                     ╭╯
+13.91 ┤                                     │
+12.91 ┤                                    ╭╯
+11.92 ┤                                    │
+10.93 ┤                                   ╭╯
+ 9.93 ┤                                  ╭╯
+ 8.94 ┤                                  │
+ 7.95 ┤                                 ╭╯
+ 6.95 ┤                                ╭╯
+ 5.96 ┤                                │
+ 4.97 ┤                              ╭─╯
+ 3.97 ┤                              │
+ 2.98 ┤                            ╭─╯
+ 1.99 ┤                           ╭╯
+ 0.99 ┤                         ╭─╯
+ 0.00 ┼─────────────────────────╯
 </pre>
 </div>
 </div>
