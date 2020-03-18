@@ -1,0 +1,1042 @@
+---
+date: 2020-03-18
+tags:
+- Clojure
+- Neanderthal
+- Data Analysis
+- Corona
+- Covid
+author: dragan
+layout: post
+title: Baby steps with Covid-19 data for (Clojure) programmers
+excerpt: Once the Corona pandemic data becomes more reliable, and abundant, we might be able to use it for some insight, provided that we learn some basics of epidemiology by then. Until then, I propose that we brush up our basic data skills through play.
+categories:
+- Clojure
+- Neanderthal
+- Data Analysis
+- Corona
+- Covid
+---
+<p>
+The Corona pandemic is on everyone's mind. If your country has not been locked
+down yet, it will be soon. The world and the human society is not going to be
+the same as before. Let's not worry too much about how economy is going to be hit,
+but hope that we solve it health-wise.
+</p>
+
+<p>
+Anyway, soon, most of us will have to spend most of our time inside, and when
+we solve basic needs, and make sure our loved ones are safe, we'll have some
+time to pass. Most people will re-watch their favorite TV shows and re-play their
+games. I'm sure that many will acquire various skills of America's Got Talent quality.
+Some programmers, though, will itch to try their skills on Covid-19 data.
+</p>
+
+<p>
+Maybe you wanted to add some machine learning skills to your programming-fu,
+but the day job just made that impossible. Why not start now? If this thing
+is going to be on our minds for months, if not years, we might throw some
+programming magic on it.
+</p>
+
+<p>
+By now, we've seen many shiny visualizations and analyses of the pandemic, published
+by experts and amateurs. Maybe you itch to throw it into a magic machine
+learning framework and get some super-x-ray insight from artificial intelligence.
+</p>
+
+<p>
+I won't do that here. First, because I know nothing about epidemiology. Please
+do not take any conclusions you hear from non-experts for granted. <b>They don't know what they're talking about</b>.
+Second, because the data that we can publicly access is too scarce to be thrown
+to any machine learning beast. You might get some numbers out, but these numbers
+will tell you only what's obvious from the visualizations anyway, at best, or
+spit out complete garbage at worst.
+</p>
+
+<p>
+Once the data becomes more reliable, and abundant, we might be able
+to use it for some insight, provided that we learn some basics of epidemiology
+by then. Until then, I propose that we brush up our basic data skills through
+pure play.
+</p>
+
+<p>
+So, there is no need to feel sorry that you hadn't learned some Big Machine Learning Framework yet.
+With basic programming skills, you can dissect the data that is currently available just fine,
+if not more easily! Just pure, plain Clojure, without specialized libraries!
+</p>
+
+<p>
+Let's take some basic steps with the Covid-19 data published by <a href="https://github.com/CSSEGISandData/COVID-19">Johns Hopkins University</a>.
+I'll use a copy provided by Oscar Wahltinez in <a href="https://github.com/open-covid-19/data">this Git repository.</a>
+</p>
+
+<div id="outline-container-orgdb1ab9e" class="outline-2">
+<h2 id="orgdb1ab9e">Loading the data</h2>
+<div class="outline-text-2" id="text-orgdb1ab9e">
+<p>
+The data is in a CSV file, so we require some useful namespaces for working with files.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #4c83ff;">ns</span> <span style="color: #afd8af;">dragan.rocks.covid-19.world</span>
+  <span style="color: #006400;">(</span><span style="color: #96CBFE;">:require</span> <span style="color: #ff1493;">[</span>clojure.java.io <span style="color: #96CBFE;">:as</span> io<span style="color: #ff1493;">]</span>
+            <span style="color: #ff1493;">[</span>clojure.data.csv <span style="color: #96CBFE;">:as</span> csv<span style="color: #ff1493;">]</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<p>
+CSV files are textual files where words are separated by comas and newlines. Typically,
+each line represent an observation, while the values of different variables for
+that observations are separated by comas. The first task is to translate that into
+convenient data structures in memory.
+</p>
+
+<p>
+We load the file as a resource, slurp its contents into a string, and parse it into
+a lazy sequence.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #afd8af;">csv</span>/read-csv <span style="color: #006400;">(</span>slurp <span style="color: #ff1493;">(</span><span style="color: #afd8af;">io</span>/resource <span style="color: #61CE3C;">"open-covid-19/output/world.csv"</span><span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+(["Date"
+  "CountryCode"
+  "CountryName"
+  "Confirmed"
+  "Deaths"
+  "Latitude"
+  "Longitude"]
+ ["2019-12-31"
+  "AE"
+  "United Arab Emirates"
+  "0"
+  "0"
+  "23.424076"
+  "53.847818"]
+ ["2019-12-31" "AF" "Afghanistan" "0" "0" "33.93911" "67.709953"]
+ ["2019-12-31" "AM" "Armenia" "0" "0" "40.069099" "45.038189"]
+ ["2019-12-31" "AT" "Austria" "0" "0" "47.516231" "14.550072"]
+ ["2019-12-31" "AU" "Australia" "0" "0" "-25.274398" "133.775136"]
+ ["2019-12-31" "AZ" "Azerbaijan" "0" "0" "40.143105" "47.576927"]
+ ["2019-12-31" "BE" "Belgium" "0" "0" "50.503887" "4.469936"]
+ ["2019-12-31" "BH" "Bahrain" "0" "0" "25.930414" "50.637772"]
+ ["2019-12-31" "BR" "Brazil" "0" "0" "-14.235004" "-51.92528"]
+ ["2019-12-31" "BY" "Belarus" "0" "0" "53.709807" "27.953389"]
+ ["2019-12-31" "CA" "Canada" "0" "0" "56.130366" "-106.346771"]
+ ["2019-12-31" "CH" "Switzerland" "0" "0" "46.818188" "8.227512"]
+ ["2019-12-31" "CN" "China" "27" "0" "35.86166" "104.195397"]
+ ["2019-12-31" "CZ" "Czech Republic" "0" "0" "49.817492" "15.472962"]
+ ["2019-12-31" "DE" "Germany" "0" "0" "51.165691" "10.451526"]
+ ...)
+</pre>
+
+<p>
+As you can see, this sequence contains a map of vectors such as <code>["2019-12-31" "AT" "Austria" "0" "0" "47.516231" "14.550072"]</code>.
+</p>
+
+<p>
+This is a sign that we successfully loaded the data. This is the data from the <code>world.csv</code> file,
+while there are a few more similar datasets: <code>usa.csv</code>, <code>china.csv</code>. We can create a convenience
+function for loading these files.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #4c83ff;">defn</span> <span style="color: #ff1493;">read-open-covid</span> <span style="color: #006400;">[</span>csv-name<span style="color: #006400;">]</span>
+  <span style="color: #006400;">(</span><span style="color: #afd8af;">csv</span>/read-csv <span style="color: #ff1493;">(</span>slurp <span style="color: #ffff00;">(</span><span style="color: #afd8af;">io</span>/resource <span style="color: #00ff00;">(</span>format <span style="color: #61CE3C;">"open-covid-19/output/%s.csv"</span> csv-name<span style="color: #00ff00;">)</span><span style="color: #ffff00;">)</span><span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<p>
+And now use it to load the world data and stash it into a global variable (normally a bad, bad,
+programming practice, but acceptable if we are only playing in the REPL, notebook-style). BTW,
+I run this code in emacs+CIDER, and automatically generate this post from org-mode. If you
+copy and paste the code, it should run in <b>any</b> Clojure REPL setup.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #4c83ff;">def</span> <span style="color: #ff69b4;">covid-world</span> <span style="color: #006400;">(</span>read-open-covid <span style="color: #61CE3C;">"world"</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgd40c38f" class="outline-2">
+<h2 id="orgd40c38f">Feeling the basic structure</h2>
+<div class="outline-text-2" id="text-orgd40c38f">
+<p>
+Now, the most basic info I can get is "What variables this data set have?". CSV files
+typically list that in the first line, and we access it as the first element in our sequence.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>first covid-world<span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+["Date" "CountryCode" "CountryName" "Confirmed" "Deaths" "Latitude" "Longitude"]
+</pre>
+
+
+<p>
+To see how example data looks like, let's take the second row.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>second covid-world<span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+["2019-12-31" "AE" "United Arab Emirates" "0" "0" "23.424076" "53.847818"]
+</pre>
+
+
+<p>
+So, date is in the <code>YYYY-MM-DD</code> format, which could be convenient for sorting. There is hope
+that Clojure can handle the comparisong and sorting of these strings as-is, without conversion
+to proper date objects (spoiler: it does). Next is the country code of the observation, which is
+obviously a useful identifier. <code>CountryName</code> is redundant, but can be a fine time saver for
+all of us who do not remember <b>all</b> country codes. Next is the official number of confirmed
+cases of infection by Covid-19, and official death toll. Latitude and longitude refer to the
+position of the country, and are included because this data set is used as a source for
+the visualization of the pandemic on the interactive wold map that you can access <a href="https://coronavirus.jhu.edu/map.html">here</a>.
+</p>
+
+<p>
+Unsurprisingly, on the New Year's Eve, There were no (discovered!) cases of infection in UAE.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org4f7bb75" class="outline-2">
+<h2 id="org4f7bb75">How many observations do we have</h2>
+<div class="outline-text-2" id="text-org4f7bb75">
+<p>
+The answer to this question is so easy to get, that I'm out of inspiration for this paragraph.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>count world-data<span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+5322
+</pre>
+
+
+<p>
+We have a little more than 5000 observation.
+</p>
+
+<p>
+How many countries do we have this data for? To answer this question, we should access country
+codes for each observation and then see how many distinct codes we have. It may require
+more fiddling in some other programming languages, but in Clojure it's bees knees.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>count <span style="color: #006400;">(</span>distinct <span style="color: #ff1493;">(</span>map second world-data<span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+143
+</pre>
+
+
+<p>
+So, is our data complete?
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>rem <span style="color: #006400;">(</span>count world-data<span style="color: #006400;">)</span> <span style="color: #006400;">(</span>count <span style="color: #ff1493;">(</span>distinct <span style="color: #ffff00;">(</span>map second world-data<span style="color: #ffff00;">)</span><span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+31
+</pre>
+
+
+<p>
+Apparently not, since there is a remainder in this division. Some dates are certainly missing
+for some countries.
+</p>
+
+<p>
+This means that we can't blindly treat all data for all countries uniformly; whatever
+the analysis we plan to do we will have to do something about that.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org4850a83" class="outline-2">
+<h2 id="org4850a83">How many observations are missing</h2>
+<div class="outline-text-2" id="text-org4850a83">
+<p>
+First, let's see how many distinct dates there are. Today is the 18th March 2020,
+and I can count that by hand on the calendar, but the point here is to do that
+using code.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>count <span style="color: #006400;">(</span>distinct <span style="color: #ff1493;">(</span>map first world-data<span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+79
+</pre>
+
+
+<p>
+Since there are 143 countries and 79 dates, ideally there would be this many observations:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>* <span style="color: #006400;">(</span>count <span style="color: #ff1493;">(</span>distinct <span style="color: #ffff00;">(</span>map first world-data<span style="color: #ffff00;">)</span><span style="color: #ff1493;">)</span><span style="color: #006400;">)</span>
+   <span style="color: #006400;">(</span>count <span style="color: #ff1493;">(</span>distinct <span style="color: #ffff00;">(</span>map second world-data<span style="color: #ffff00;">)</span><span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+11297
+</pre>
+
+
+<p>
+Which means that we are missing half the data.
+</p>
+
+<p>
+But it's not all. How many observations of the <code>Confirmed</code> variable are <code>0</code>?
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>* <span style="color: #006400;">(</span>count <span style="color: #ff1493;">(</span>filter zero? <span style="color: #ffff00;">(</span>map #<span style="color: #00ff00;">(</span>nth <span style="color: #ff69b4;">%</span> 3<span style="color: #00ff00;">)</span> world-data<span style="color: #ffff00;">)</span><span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+class java.lang.ClassCastExceptionclass java.lang.ClassCastExceptionExecution error (ClassCastException) at dragan.rocks.covid-19.world/eval15734 (form-init8558230572914833950.clj:1).
+java.lang.String cannot be cast to java.lang.Number
+</pre>
+
+
+<p>
+We get the exception, since <code>"0"</code> and <code>"4"</code> are not a numbers, but strings of characters.
+</p>
+
+<p>
+Let's convert these columns to proper types:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #4c83ff;">def</span> <span style="color: #ff69b4;">world-data2</span>
+  <span style="color: #006400;">(</span>map <span style="color: #ff1493;">(</span><span style="color: #4c83ff;">fn</span> <span style="color: #ffff00;">[</span><span style="color: #00ff00;">[</span>d cc cn conf death<span style="color: #00ff00;">]</span><span style="color: #ffff00;">]</span>
+         <span style="color: #ffff00;">[</span>d cc cn <span style="color: #00ff00;">(</span><span style="color: #afd8af;">Long</span>/parseLong conf<span style="color: #00ff00;">)</span> <span style="color: #00ff00;">(</span><span style="color: #afd8af;">Long</span>/parseLong death<span style="color: #00ff00;">)</span><span style="color: #ffff00;">]</span><span style="color: #ff1493;">)</span>
+       world-data<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#'dragan.rocks.covid-19.world/world-data2
+</pre>
+
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>* <span style="color: #006400;">(</span>count <span style="color: #ff1493;">(</span>filter zero? <span style="color: #ffff00;">(</span>map #<span style="color: #00ff00;">(</span>nth <span style="color: #ff69b4;">%</span> 3<span style="color: #00ff00;">)</span> world-data2<span style="color: #ffff00;">)</span><span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+2976
+</pre>
+
+
+<p>
+In roughly half of the observations, there were no confirmed cases.
+But not even all zeros are equal. Some zeroes are here because the
+pandemic hasn't reached a country at the particular date. Some other
+zeros might be there because no new cases were discovered in a country
+that has previous case. But even that does not mean there are no new case.
+In my country, Serbia, on some dates no tests were done (or, perhaps, were
+done but haven't been published, who knows).
+</p>
+
+<p>
+The point is that this data is so early, that it is very scattered and
+very rough.
+</p>
+
+<p>
+Anyway, let's see how many data is recorded at all per each day (<code>0</code> or otherwise).
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #4c83ff;">def</span> <span style="color: #ff69b4;">date-freqs</span>
+  <span style="color: #006400;">(</span>sort-by first <span style="color: #ff1493;">(</span>frequencies <span style="color: #ffff00;">(</span>map first world-data2<span style="color: #ffff00;">)</span><span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+(["2019-12-31" 66]
+ ["2020-01-01" 66]
+ ["2020-01-02" 66]
+ ["2020-01-03" 66]
+ ["2020-01-04" 66]
+ ["2020-01-05" 66]
+ ["2020-01-06" 66]
+ ["2020-01-07" 66]
+ ["2020-01-08" 66]
+ ["2020-01-09" 66]
+ ["2020-01-10" 66]
+ ["2020-01-11" 66]
+ ["2020-01-12" 66]
+ ["2020-01-13" 66]
+ ["2020-01-14" 66]
+ ["2020-01-15" 66]
+ ...)
+</pre>
+
+<p>
+At the beginning, most data is available for (probably) the same 66 countries.
+</p>
+
+<p>
+Let's discover (by code) what's the first date with a different number of observations.
+</p>
+
+<p>
+It seems that this <code>66</code> runs right until two weeks ago. And then?
+</p>
+
+<p>
+All dates after the 3rd of March first see less observations, and then, starting with the March 11th,
+ the number of observations
+suddenly jumps. My hunch is that at first, most countries just submitted the default <code>0</code> to whomever
+collected this data (the World Health Organization, I suppose?), simply ignoring the problem.
+Then, as they started to realize the immediate danger, they were reluctant to send the
+invented data (or the WHO stopped collecting the default zeros?), and then, on 15th March
+the data becomes more complete. My hunch is the global pandemic was officially announced sometimes before that.
+Since this was in the past, I can simply check on the Internet (&#x2026;typing away in the browser&#x2026;): the
+pandemic was announced on March 11th 2020.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgabd3a84" class="outline-2">
+<h2 id="orgabd3a84">How much data do we have for each particular country</h2>
+<div class="outline-text-2" id="text-orgabd3a84">
+<p>
+Analogously to the frequencies of observations on a particular date,
+we can count the frequencies related to countries; instead of the first column,
+we will use the second.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #4c83ff;">def</span> <span style="color: #ff69b4;">country-freqs</span>
+  <span style="color: #006400;">(</span>sort-by first <span style="color: #ff1493;">(</span>frequencies <span style="color: #ffff00;">(</span>map second world-data2<span style="color: #ffff00;">)</span><span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+(["AD" 4]
+ ["AE" 72]
+ ["AF" 68]
+ ["AG" 1]
+ ["AL" 9]
+ ["AM" 69]
+ ["AR" 11]
+ ["AT" 78]
+ ["AU" 78]
+ ["AZ" 71]
+ ["BA" 5]
+ ["BD" 3]
+ ["BE" 78]
+ ["BF" 5]
+ ["BG" 8]
+ ["BH" 77]
+ ...)
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org2220b99" class="outline-2">
+<h2 id="org2220b99">Selecting your country</h2>
+<div class="outline-text-2" id="text-org2220b99">
+<p>
+The human eye quickly gets lost in this bunch of numbers. Let's create a function that
+selects only the data available for the country, or a set of countries, that we are
+interested in.
+</p>
+
+<p>
+For, example, for this set of countries: <code>#{"IT" "FR" "ES" "CN"}</code>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>filter <span style="color: #006400;">(</span><span style="color: #4c83ff;">fn</span> <span style="color: #ff1493;">[</span><span style="color: #ffff00;">[</span>_ code<span style="color: #ffff00;">]</span><span style="color: #ff1493;">]</span> <span style="color: #ff1493;">(</span>#<span style="color: #ffff00;">{</span><span style="color: #61CE3C;">"IT"</span> <span style="color: #61CE3C;">"FR"</span> <span style="color: #61CE3C;">"ES"</span> <span style="color: #61CE3C;">"CN"</span><span style="color: #ffff00;">}</span> code<span style="color: #ff1493;">)</span><span style="color: #006400;">)</span>
+        world-data2<span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+(["2019-12-31" "CN" "China" 27 0]
+ ["2019-12-31" "ES" "Spain" 0 0]
+ ["2019-12-31" "FR" "France" 0 0]
+ ["2019-12-31" "IT" "Italy" 0 0]
+ ["2020-01-01" "CN" "China" 27 0]
+ ["2020-01-01" "ES" "Spain" 0 0]
+ ["2020-01-01" "FR" "France" 0 0]
+ ["2020-01-01" "IT" "Italy" 0 0]
+ ["2020-01-02" "CN" "China" 27 0]
+ ["2020-01-02" "ES" "Spain" 0 0]
+ ["2020-01-02" "FR" "France" 0 0]
+ ["2020-01-02" "IT" "Italy" 0 0]
+ ["2020-01-03" "CN" "China" 44 0]
+ ["2020-01-03" "ES" "Spain" 0 0]
+ ["2020-01-03" "FR" "France" 0 0]
+ ["2020-01-03" "IT" "Italy" 0 0]
+ ...)
+</pre>
+
+<p>
+We'll write some convenient functions for computing the previously discussed values.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #4c83ff;">defn</span> <span style="color: #ff1493;">take-countries</span> <span style="color: #006400;">[</span>data country-set<span style="color: #006400;">]</span>
+  <span style="color: #006400;">(</span>filter <span style="color: #ff1493;">(</span><span style="color: #4c83ff;">fn</span> <span style="color: #ffff00;">[</span><span style="color: #00ff00;">[</span>_ code<span style="color: #00ff00;">]</span><span style="color: #ffff00;">]</span> <span style="color: #ffff00;">(</span>country-set code<span style="color: #ffff00;">)</span><span style="color: #ff1493;">)</span> data<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #4c83ff;">defn</span> <span style="color: #ff1493;">date-freqs</span> <span style="color: #006400;">[</span>data<span style="color: #006400;">]</span>
+  <span style="color: #006400;">(</span>sort-by first <span style="color: #ff1493;">(</span>frequencies <span style="color: #ffff00;">(</span>map first data<span style="color: #ffff00;">)</span><span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #4c83ff;">defn</span> <span style="color: #ff1493;">country-freqs</span> <span style="color: #006400;">[</span>data<span style="color: #006400;">]</span>
+  <span style="color: #006400;">(</span>sort-by first <span style="color: #ff1493;">(</span>frequencies <span style="color: #ffff00;">(</span>map second data<span style="color: #ffff00;">)</span><span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #4c83ff;">def</span> <span style="color: #ff69b4;">my-countries</span>
+  <span style="color: #006400;">(</span>country-freqs
+   <span style="color: #ff1493;">(</span>take-countries world-data
+                   #<span style="color: #ffff00;">{</span><span style="color: #61CE3C;">"IT"</span> <span style="color: #61CE3C;">"FR"</span> <span style="color: #61CE3C;">"ES"</span> <span style="color: #61CE3C;">"CN"</span> <span style="color: #61CE3C;">"US"</span> <span style="color: #61CE3C;">"RS"</span> <span style="color: #61CE3C;">"DE"</span><span style="color: #ffff00;">}</span><span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<p>
+Now we can see that most of these countries have pretty complete (if not overly
+reliable) data, while Serbia only recently started doing tests and reporting some numbers.
+</p>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+</colgroup>
+<tbody>
+<tr>
+<td class="org-left">(2019-12-31 CN China 27 0 35.86166 104.195397)</td>
+<td class="org-left">(2019-12-31 DE Germany 0 0 51.165691 10.451526)</td>
+<td class="org-left">(2019-12-31 ES Spain 0 0 40.463667 -3.74922)</td>
+<td class="org-left">(2019-12-31 FR France 0 0 46.227638 2.213749)</td>
+<td class="org-left">(2019-12-31 IT Italy 0 0 41.87194 12.56738)</td>
+<td class="org-left">(2019-12-31 US United States of America 0 0 37.09024 -95.712891)</td>
+<td class="org-left">(2020-01-01 CN China 27 0 35.86166 104.195397)</td>
+<td class="org-left">(2020-01-01 DE Germany 0 0 51.165691 10.451526)</td>
+<td class="org-left">(2020-01-01 ES Spain 0 0 40.463667 -3.74922)</td>
+<td class="org-left">(2020-01-01 FR France 0 0 46.227638 2.213749)</td>
+<td class="org-left">(2020-01-01 IT Italy 0 0 41.87194 12.56738)</td>
+<td class="org-left">(2020-01-01 US United States of America 0 0 37.09024 -95.712891)</td>
+<td class="org-left">(2020-01-02 CN China 27 0 35.86166 104.195397)</td>
+<td class="org-left">(2020-01-02 DE Germany 0 0 51.165691 10.451526)</td>
+<td class="org-left">(2020-01-02 ES Spain 0 0 40.463667 -3.74922)</td>
+<td class="org-left">(2020-01-02 FR France 0 0 46.227638 2.213749)</td>
+<td class="org-left">&#x2026;</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+
+<div id="outline-container-org14d4099" class="outline-2">
+<h2 id="org14d4099">Draw some plots</h2>
+<div class="outline-text-2" id="text-org14d4099">
+<p>
+Instead of flashy plotting libraries, I'll draw some ASCII art.
+The reason is that the data is so obvious although coarse, that I don't
+want to make a false impression that you'll learn anything new that
+you haven't already seen in the news and on the Internet.
+</p>
+
+<p>
+The second is: we are programmers, we present data in any silly way that we please!
+</p>
+
+<p>
+I selected a pretty basic Java ASCII plotting library after a quick search on GitHub.
+Great thanks to Mitch Talmadge for <a href="https://github.com/MitchTalmadge/ASCII-Data">ASCII-Data</a> :)
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>import 'com.mitchtalmadge.asciidata.graph.ASCIIGraph<span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<p>
+First I'll just take the number of confirmed cases from Serbia, and remove whatever zeros
+there are before the first case (we are not interesting in plotting a flat line).
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>drop-while zero? <span style="color: #006400;">(</span>map #<span style="color: #ff1493;">(</span>nth <span style="color: #ff69b4;">%</span> 3<span style="color: #ff1493;">)</span>
+                         <span style="color: #ff1493;">(</span>take-countries world-data2 #<span style="color: #ffff00;">{</span><span style="color: #61CE3C;">"RS"</span><span style="color: #ffff00;">}</span><span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+</colgroup>
+<tbody>
+<tr>
+<td class="org-right">1</td>
+<td class="org-right">5</td>
+<td class="org-right">18</td>
+<td class="org-right">24</td>
+<td class="org-right">41</td>
+<td class="org-right">46</td>
+<td class="org-right">55</td>
+<td class="org-right">57</td>
+</tr>
+</tbody>
+</table>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #4c83ff;">def</span> <span style="color: #ff69b4;">rs-data</span>
+  <span style="color: #006400;">(</span>drop-while zero? <span style="color: #ff1493;">(</span>map #<span style="color: #ffff00;">(</span>nth <span style="color: #ff69b4;">%</span> 3<span style="color: #ffff00;">)</span>
+                         <span style="color: #ffff00;">(</span>take-countries world-data2 #<span style="color: #00ff00;">{</span><span style="color: #61CE3C;">"RS"</span><span style="color: #00ff00;">}</span><span style="color: #ffff00;">)</span><span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<p>
+Let's plot this.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>println <span style="color: #006400;">(</span>.plot <span style="color: #ff1493;">(</span><span style="color: #afd8af;">ASCIIGraph</span>/fromSeries <span style="color: #ffff00;">(</span>double-array rs-data<span style="color: #ffff00;">)</span><span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+nil
+</pre>
+
+
+<pre class="example">
+57.00 ┤      ╭
+56.00 ┤      │
+55.00 ┤     ╭╯
+54.00 ┤     │
+53.00 ┤     │
+52.00 ┤     │
+51.00 ┤     │
+50.00 ┤     │
+49.00 ┤     │
+48.00 ┤     │
+47.00 ┤     │
+46.00 ┤    ╭╯
+45.00 ┤    │
+44.00 ┤    │
+43.00 ┤    │
+42.00 ┤    │
+41.00 ┤   ╭╯
+40.00 ┤   │
+39.00 ┤   │
+38.00 ┤   │
+37.00 ┤   │
+36.00 ┤   │
+35.00 ┤   │
+34.00 ┤   │
+33.00 ┤   │
+32.00 ┤   │
+31.00 ┤   │
+30.00 ┤   │
+29.00 ┤   │
+28.00 ┤   │
+27.00 ┤   │
+26.00 ┤   │
+25.00 ┤   │
+24.00 ┤  ╭╯
+23.00 ┤  │
+22.00 ┤  │
+21.00 ┤  │
+20.00 ┤  │
+19.00 ┤  │
+18.00 ┤ ╭╯
+17.00 ┤ │
+16.00 ┤ │
+15.00 ┤ │
+14.00 ┤ │
+13.00 ┤ │
+12.00 ┤ │
+11.00 ┤ │
+10.00 ┤ │
+ 9.00 ┤ │
+ 8.00 ┤ │
+ 7.00 ┤ │
+ 6.00 ┤ │
+ 5.00 ┤╭╯
+ 4.00 ┤│
+ 3.00 ┤│
+ 2.00 ┤│
+ 1.00 ┼╯
+</pre>
+
+<p>
+Whoaaa. Although the numbers looked pretty tame, graphs shoots up in the skies.
+This is because the growth is <b>exponential</b>.
+</p>
+
+<p>
+Since the exponential function grows really fast, the lower numbers quickly become miniscule.
+However, we are not interested in absolute numbers, but in growth. Therefore,
+it is more appropriate to take the logarithm of this function, and see whether the
+logarithm starts to drop off, if only for a tiny bit.
+</p>
+
+<p>
+We need a convenience <code>log</code> function. I could have imported one from <a href="http://neanderthal.uncomplicate.org">Neanderthal</a>, but a fast
+CPU and GPU library is clearly an overkill for such a task. Hopefully soon there will be abundance
+of data, and we'll be able to put these nuclear options to use. For now, let's use sticks and stones.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #4c83ff;">defn</span> <span style="color: #ff1493;">log</span> <span style="color: #d3d3d3; background-color: #000000;">^</span><span style="color: #afd8af;">double</span> <span style="color: #006400;">[</span><span style="color: #d3d3d3; background-color: #000000;">^</span><span style="color: #afd8af;">double</span> x<span style="color: #006400;">]</span>
+  <span style="color: #006400;">(</span><span style="color: #afd8af;">Math</span>/log x<span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#'dragan.rocks.covid-19.world/log
+</pre>
+
+
+<p>
+Now, graph the logarithm of the function of interest.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>println <span style="color: #006400;">(</span>.plot <span style="color: #ff1493;">(</span><span style="color: #afd8af;">ASCIIGraph</span>/fromSeries
+                 <span style="color: #ffff00;">(</span>double-array <span style="color: #00ff00;">(</span>map log rs-data<span style="color: #00ff00;">)</span><span style="color: #ffff00;">)</span><span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+nil
+</pre>
+
+
+<p>
+It grows quite fast, and it is only at the beginning.
+</p>
+
+<pre class="example">
+4.04 ┤   ╭───
+3.03 ┤ ╭─╯
+2.02 ┤╭╯
+1.01 ┤│
+0.00 ┼╯
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org72f99d3" class="outline-2">
+<h2 id="org72f99d3">Italy is overwhelmed</h2>
+<div class="outline-text-2" id="text-org72f99d3">
+<p>
+Now, let's see how Italy is holding. For a few weeks we've listened to really bad news.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span><span style="color: #4c83ff;">defn</span> <span style="color: #ff1493;">extract-data</span> <span style="color: #006400;">[</span>country-code<span style="color: #006400;">]</span>
+ <span style="color: #006400;">(</span>remove zero? <span style="color: #ff1493;">(</span>map #<span style="color: #ffff00;">(</span>nth <span style="color: #ff69b4;">%</span> 3<span style="color: #ffff00;">)</span>
+                    <span style="color: #ffff00;">(</span>take-countries world-data2 #<span style="color: #00ff00;">{</span>country-code<span style="color: #00ff00;">}</span><span style="color: #ffff00;">)</span><span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>reverse <span style="color: #006400;">(</span>map log <span style="color: #ff1493;">(</span>extract-data <span style="color: #61CE3C;">"IT"</span><span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+</colgroup>
+<tbody>
+<tr>
+<td class="org-right">10.357933282865915</td>
+<td class="org-right">10.239245248219472</td>
+<td class="org-right">10.12414802355653</td>
+<td class="org-right">9.959726098983317</td>
+<td class="org-right">9.77905747415795</td>
+<td class="org-right">9.62331057957012</td>
+<td class="org-right">9.430439293104167</td>
+<td class="org-right">9.23824732522919</td>
+<td class="org-right">9.123910643977796</td>
+<td class="org-right">8.905851181208021</td>
+<td class="org-right">8.679822114864455</td>
+<td class="org-right">8.441607204459642</td>
+<td class="org-right">8.27563105457801</td>
+<td class="org-right">8.035602692918582</td>
+<td class="org-right">7.824845691026856</td>
+<td class="org-right">7.618742377670413</td>
+<td class="org-left">&#x2026;</td>
+</tr>
+</tbody>
+</table>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>log-plot <span style="color: #006400;">(</span>extract-data <span style="color: #61CE3C;">"IT"</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<p>
+It hasn't started to slow down yet, although it looks like it is about to.
+</p>
+
+<pre class="example">
+10.36 ┤                                           ╭───
+ 9.39 ┤                                      ╭────╯
+ 8.42 ┤                                 ╭────╯
+ 7.46 ┤                             ╭───╯
+ 6.49 ┤                          ╭──╯
+ 5.53 ┤                       ╭──╯
+ 4.56 ┤                      ╭╯
+ 3.59 ┤                      │
+ 2.63 ┤                     ╭╯
+ 1.66 ┤                     │
+ 0.69 ┼─────────────────────╯
+</pre>
+</div>
+</div>
+
+<div id="outline-container-orgee3eabd" class="outline-2">
+<h2 id="orgee3eabd">China is slowing down</h2>
+<div class="outline-text-2" id="text-orgee3eabd">
+<p>
+And China already won this battle, and, I hope, war itself.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>reverse <span style="color: #006400;">(</span>map log <span style="color: #ff1493;">(</span>extract-data <span style="color: #61CE3C;">"CN"</span><span style="color: #ff1493;">)</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+</colgroup>
+<tbody>
+<tr>
+<td class="org-right">11.303808085389111</td>
+<td class="org-right">11.302451316756681</td>
+<td class="org-right">11.302142703354239</td>
+<td class="org-right">11.301871044753339</td>
+<td class="org-right">11.301636371103024</td>
+<td class="org-right">11.301364574899084</td>
+<td class="org-right">11.301067985672987</td>
+<td class="org-right">11.300709489621875</td>
+<td class="org-right">11.300462176064121</td>
+<td class="org-right">11.29990549682687</td>
+<td class="org-right">11.29933612646083</td>
+<td class="org-right">11.29808484869358</td>
+<td class="org-right">11.295975195631474</td>
+<td class="org-right">11.294520668003193</td>
+<td class="org-right">11.293039103249892</td>
+<td class="org-right">11.291455512408028</td>
+<td class="org-left">&#x2026;</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+See how the numbers are rising slowly <b>on the log scale</b>. The absolute numbers are still bad, but each day they
+are less bad.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #8b0000;">(</span>log-plot <span style="color: #006400;">(</span>extract-data <span style="color: #61CE3C;">"IT"</span><span style="color: #006400;">)</span><span style="color: #8b0000;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+nil
+</pre>
+
+
+<pre class="example">
+11.30 ┤                                           ╭─────────────────────────────────
+10.30 ┤                                  ╭────────╯
+ 9.30 ┤                             ╭────╯
+ 8.30 ┤                          ╭──╯
+ 7.30 ┤                        ╭─╯
+ 6.30 ┤                    ╭───╯
+ 5.30 ┤                  ╭─╯
+ 4.30 ┤    ╭─────────────╯
+ 3.30 ┼────╯
+</pre>
+</div>
+</div>
+
+<div id="outline-container-orgb384954" class="outline-2">
+<h2 id="orgb384954">Programmers, learn Machine Learning!</h2>
+<div class="outline-text-2" id="text-orgb384954">
+<p>
+I hope this was easy and interesting, and it occupied your attention away
+from the news for at least some time.
+</p>
+
+<p>
+Simple tools really make you think about the problem, so the flashy new tools are not necessarry when you're just starting.
+</p>
+
+<p>
+Although Machine Learning may look like a high mountain to climb,
+I hope this post proved to you that you made that first step long ago,
+with your first steps in programming!
+</p>
+</div>
+</div>
