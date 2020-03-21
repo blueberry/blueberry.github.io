@@ -320,12 +320,12 @@ But it's not all. How many observations of the <code>Confirmed</code> variable a
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span>* <span style="color: #7388d6;">(</span>count <span style="color: #909183;">(</span>filter zero? <span style="color: #709870;">(</span>map #<span style="color: #907373;">(</span>nth <span style="color: #0084C8; font-weight: bold;">%</span> 3<span style="color: #907373;">)</span> world-data<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>count <span style="color: #7388d6;">(</span>filter zero? <span style="color: #909183;">(</span>map #<span style="color: #709870;">(</span>nth <span style="color: #0084C8; font-weight: bold;">%</span> 3<span style="color: #709870;">)</span> world-data<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
 <pre class="example">
-class java.lang.ClassCastExceptionclass java.lang.ClassCastExceptionExecution error (ClassCastException) at dragan.rocks.covid-19.world/eval16114 (form-init8558230572914833950.clj:1).
+class java.lang.ClassCastExceptionclass java.lang.ClassCastExceptionExecution error (ClassCastException) at dragan.rocks.covid-19.world/eval14376 (form-init3222897912165483565.clj:1).
 java.lang.String cannot be cast to java.lang.Number
 </pre>
 
@@ -525,14 +525,14 @@ We'll write some convenient functions for computing the previously discussed val
 </div>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">country-freqs</span> <span style="color: #7388d6;">[</span>data<span style="color: #7388d6;">]</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">country-freq</span> <span style="color: #7388d6;">[</span>data<span style="color: #7388d6;">]</span>
   <span style="color: #7388d6;">(</span>sort-by first <span style="color: #909183;">(</span>frequencies <span style="color: #709870;">(</span>map second data<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
 <div class="org-src-container">
 <pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">my-countries</span>
-  <span style="color: #7388d6;">(</span>country-freqs
+  <span style="color: #7388d6;">(</span>country-freq
    <span style="color: #909183;">(</span>take-countries world-data
                    #<span style="color: #709870;">{</span><span style="color: #4E9A06;">"IT"</span> <span style="color: #4E9A06;">"FR"</span> <span style="color: #4E9A06;">"ES"</span> <span style="color: #4E9A06;">"CN"</span> <span style="color: #4E9A06;">"US"</span> <span style="color: #4E9A06;">"RS"</span> <span style="color: #4E9A06;">"DE"</span><span style="color: #709870;">}</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
@@ -549,57 +549,42 @@ reliable) data, while Serbia only recently started doing tests and reporting som
 <colgroup>
 <col  class="org-left" />
 
-<col  class="org-left" />
-
-<col  class="org-left" />
-
-<col  class="org-left" />
-
-<col  class="org-left" />
-
-<col  class="org-left" />
-
-<col  class="org-left" />
-
-<col  class="org-left" />
-
-<col  class="org-left" />
-
-<col  class="org-left" />
-
-<col  class="org-left" />
-
-<col  class="org-left" />
-
-<col  class="org-left" />
-
-<col  class="org-left" />
-
-<col  class="org-left" />
-
-<col  class="org-left" />
-
-<col  class="org-left" />
+<col  class="org-right" />
 </colgroup>
 <tbody>
 <tr>
-<td class="org-left">(2019-12-31 CN China 27 0 35.86166 104.195397)</td>
-<td class="org-left">(2019-12-31 DE Germany 0 0 51.165691 10.451526)</td>
-<td class="org-left">(2019-12-31 ES Spain 0 0 40.463667 -3.74922)</td>
-<td class="org-left">(2019-12-31 FR France 0 0 46.227638 2.213749)</td>
-<td class="org-left">(2019-12-31 IT Italy 0 0 41.87194 12.56738)</td>
-<td class="org-left">(2019-12-31 US United States of America 0 0 37.09024 -95.712891)</td>
-<td class="org-left">(2020-01-01 CN China 27 0 35.86166 104.195397)</td>
-<td class="org-left">(2020-01-01 DE Germany 0 0 51.165691 10.451526)</td>
-<td class="org-left">(2020-01-01 ES Spain 0 0 40.463667 -3.74922)</td>
-<td class="org-left">(2020-01-01 FR France 0 0 46.227638 2.213749)</td>
-<td class="org-left">(2020-01-01 IT Italy 0 0 41.87194 12.56738)</td>
-<td class="org-left">(2020-01-01 US United States of America 0 0 37.09024 -95.712891)</td>
-<td class="org-left">(2020-01-02 CN China 27 0 35.86166 104.195397)</td>
-<td class="org-left">(2020-01-02 DE Germany 0 0 51.165691 10.451526)</td>
-<td class="org-left">(2020-01-02 ES Spain 0 0 40.463667 -3.74922)</td>
-<td class="org-left">(2020-01-02 FR France 0 0 46.227638 2.213749)</td>
-<td class="org-left">&#x2026;</td>
+<td class="org-left">CN</td>
+<td class="org-right">78</td>
+</tr>
+
+<tr>
+<td class="org-left">DE</td>
+<td class="org-right">78</td>
+</tr>
+
+<tr>
+<td class="org-left">ES</td>
+<td class="org-right">78</td>
+</tr>
+
+<tr>
+<td class="org-left">FR</td>
+<td class="org-right">78</td>
+</tr>
+
+<tr>
+<td class="org-left">IT</td>
+<td class="org-right">79</td>
+</tr>
+
+<tr>
+<td class="org-left">RS</td>
+<td class="org-right">8</td>
+</tr>
+
+<tr>
+<td class="org-left">US</td>
+<td class="org-right">78</td>
 </tr>
 </tbody>
 </table>
@@ -829,7 +814,7 @@ Now, let's see how Italy is holding. For a few weeks we've listened to really ba
 </div>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span>reverse <span style="color: #7388d6;">(</span>map log <span style="color: #909183;">(</span>extract-data <span style="color: #4E9A06;">"IT"</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>take 5 <span style="color: #7388d6;">(</span>reverse <span style="color: #909183;">(</span>map log <span style="color: #709870;">(</span>extract-data <span style="color: #4E9A06;">"IT"</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -846,30 +831,6 @@ Now, let's see how Italy is holding. For a few weeks we've listened to really ba
 <col  class="org-right" />
 
 <col  class="org-right" />
-
-<col  class="org-right" />
-
-<col  class="org-right" />
-
-<col  class="org-right" />
-
-<col  class="org-right" />
-
-<col  class="org-right" />
-
-<col  class="org-right" />
-
-<col  class="org-right" />
-
-<col  class="org-right" />
-
-<col  class="org-right" />
-
-<col  class="org-right" />
-
-<col  class="org-right" />
-
-<col  class="org-left" />
 </colgroup>
 <tbody>
 <tr>
@@ -878,18 +839,6 @@ Now, let's see how Italy is holding. For a few weeks we've listened to really ba
 <td class="org-right">10.12414802355653</td>
 <td class="org-right">9.959726098983317</td>
 <td class="org-right">9.77905747415795</td>
-<td class="org-right">9.62331057957012</td>
-<td class="org-right">9.430439293104167</td>
-<td class="org-right">9.23824732522919</td>
-<td class="org-right">9.123910643977796</td>
-<td class="org-right">8.905851181208021</td>
-<td class="org-right">8.679822114864455</td>
-<td class="org-right">8.441607204459642</td>
-<td class="org-right">8.27563105457801</td>
-<td class="org-right">8.035602692918582</td>
-<td class="org-right">7.824845691026856</td>
-<td class="org-right">7.618742377670413</td>
-<td class="org-left">&#x2026;</td>
 </tr>
 </tbody>
 </table>
@@ -928,7 +877,7 @@ And China already won this battle, and, I hope, war itself.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-clojure"><span style="color: #707183;">(</span>reverse <span style="color: #7388d6;">(</span>map log <span style="color: #909183;">(</span>extract-data <span style="color: #4E9A06;">"CN"</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<pre class="src src-clojure"><span style="color: #707183;">(</span>take 5 <span style="color: #7388d6;">(</span>reverse <span style="color: #909183;">(</span>map log <span style="color: #709870;">(</span>extract-data <span style="color: #4E9A06;">"CN"</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
 </pre>
 </div>
 
@@ -945,30 +894,6 @@ And China already won this battle, and, I hope, war itself.
 <col  class="org-right" />
 
 <col  class="org-right" />
-
-<col  class="org-right" />
-
-<col  class="org-right" />
-
-<col  class="org-right" />
-
-<col  class="org-right" />
-
-<col  class="org-right" />
-
-<col  class="org-right" />
-
-<col  class="org-right" />
-
-<col  class="org-right" />
-
-<col  class="org-right" />
-
-<col  class="org-right" />
-
-<col  class="org-right" />
-
-<col  class="org-left" />
 </colgroup>
 <tbody>
 <tr>
@@ -977,18 +902,6 @@ And China already won this battle, and, I hope, war itself.
 <td class="org-right">11.302142703354239</td>
 <td class="org-right">11.301871044753339</td>
 <td class="org-right">11.301636371103024</td>
-<td class="org-right">11.301364574899084</td>
-<td class="org-right">11.301067985672987</td>
-<td class="org-right">11.300709489621875</td>
-<td class="org-right">11.300462176064121</td>
-<td class="org-right">11.29990549682687</td>
-<td class="org-right">11.29933612646083</td>
-<td class="org-right">11.29808484869358</td>
-<td class="org-right">11.295975195631474</td>
-<td class="org-right">11.294520668003193</td>
-<td class="org-right">11.293039103249892</td>
-<td class="org-right">11.291455512408028</td>
-<td class="org-left">&#x2026;</td>
 </tr>
 </tbody>
 </table>
@@ -1004,7 +917,7 @@ are less bad.
 </div>
 
 <pre class="example">
-nil
+"   11.30 ┤                                           ╭─────────────────────────────────\n   10.30 ┤                                  ╭────────╯                                 \n    9.30 ┤                             ╭────╯                                          \n    8.30 ┤                          ╭──╯                                               \n    7.30 ┤                        ╭─╯                                                  \n    6.30 ┤                    ╭───╯                                                    \n    5.30 ┤                  ╭─╯                                                        \n    4.30 ┤    ╭─────────────╯                                                          \n    3.30 ┼────╯                                                                        \n"
 </pre>
 
 
@@ -1039,8 +952,8 @@ We can calculate each change explicitly, and see this directly.
 </div>
 
 <pre class="example">
-#'dragan.rocks.covid-19.world/absolute-plotnilBoxed math warning, *cider-repl dragan.rocks/org:localhost:45889(clj)*:5:31 - call: public static java.lang.Number clojure.lang.Numbers.divide(java.lang.Object,long).
-Boxed math warning, *cider-repl dragan.rocks/org:localhost:45889(clj)*:7:51 - call: public static java.lang.Number clojure.lang.Numbers.unchecked_minus(java.lang.Object,java.lang.Object).
+#'dragan.rocks.covid-19.world/absolute-plotnilBoxed math warning, *Org-Babel Preview Corona-1-Baby-steps-with-Covid-19-for-programmers.org[ clojure ]*:5:31 - call: public static java.lang.Number clojure.lang.Numbers.divide(java.lang.Object,long).
+Boxed math warning, *Org-Babel Preview Corona-1-Baby-steps-with-Covid-19-for-programmers.org[ clojure ]*:7:51 - call: public static java.lang.Number clojure.lang.Numbers.unchecked_minus(java.lang.Object,java.lang.Object).
 </pre>
 
 
