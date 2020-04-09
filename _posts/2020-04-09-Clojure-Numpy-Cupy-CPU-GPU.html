@@ -126,7 +126,7 @@ We create a NumPy array.
 </div>
 
 <p>
-I made sure that we use single-precison floats, so we can do a fair comparison to the GPU,
+I made sure that we use single-precison floats, so we can do a fair comparison with the GPU,
 which supports fast computations with <code>float32</code>, but is crippled for <code>float64</code>.
 I reshaped it to \(1000\times{100000}\), a size that you might not need every day,
 but is nothing unusually big. It represents a data set with \(1000\) variables and \(100,000\) observations.
@@ -194,7 +194,7 @@ Here's the full implementation of the function that does the same thing as Pytho
 It's taken from <a href="https://aiprobook.com/numerical-linear-algebra-for-programmers">Numerical Linear Algebra for Programmers</a>, as one of many examples that teach
 the full path from math theory to applied number crunching. I tried to make the book as practical as possible,
 so I demonstrate each and every step, so you can learn by doing, not only by looking at formulas.
-What's more, the stuff we implement is top performance (as you'll see now)!
+What's more, the stuff we implement is a top performer (as you'll see now)!
 </p>
 
 <p>
@@ -296,7 +296,7 @@ We create the same array on the GPU (note <code>cupy</code> instead of <code>num
 </div>
 
 <p>
-I following Nvidia's official guide, and made sure that we wait for the
+I'm following Nvidia's official guide, and I've made sure that we wait for the
 actual computation to finish before measuring time. A common mistake in GPU
 benchmarks that are too good to be true is when people just queue asynchronous
 calls and don't wait for the GPU to actually do the job.
@@ -313,13 +313,13 @@ calls and don't wait for the GPU to actually do the job.
 </pre>
 
 <p>
-That is faster than NumPy on the CPU, but only a few tens of percents.
+That is faster than NumPy on the CPU, but not by much.
 And it is even <i>slower</i> than Neanderthal on the CPU.
 </p>
 
 <p>
 The first instinct is to check whether we mistakenly use <code>float64</code>, which
-is notoriously crippled to be several tens of time slower than <code>flot32</code> on
+is notoriously crippled to be many times slower than <code>flot32</code> on
 Nvidia's consumer GPU cards.
 </p>
 
@@ -358,8 +358,8 @@ Yes, the array is on the GPU.
 
 <p>
 But, maybe there is something missing. Maybe, despite all this info,
-the computation takes place on the CPU? I put this computation a loop
-and checke nvidia-smi. It shows 100% GPU utilization, so I'm pretty sure
+the computation takes place on the CPU? I put this computation in a loop
+and checked <code>nvidia-smi</code>. It shows 100% GPU utilization, so I'm pretty sure
 that this runs on the GPU, with data that already sits in GPU memory, as
 it should.
 </p>
