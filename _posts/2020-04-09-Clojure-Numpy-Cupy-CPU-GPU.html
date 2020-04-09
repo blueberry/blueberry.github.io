@@ -1,0 +1,402 @@
+---
+date: 2020-04-09
+tags:
+- Neanderthal
+- MKL
+- Clojure
+- CUDA
+- OpenCL
+- Python
+- NumPy
+- CuPy
+author: dragan
+layout: post
+title: CuPy accelerates NumPy on the GPU? Hold my Cider, here's Clojure!
+categories:
+- Neanderthal
+- MKL
+- Clojure
+- CUDA
+- OpenCL
+- Python
+- NumPy
+- CuPy
+excerpt: TODO
+---
+<p>
+Everyone knows that Python's NumPy is fast due to its C++ based native backends.
+Power users even know that Nvidia provides a drop-in replacement, CuPy, that brings
+the power of GPU acceleration. Everyone knew that there was no airplane faster than
+Messerschmitt Me 163, but that was good information in 1944. Everyone knows that Java
+is slow and Clojure is not a great choice for number crunching, but as soon as I dig
+anywhere with my software, I discover that the folk wisdom is terribly wrong, and that
+Clojure kicks ass on CPU <i>and especially on the GPU</i>.
+</p>
+
+<p>
+Here's summary, or, if you prefer, a TL;DR: I compared NumPy's <code>corrcoef</code> function
+with a simple 7-liner that I wrote as a demonstration for my book <a href="https://aiprobook.com/numerical-linear-algebra-for-programmers">Numerical Linear Algebra for Programmers</a>.
+The times for computing <code>corrcoef</code> for a \(1000\times{100000}\) matrix, on the CPU and GPU,
+are in the following table (lower is better).
+</p>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">&#xa0;</th>
+<th scope="col" class="org-left">Python &amp; NumPy/CuPy</th>
+<th scope="col" class="org-left">Clojure &amp; Neanderthal</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left">CPU i7 4790K</td>
+<td class="org-left">946 ms</td>
+<td class="org-left">711 ms (544 ms)</td>
+</tr>
+
+<tr>
+<td class="org-left">GPU Nvidia GTX 1080Ti</td>
+<td class="org-left">680 ms</td>
+<td class="org-left">30 ms</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+Clojure is helped by <a href="https://neanderthal.uncomplicate.org">Neanderthal</a> (<iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=neanderthal&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>) my free open source library.
+</p>
+
+<div id="outline-container-org065f51d" class="outline-2">
+<h2 id="org065f51d">Correlation Coefficient</h2>
+<div class="outline-text-2" id="text-org065f51d">
+<p>
+Here's why <code>corrcoef</code> is a good choice for this comparison:
+</p>
+<ul class="org-ul">
+<li>It's a statistical function, commonly used in the wild (data analysis, etc.).</li>
+<li>Its implementation requires all levels of BLAS 1, 2 &amp; 3 functions of linear, quadratic, and cubic asymptotic complexity.
+<ul class="org-ul">
+<li>Matrix Multiplication (Blas 3)</li>
+<li>Elementwise math functions (linear)</li>
+<li>Outer product (Blas 2)</li>
+</ul></li>
+<li>It's still simple enough that we can compare apples to apples.</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-orgef03efb" class="outline-2">
+<h2 id="orgef03efb">NumPy (optimized)</h2>
+<div class="outline-text-2" id="text-orgef03efb">
+<p>
+First, the spec: I run this on an (old-ish but still powerful) i7-4790K desktop with 32GB of RAM.
+OS is Arch Linux, with the latest Intel MKL and OpenBLAS installed globally. NumPy is provided by <code>pip</code>
+(Conda on Arch is a mess, and I leave Docker, Kubernetes, and whatnot, to other people).
+Sadly, <code>intel-numpy</code> doesn't seem to be maintained that well, and it refuses to install
+through Arch's <code>pip</code>. That leaves NumPy with OpenBLAS, which should not be an issue,
+since OpenBLAS is very fast, and I expect it to be within a few percent of Intel's MKL.
+(You might cry foul, but, hey, grab NumPy &amp; MKL and check for yourself).
+</p>
+
+<p>
+I enjoy working in Clojure's REPL, so I'll use it for calling NumPy via <code>libpython-clj</code>.
+You may object again, since that might be a cause of NumPy's troubles, but I claim it's not,
+and I do it on purpose, to motivate you to fire up your favorite Python dev tool and
+try to prove me wrong.
+</p>
+
+<p>
+We create a NumPy array.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">x</span> <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">-&gt;</span> <span style="color: #909183;">(</span><span style="color: #2F8B58; font-weight: bold;">numpy</span>/linspace 0 2 100000000 <span style="color: #F5666D;">:dtype</span> <span style="color: #4E9A06;">"float32"</span><span style="color: #909183;">)</span>
+           <span style="color: #909183;">(</span><span style="color: #2F8B58; font-weight: bold;">numpy</span>/reshape <span style="color: #709870;">[</span>1000 100000<span style="color: #709870;">]</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+I made sure that we use single-precison floats, so we can do a fair comparison to the GPU,
+which supports fast computations with <code>float32</code>, but is crippled for <code>float64</code>.
+I reshaped it to \(1000\times{100000}\), a size that you might not need every day,
+but is nothing unusually big. It represents a data set with \(1000\) variables and \(100,000\) observations.
+</p>
+
+<p>
+Next, we call <code>corrcoef</code> to check whether it does what we expect it to.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #2F8B58; font-weight: bold;">numpy</span>/corrcoef x<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+[[1.         1.         1.         ... 1.         1.         1.        ]
+ [1.         1.         1.         ... 1.         1.         1.        ]
+ [1.         1.         1.         ... 1.         1.         1.        ]
+ ...
+ [1.         1.         1.         ... 1.         1.         0.99999999]
+ [1.         1.         1.         ... 1.         1.         1.        ]
+ [1.         1.         1.         ... 0.99999999 1.         1.        ]]
+</pre>
+
+<p>
+We measure a wall clock time. I don't see a need for a more sophisticated benchmark here, involving
+samples, standard deviations, etc. since this is a long-running computation implemented
+by a native backend. There's no caches and JITs to warm here, just brutal number crunching.
+Try it many times, or put it in a loop, and see. The timings will vary, naturally, but within
+a few percent. Or, if you really want to be sure, please do whatever advanced benchmark you can
+think of and let me know of the results.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>time <span style="color: #7388d6;">(</span><span style="color: #2F8B58; font-weight: bold;">numpy</span>/corrcoef x<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+"Elapsed time: 946.143499 msecs"
+</pre>
+
+<p>
+Just to be clear, this <i>is</i> a great result! This <i>is</i> fast, and is much faster than
+it would be with interpreted Python, hand-written C++, or pure Java. Nothing is wrong
+or deficient here. This <i>is</i> good enough.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgc034f9d" class="outline-2">
+<h2 id="orgc034f9d">Clojure &amp; Neanderthal</h2>
+<div class="outline-text-2" id="text-orgc034f9d">
+<p>
+However, with Clojure &amp; <a href="http://neanderthal.uncomplicate.org">Neanderthal</a> (<iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=neanderthal&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>):
+</p>
+<ul class="org-ul">
+<li>We can do even better!</li>
+<li>We can implement it in a simple &amp; elegant way.</li>
+<li>We understand 100% of the solution instead of relying on black box implementation that we're scared to look at.</li>
+</ul>
+
+<p>
+Here's the full implementation of the function that does the same thing as Python's <code>corrcoef</code>.
+It's taken from <a href="https://aiprobook.com/numerical-linear-algebra-for-programmers">Numerical Linear Algebra for Programmers</a>, as one of many examples that teach
+the full path from math theory to applied number crunching. I tried to make the book as practical as possible,
+so I demonstrate each and every step, so you can learn by doing, not only by looking at formulas.
+What's more, the stuff we implement is top performance (as you'll see now)!
+</p>
+
+<p>
+We use functions provided by <a href="http://neanderthal.uncomplicate.org">Neanderthal</a> (<iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=neanderthal&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>), which is free and open-source. This is
+<i>the full implementation</i>, not some pseudocode. You can find the full discussion in the book.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">matrix-correlation!</span> <span style="color: #7388d6;">[</span>a!<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>with-release <span style="color: #909183;">[</span>ones <span style="color: #709870;">(</span>entry! <span style="color: #907373;">(</span>vctr a! <span style="color: #6276ba;">(</span>ncols a!<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span> 1.0<span style="color: #709870;">)</span>
+                 work <span style="color: #709870;">(</span>mv a! ones<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #709870;">[</span>a-mean <span style="color: #907373;">(</span>rk! <span style="color: #6276ba;">(</span>/ -1.0 <span style="color: #858580;">(</span>dim ones<span style="color: #858580;">)</span><span style="color: #6276ba;">)</span> work ones a!<span style="color: #907373;">)</span><span style="color: #709870;">]</span>
+      <span style="color: #709870;">(</span><span style="color: #A52A2A; font-weight: bold;">let-release</span> <span style="color: #907373;">[</span>sigma <span style="color: #6276ba;">(</span>mm a-mean <span style="color: #858580;">(</span>trans a-mean<span style="color: #858580;">)</span><span style="color: #6276ba;">)</span><span style="color: #907373;">]</span>
+        <span style="color: #907373;">(</span>sqrt! <span style="color: #6276ba;">(</span>copy! <span style="color: #858580;">(</span>dia sigma<span style="color: #858580;">)</span> work<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span>
+        <span style="color: #907373;">(</span>with-release <span style="color: #6276ba;">[</span>sigma-x*y <span style="color: #858580;">(</span>rk work work<span style="color: #858580;">)</span><span style="color: #6276ba;">]</span>
+          <span style="color: #6276ba;">(</span>div! sigma sigma-x*y<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">matrix-correlation</span> <span style="color: #7388d6;">[</span>a<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>with-release <span style="color: #909183;">[</span>a-copy <span style="color: #709870;">(</span>copy a<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>matrix-correlation! a-copy<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Here's <code>matrix-correlation</code> in action with a random \(1000\times{100000}\) matrix.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">y</span> <span style="color: #7388d6;">(</span>rand-uniform! <span style="color: #909183;">(</span>fge 1000 100000<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>time <span style="color: #7388d6;">(</span>matrix-correlation y<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+The result makes sense.
+</p>
+
+<pre class="example">
+=&gt;
+#RealGEMatrix[float, mxn:1000x1000, layout:column, offset:0]
+   ▥       ↓       ↓       ↓       ↓       ↓       ┓
+   →       1.00   -0.00    ⁙       0.00   -0.00
+   →      -0.00    1.00    ⁙       0.01   -0.00
+   →       ⁙       ⁙       ⁙       ⁙       ⁙
+   →       0.00    0.01    ⁙       1.00   -0.01
+   →      -0.00   -0.00    ⁙      -0.01    1.00
+   ┗                                               ┛
+</pre>
+
+<p>
+But the result is not what interests us. We would like to know how fast we got it.
+</p>
+
+<pre class="example">
+"Elapsed time: 710.890478 msecs"
+</pre>
+
+<p>
+That is even faster than NumPy, and by quite a margin!
+</p>
+
+<p>
+But, wait, we can go even faster! If we're willing to sacrifice and overwrite
+the original data, we can use the destructive version (note the suffix "<code>!</code>").
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>time <span style="color: #7388d6;">(</span>matrix-correlation! y<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+"Elapsed time: 543.826297 msecs"
+</pre>
+
+<p>
+That's pretty nice result for some textbook code!
+</p>
+</div>
+</div>
+
+<div id="outline-container-org56830ed" class="outline-2">
+<h2 id="org56830ed">GPU acceleration with Nvidia GTX 1080Ti</h2>
+<div class="outline-text-2" id="text-org56830ed">
+<p>
+NumPy does not support GPU acceleration, but Nvidia provides CuPy, which
+mimics NumPy's API on the GPU. It's Nvidia's stuff, so it should offer the
+full power of CUDA, right? It doesn't seem to be so.
+</p>
+
+<p>
+We create the same array on the GPU (note <code>cupy</code> instead of <code>numpy</code>).
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">gpu-x</span> <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">-&gt;</span> <span style="color: #909183;">(</span><span style="color: #2F8B58; font-weight: bold;">cupy</span>/linspace 0 2 100000000 <span style="color: #F5666D;">:dtype</span> <span style="color: #4E9A06;">"float32"</span><span style="color: #909183;">)</span>
+               <span style="color: #909183;">(</span><span style="color: #2F8B58; font-weight: bold;">cupy</span>/reshape  <span style="color: #709870;">[</span>1000 100000<span style="color: #709870;">]</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+I following Nvidia's official guide, and made sure that we wait for the
+actual computation to finish before measuring time. A common mistake in GPU
+benchmarks that are too good to be true is when people just queue asynchronous
+calls and don't wait for the GPU to actually do the job.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>time <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">do</span> <span style="color: #909183;">(</span><span style="color: #2F8B58; font-weight: bold;">cupy</span>/corrcoef gpu-x<span style="color: #909183;">)</span>
+          <span style="color: #909183;">(</span>py. <span style="color: #2F8B58; font-weight: bold;">Stream</span>/null synchronize<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+"Elapsed time: 679.769357 msecs"
+</pre>
+
+<p>
+That is faster than NumPy on the CPU, but only a few tens of percents.
+And it is even <i>slower</i> than Neanderthal on the CPU.
+</p>
+
+<p>
+The first instinct is to check whether we mistakenly use <code>float64</code>, which
+is notoriously crippled to be several tens of time slower than <code>flot32</code> on
+Nvidia's consumer GPU cards.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #2F8B58; font-weight: bold;">py</span>/get-attr gpu-x <span style="color: #4E9A06;">"dtype"</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+float32
+</pre>
+
+<p>
+Nope, we work with <code>float32</code>.
+</p>
+
+<p>
+The next issue might be that our array is not on the GPU, but on the CPU,
+and has to be transferred to the GPU memory, which is rather slow. I followed
+the suggestion from Nvidia's CuPy documentation, and the array should be on
+the GPU, but let's check just in case.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #2F8B58; font-weight: bold;">py</span>/get-attr gpu-x <span style="color: #4E9A06;">"device"</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+&lt;CUDA Device 0&gt;
+</pre>
+
+<p>
+Yes, the array is on the GPU.
+</p>
+
+<p>
+But, maybe there is something missing. Maybe, despite all this info,
+the computation takes place on the CPU? I put this computation a loop
+and checke nvidia-smi. It shows 100% GPU utilization, so I'm pretty sure
+that this runs on the GPU, with data that already sits in GPU memory, as
+it should.
+</p>
+
+<p>
+Underwhelming results for CuPy.
+</p>
+
+<p>
+How Clojure deals with that? Clojure does not need special drop-in
+replacement library. Neanderthal supports CPU, Nvidia GPU with CUDA,
+and AMD GPU with OpenCL engines. All Neanderthal's functions are
+polymorphic and automatically adapt to whatever hardware you throw at them.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">gpu-y</span> <span style="color: #7388d6;">(</span>rand-uniform! <span style="color: #909183;">(</span>cuge 1000 100000<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>time <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">do</span> <span style="color: #909183;">(</span>matrix-correlation gpu-y<span style="color: #909183;">)</span>
+          <span style="color: #909183;">(</span>synchronize!<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+"Elapsed time: 30.677678 msecs"
+</pre>
+
+<p>
+Yes, that's the acceleration we should expected from the GPU!
+</p>
+
+<p>
+In case you have any comments and questions, please contact me. I would
+love to improve any part of this article, if possible!
+</p>
+</div>
+</div>
