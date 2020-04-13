@@ -1,0 +1,478 @@
+---
+date: 2020-04-14
+tags:
+- Neanderthal
+- MKL
+- Clojure
+- CUDA
+- OpenCL
+- Python
+- NumPy
+- CuPy
+author: dragan
+layout: post
+title: More fun with NumPy, CuPy, Clojure and GPU acceleration. Hold my Cider 2!
+excerpt: I continue experimenting with Neanderthal, NumPy and CuPy. Hold my Cider, Python is not an excuse!
+categories:
+- Neanderthal
+- MKL
+- Clojure
+- CUDA
+- OpenCL
+- Python
+- NumPy
+- CuPy
+---
+<p>
+NumPy and CuPy converted my computations to <code>float64</code> despite being told to
+work with <code>float32</code>, and that prompted some readers to discard my <a href="./Clojure-Numpy-Cupy-CPU-GPU">previous article</a>
+as <i>faulty</i>. My article doesn't make CuPy and NumPy more or less perfect, though,
+and that forceful conversion stings everyone who is using Nvidia's
+GTX gaming GPUs. I don't have grants that would cover $10,000 for uncrippled
+<code>float64</code> support on Tesla GPU. So, if you're poor like me, that article
+probably offered valuable information.
+</p>
+
+<p>
+I've received some nice suggestions, too. Some readers were inspired by my article
+and re-implemented that <code>corrcoef</code> function in their favorite Python tools
+(Numpy, CuPy, PyTorch) and found out that the advice from my book <a href="https://aiprobook.com/numerical-linear-algebra-for-programmers">Numerical Linear Algebra for Programmers</a>
+is not constrained to Clojure, and that it is fast in NumPy and CuPy, too.
+Of course! Most of my book applies to <i>any</i> language, and is written for <i>all programmers</i>,
+not just Clojure programmers. Seriously - check it out, and while you're
+there, maybe you'll also be interested in <a href="https://aiprobook.com/deep-learning-for-programmers/">Deep Learning for Programmers</a>.
+</p>
+
+<p>
+Unfortunately, these readers haven't sent me the code (yet), and I didn't have
+the opportunity to compare it to Clojure on my machine, but I trust them
+that they were satisfied with the result.
+</p>
+
+<p>
+There is an interesting way to compare my unambitious textbook implementation
+with NumPy and CuPy without that <code>float64</code> conversion impact. Simply, use
+<code>float64</code> computations in <a href="https://neanderthal.uncomplicate.org">Neanderthal</a> (<iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=neanderthal&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>),
+ too, just for the sake of comparison.
+In this article, I compare implementation
+of Pearson's correlation coefficient (a widely used statistical function) on
+a range of large and small matrices.
+</p>
+
+<div id="outline-container-orgd9a2841" class="outline-2">
+<h2 id="orgd9a2841">TL;DR</h2>
+<div class="outline-text-2" id="text-orgd9a2841">
+<p>
+The following two tables contain the summary of the micro-benchmarks that
+I run on my CPU and GPU.
+</p>
+
+<p>
+Since NumPy and CuPy forcefully do <code>float64</code> computation regardless of
+data type, there is one column for them. <a href="https://neanderthal.uncomplicate.org">Neanderthal</a> (<iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=neanderthal&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>) follows what
+it's told, so I include both <code>float64</code> (<code>double</code> in Javaspeak) for
+direct comparison, and <code>float32</code> (<code>float</code>) as a reference.
+</p>
+
+<p>
+NumPy and CuPy code is run from the interactive Python console, while
+Clojure uses interactive REPL.
+</p>
+
+<p>
+Note that my code is not a port of NumPy, nor a drop-in replacement;
+this is simply a head-to-head comparison of two different implementations.
+Python has its strengths and weaknesses, but JVM has its own constraints,
+too, so don't blame me for either of them, nor expect that I care about
+fixing them.
+</p>
+</div>
+
+<div id="outline-container-org0a933dd" class="outline-3">
+<h3 id="org0a933dd">CPU i7 4790K</h3>
+<div class="outline-text-3" id="text-org0a933dd">
+<p>
+All time is reported in milliseconds (lower is better).
+</p>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">size</th>
+<th scope="col" class="org-right">NumPy</th>
+<th scope="col" class="org-right">Neanderthal double</th>
+<th scope="col" class="org-right">Neanderthal float</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left">1K&times;100K</td>
+<td class="org-right">949</td>
+<td class="org-right">686</td>
+<td class="org-right">350</td>
+</tr>
+
+<tr>
+<td class="org-left">1K&times;10K</td>
+<td class="org-right">113</td>
+<td class="org-right">111</td>
+<td class="org-right">56.2</td>
+</tr>
+
+<tr>
+<td class="org-left">100&times;100K</td>
+<td class="org-right">61</td>
+<td class="org-right">21</td>
+<td class="org-right">10.5</td>
+</tr>
+
+<tr>
+<td class="org-left">100&times;10K</td>
+<td class="org-right">5.47</td>
+<td class="org-right">2.22</td>
+<td class="org-right">1.19</td>
+</tr>
+
+<tr>
+<td class="org-left">10&times;10K</td>
+<td class="org-right">0.29</td>
+<td class="org-right">0.16</td>
+<td class="org-right">0.16</td>
+</tr>
+
+<tr>
+<td class="org-left">10&times;1K</td>
+<td class="org-right">0.085</td>
+<td class="org-right">0.026</td>
+<td class="org-right">0.028</td>
+</tr>
+
+<tr>
+<td class="org-left">10&times;100</td>
+<td class="org-right">0.057</td>
+<td class="org-right">0.011</td>
+<td class="org-right">0.012</td>
+</tr>
+
+<tr>
+<td class="org-left">10&times;1M</td>
+<td class="org-right">43</td>
+<td class="org-right">18</td>
+<td class="org-right">15</td>
+</tr>
+
+<tr>
+<td class="org-left">10K&times;10K</td>
+<td class="org-right">11476</td>
+<td class="org-right">8079</td>
+<td class="org-right">4902</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+
+<div id="outline-container-org48e80e7" class="outline-3">
+<h3 id="org48e80e7">GPU Nvidia GTX 1080Ti</h3>
+<div class="outline-text-3" id="text-org48e80e7">
+<p>
+All time is reported in milliseconds (lower is better).
+</p>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">size</th>
+<th scope="col" class="org-right">CuPy</th>
+<th scope="col" class="org-right">Neanderthal double</th>
+<th scope="col" class="org-right">Neanderthal float</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left">1K&times;100K</td>
+<td class="org-right">686</td>
+<td class="org-right">401</td>
+<td class="org-right">20</td>
+</tr>
+
+<tr>
+<td class="org-left">1K&times;10K</td>
+<td class="org-right">70</td>
+<td class="org-right">42</td>
+<td class="org-right">2.60</td>
+</tr>
+
+<tr>
+<td class="org-left">100&times;100K</td>
+<td class="org-right">9.9</td>
+<td class="org-right">9.2</td>
+<td class="org-right">2.25</td>
+</tr>
+
+<tr>
+<td class="org-left">100&times;10K</td>
+<td class="org-right">1.38</td>
+<td class="org-right">1.56</td>
+<td class="org-right">0.3</td>
+</tr>
+
+<tr>
+<td class="org-left">10&times;10K</td>
+<td class="org-right">0.21</td>
+<td class="org-right">0.22</td>
+<td class="org-right">0.14</td>
+</tr>
+
+<tr>
+<td class="org-left">10&times;1K</td>
+<td class="org-right">0.18</td>
+<td class="org-right">0.67</td>
+<td class="org-right">0.1</td>
+</tr>
+
+<tr>
+<td class="org-left">10&times;100</td>
+<td class="org-right">0.18</td>
+<td class="org-right">0.1</td>
+<td class="org-right">0.1</td>
+</tr>
+
+<tr>
+<td class="org-left">10&times;1M</td>
+<td class="org-right">6.32</td>
+<td class="org-right">6.57</td>
+<td class="org-right">0.26</td>
+</tr>
+
+<tr>
+<td class="org-left">10K&times;10K</td>
+<td class="org-right">5078</td>
+<td class="org-right">2597</td>
+<td class="org-right">117</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+Honestly, if the several lines of code from my <i>textbook</i> implementation
+reached within an order of magnitude of professional libraries such as
+NumPy an CuPy, that would still be rather nice. I can't say that these
+results do not make me satisfied :)
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org3852e51" class="outline-2">
+<h2 id="org3852e51">The Python code</h2>
+<div class="outline-text-2" id="text-org3852e51">
+<p>
+To prevent folks bugging me about why I called NumPy from Clojure,
+I wrote a Python script this time. Micro benchmarks in Python code
+that I see on the Internet are clunky at best, and more sophisticated
+tools are equally ridiculous. Having to call my functions in a string-
+embedded DSL? Thanks, but no.
+</p>
+
+<p>
+So I did the lazy thing, and used a simple
+<code>time_ns()</code> based measurement of a loop that calls the <code>corrcoef</code> function
+enough times to mitigate the imprecision of the timestamp that Python
+gets. I believe that's a good approximation of how would a user experience
+this function when calling it from the code. It's good enough considering
+that we are calling exactly one function that delegates to native code anyway.
+</p>
+
+<p>
+On the CPU, it looks like this:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-python"><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #00578E; font-weight: bold;">numpy_corrcoef</span>(m, n, reps):
+    <span style="color: #0084C8; font-weight: bold;">a</span> = numpy.random.random(m * n).reshape(m,n)
+    <span style="color: #0084C8; font-weight: bold;">s</span> = time.time_ns()
+    <span style="color: #A52A2A; font-weight: bold;">for</span> x <span style="color: #A52A2A; font-weight: bold;">in</span> <span style="color: #A020F0;">range</span>(reps):
+        numpy.corrcoef(a)
+    <span style="color: #0084C8; font-weight: bold;">e</span> = time.time_ns()
+    <span style="color: #A52A2A; font-weight: bold;">print</span>((e-s)/reps/(10**6), <span style="color: #4E9A06;">" milliseconds"</span>)
+
+numpy_corrcoef(1000, 100000, 1)
+numpy_corrcoef(10, 10000, 1000)
+<span style="color: #204A87;"># </span><span style="color: #204A87;">etc.</span>
+</pre>
+</div>
+
+<p>
+On the GPU, it takes care of synchronization:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-python"><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #00578E; font-weight: bold;">cupy_corrcoef</span>(m, n, reps):
+    <span style="color: #0084C8; font-weight: bold;">a</span> = cupy.random.random(m * n).reshape(m,n)
+    cupy.cuda.Stream.null.synchronize()
+    <span style="color: #0084C8; font-weight: bold;">s</span> = time.time_ns()
+    <span style="color: #A52A2A; font-weight: bold;">for</span> x <span style="color: #A52A2A; font-weight: bold;">in</span> <span style="color: #A020F0;">range</span>(reps):
+        cupy.corrcoef(a)
+    cupy.cuda.Stream.null.synchronize()
+    <span style="color: #0084C8; font-weight: bold;">e</span> = time.time_ns()
+    <span style="color: #A52A2A; font-weight: bold;">print</span>((e-s)/reps/(10**6), <span style="color: #4E9A06;">" milliseconds"</span>)
+
+cupy_corrcoef(1000, 100000, 1)
+<span style="color: #204A87;"># </span><span style="color: #204A87;">etc.</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orge4fff02" class="outline-2">
+<h2 id="orge4fff02">The Clojure code</h2>
+<div class="outline-text-2" id="text-orge4fff02">
+<p>
+In Clojure, we have sophisticate benchmarking capabilities right
+there in the REPL through the Criterium library. Although would
+like to use its <code>quick-bench</code>, as it gives reliable and precise
+measurements with one simple line of code, I opted to follow the
+Python way, and use <code>time</code> and the appropriate loop, to make it as
+similar as the Python code as possible.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">bench-neanderthal-cpu</span> <span style="color: #7388d6;">[</span>m n factory reps<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>with-release <span style="color: #909183;">[</span>x <span style="color: #709870;">(</span>rand-uniform! <span style="color: #907373;">(</span>ge factory m n<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>time
+     <span style="color: #709870;">(</span><span style="color: #A52A2A; font-weight: bold;">dotimes</span> <span style="color: #907373;">[</span>i reps<span style="color: #907373;">]</span>
+       <span style="color: #907373;">(</span>matrix-correlation! x<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">bench-neanderthal-gpu</span> <span style="color: #7388d6;">[</span>m n factory reps<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>with-default
+    <span style="color: #909183;">(</span><span style="color: #2F8B58; font-weight: bold;">cuda</span>/with-engine factory default-stream
+      <span style="color: #709870;">(</span>with-release <span style="color: #907373;">[</span>x <span style="color: #6276ba;">(</span>rand-uniform! <span style="color: #858580;">(</span>cuge m n<span style="color: #858580;">)</span><span style="color: #6276ba;">)</span><span style="color: #907373;">]</span>
+        <span style="color: #907373;">(</span>synchronize!<span style="color: #907373;">)</span>
+        <span style="color: #907373;">(</span>time
+         <span style="color: #6276ba;">(</span><span style="color: #A52A2A; font-weight: bold;">do</span>
+           <span style="color: #858580;">(</span><span style="color: #A52A2A; font-weight: bold;">dotimes</span> <span style="color: #80a880;">[</span>i reps<span style="color: #80a880;">]</span>
+             <span style="color: #80a880;">(</span>release <span style="color: #887070;">(</span>matrix-correlation! x<span style="color: #887070;">)</span><span style="color: #80a880;">)</span><span style="color: #858580;">)</span>
+           <span style="color: #858580;">(</span>synchronize!<span style="color: #858580;">)</span><span style="color: #6276ba;">)</span><span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+In the previous article you can find the code for <code>matrix-correlation!</code>.
+That implementation did a full general matrix multiplication, although
+the correlation matrix is symmetric, since for most matrix sizes it is
+faster to do twice as many flops as necessary instead of using logic to
+avoid duplicate work. Especially on the GPU, the matrix should have to be
+unrealistically large for the symmetric matrix multiply to pay off.
+</p>
+
+<p>
+Also, consider what <code>corrcoef</code> computes: correlation between different variables.
+There will typically be much fewer variables than observations, so the matrix
+will be a long rectangle. There, my old implementation will be optimal, even
+for large matrices.
+</p>
+
+<p>
+However, I confirmed by measurement and comparison that NumPy uses symmetric
+multiply for large matrices. This cannot be seen directly from the code, but
+is 100% certain since it takes NumPy 1.5 second to do the full matrix multiply
+of this matrix, and around 1 sec for the whole <code>corrcoef</code>.
+</p>
+
+<p>
+That's why I added this option to <a href="https://neanderthal.uncomplicate.org">Neanderthal</a> (<iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=neanderthal&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>), and made a simple heuristic
+to use symmetric multiply for huge fat matrices (the <code>mmt!</code> function, and
+GEMM for everything else. That made the code less elegant, and several lines
+longer, but, hey, everything for performance! :)
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">matrix-correlation!</span> <span style="color: #7388d6;">[</span>a!<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>with-release <span style="color: #909183;">[</span>ones <span style="color: #709870;">(</span>entry! <span style="color: #907373;">(</span>vctr a! <span style="color: #6276ba;">(</span>ncols a!<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span> 1.0<span style="color: #709870;">)</span>
+                 work <span style="color: #709870;">(</span>mv a! ones<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #709870;">[</span>a-mean <span style="color: #907373;">(</span>rk! <span style="color: #6276ba;">(</span>/ -1.0 <span style="color: #858580;">(</span>dim ones<span style="color: #858580;">)</span><span style="color: #6276ba;">)</span> work ones a!<span style="color: #907373;">)</span><span style="color: #709870;">]</span>
+      <span style="color: #709870;">(</span><span style="color: #A52A2A; font-weight: bold;">let-release</span> <span style="color: #907373;">[</span>large <span style="color: #6276ba;">(</span><span style="color: #A52A2A; font-weight: bold;">and</span> <span style="color: #858580;">(</span>&lt; 512 <span style="color: #80a880;">(</span>mrows a!<span style="color: #80a880;">)</span><span style="color: #858580;">)</span> <span style="color: #858580;">(</span>&lt; 8196 <span style="color: #80a880;">(</span>ncols a!<span style="color: #80a880;">)</span><span style="color: #858580;">)</span><span style="color: #6276ba;">)</span>
+                    sigma <span style="color: #6276ba;">(</span>sy a! <span style="color: #858580;">(</span>mrows a!<span style="color: #858580;">)</span><span style="color: #6276ba;">)</span><span style="color: #907373;">]</span>
+        <span style="color: #907373;">(</span><span style="color: #A52A2A; font-weight: bold;">if</span> large
+          <span style="color: #6276ba;">(</span>mmt! a-mean sigma<span style="color: #6276ba;">)</span>
+          <span style="color: #6276ba;">(</span>mm! a-mean <span style="color: #858580;">(</span>trans a-mean<span style="color: #858580;">)</span> <span style="color: #858580;">(</span>view-ge sigma<span style="color: #858580;">)</span><span style="color: #6276ba;">)</span><span style="color: #907373;">)</span>
+        <span style="color: #907373;">(</span>sqrt! <span style="color: #6276ba;">(</span>copy! <span style="color: #858580;">(</span>dia sigma<span style="color: #858580;">)</span> work<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span>
+        <span style="color: #907373;">(</span>with-release <span style="color: #6276ba;">[</span>sigma-x*y <span style="color: #858580;">(</span>rk work<span style="color: #858580;">)</span><span style="color: #6276ba;">]</span>
+          <span style="color: #6276ba;">(</span>div! <span style="color: #858580;">(</span>view-ge sigma<span style="color: #858580;">)</span> <span style="color: #858580;">(</span>view-ge sigma-x*y<span style="color: #858580;">)</span><span style="color: #6276ba;">)</span><span style="color: #907373;">)</span>
+        sigma<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org65dfeef" class="outline-2">
+<h2 id="org65dfeef">The books</h2>
+<div class="outline-text-2" id="text-org65dfeef">
+<p>
+I guess that this is enough info. If you feel inspired,
+you can try to write the Python equivalent, and see whether it is faster
+than the NumPy's and CuPy's implementation.
+</p>
+
+<p>
+The books that I write are written for all programmers, not just Clojure
+programmers. I use Clojure because it is very enjoyable due to its elegance
+and power, but almost all the lessons in the book are applicable in other
+environments. Clojure helped me in writing the whole stack of these libraries
+that support CPU, GPU, CUDA, OpenCL, etc. in surprisingly small numbers of lines
+of code.
+</p>
+
+<p>
+It can help you, too, to be more productive, but even if Clojure is not
+your cup of tea, the books can help you learn this stuff and apply it in other
+programming languages, since the books make clear connection from theory to
+implementation, without skipping any steps in between!
+</p>
+
+<p>
+The key difference compared to other books, is that here you can try
+each small building block, which is usually one or a few lines of code
+directly in the interactive REPL, see the results right away, experiment,
+and understand the theoretic concept that is demonstrated. Equally important
+is that the performance of that code is top notch right away!
+</p>
+
+<ul class="org-ul">
+<li><a href="https://aiprobook.com/numerical-linear-algebra-for-programmers">Numerical Linear Algebra for Programmers</a></li>
+<li><a href="https://aiprobook.com/deep-learning-for-programmers/">Deep Learning for Programmers</a></li>
+</ul>
+
+<p>
+There's already 400 pages written. By subscribing to these books you get the access
+to the drafts right away, and the final book this summer. There's no middle
+man; 100% of the proceeds goes towards my work on these open source libraries!
+</p>
+</div>
+</div>
