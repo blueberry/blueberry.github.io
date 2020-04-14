@@ -12,6 +12,7 @@ tags:
 author: dragan
 layout: post
 title: CuPy accelerates NumPy on the GPU? Hold my Cider, here's Clojure!
+excerpt: Everyone knows that Java is slow and Clojure is not a great choice for number crunching, but as soon as I dig anywhere with my software, I discover that the folk wisdom is terribly wrong, and that Clojure kicks ass on CPU and especially on the GPU. Here's a comparison of the corrcoef function in NumPy, CuPy, and Neanderthal.
 categories:
 - Neanderthal
 - MKL
@@ -21,7 +22,6 @@ categories:
 - Python
 - NumPy
 - CuPy
-excerpt: Everyone knows that Java is slow and Clojure is not a great choice for number crunching, but as soon as I dig anywhere with my software, I discover that the folk wisdom is terribly wrong, and that Clojure kicks ass on CPU and especially on the GPU. Here's a comparison of the corrcoef function in NumPy, CuPy, and Neanderthal.
 ---
 <p>
 Everyone knows that Python's <a href="https://numpy.org">NumPy</a> is fast due to its C++ based native backends.
@@ -397,6 +397,10 @@ Yes, that's the acceleration we should expected from the GPU!
 <p>
 In case you have any comments and questions, please contact me. I would
 love to improve any part of this article, if possible!
+</p>
+
+<p>
+Read part 2 of this article with more comparison <a href="./Clojure-Numpy-Cupy-CPU-GPU-2">here.</a>
 </p>
 </div>
 </div>
