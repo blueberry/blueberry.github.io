@@ -1,0 +1,99 @@
+---
+date: 2020-08-06
+tags:
+- Neanderthal
+- MKL
+- Clojure
+author: dragan
+layout: post
+title: Clojure Neanderthal MKL acceleration out of the box
+excerpt: You no longer have to install any system wide native library to use Neanderthal on the CPU! It is enough to add an optional dependency to Bytedeco's MKL redistribution jar in you project configuration (Lein, deps, boot), and everything will work out of the box!
+categories:
+- Neanderthal
+- MKL
+- Clojure
+---
+<p>
+Good news on a slow August day: you no longer have to install any system wide native library
+to use Neanderthal(<iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=neanderthal&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>) on the CPU!
+It is enough to add an optional dependency to Bytedeco's MKL redistribution jar in you project
+configuration (Lein, deps, boot), and everything will work out of the box for you!
+</p>
+
+<p>
+Did I have to do a lot of work to support it? Yes and no! No, in a sense that I only
+had to add 4 lines of Clojure code at the appropriate place in the depths of Neanderthal.
+No, in a sense that this is something that already worked if you added similar 4 lines
+of Clojure code in the appropriate place in you project. Yes, in a sense that Neanderthal
+was designed from the start to be technology-agnostic and support as many CPU, GPU,
+and other engines as Clojure programmers are eager to explore.
+</p>
+
+<p>
+This is one small step code-wise, but a big leap convenience-wise. The major <b>perceived</b>
+pain point for the new users was the requirement to install MKL on your system. It is
+a simple step anyway. On Arch Linux it is literally <code>pacman -Syu intel-mkl</code>. That was all.
+But still, habits are strange beasts, and Clojure and Java programmers fight tooth and
+nail against using anything outside repository jars. Which is reasonable. But still&#x2026;
+The performance benefits of MKL, CUDA, and OpenCL are enormous. Didn't matter for most
+people. Turn on the light! OK. There is light now :)
+</p>
+
+<p>
+Of course, I still recommend using the system-wide MKL. That's 750 MB that can sit in
+your system instead of your jars. That's 750 MB that you don't have to update all the time
+if you don't like. 750 MB that can be used by other software on your machine (NumPy, TensorFlow, whatever).
+</p>
+
+<p>
+However, I <i>do</i> appreciate that, if you're eager to try Neanderthal you would like to
+open your REPL and learn how to write high performance Clojure code right away, and not
+reading how to configure things on your OS. That's why this tiny update is a major news.
+</p>
+
+<p>
+So, let's show some code. The <a href="https://github.com/uncomplicate/neanderthal/tree/master/examples/hello-world">Hello World</a> example in the Neanderthal repository
+has been updated with the optional MKL jar, and it looks like this:
+</p>
+
+<pre class="example">
+(defproject hello-world "0.35.0"
+  :dependencies [[org.clojure/clojure "1.10.1"]
+                 [uncomplicate/neanderthal "0.35.0"]
+                 ;;Optional. If bytedeco is not present, a system-wide MKL is used.
+                 [org.bytedeco/mkl-platform-redist "2020.1-1.5.3"]]
+  ;; If on Java 9+, you have to uncomment the following JVM option.
+  :jvm-opts ^:replace [#_"--add-opens=java.base/jdk.internal.ref=ALL-UNNAMED"])
+</pre>
+
+<p>
+If the <code>mkl-platform-redist</code> jar is present, Neanderthal will load the native binaries
+for your OS from there. If it's not, it is expected that you have MKL somewhere on your
+system's <code>LD_LIBRARY_PATH</code>.
+</p>
+
+<p>
+There's noting else that changed. Here's the old example from Hello World:
+</p>
+
+<pre class="example">
+(ns hello-world.native
+  (:require [uncomplicate.neanderthal
+             [core :refer :all]
+             [native :refer :all]]))
+
+;; We create two matrices...
+(def a (dge 2 3 [1 2 3 4 5 6]))
+(def b (dge 3 2 [1 3 5 7 9 11]))
+;; ... and multiply them
+(mm a b)
+</pre>
+
+<p>
+Thanks to Tom Poole for exploring this and (very politely and subtly)
+nudging me to automate it for all users.
+</p>
+
+<p>
+Enjoy!
+</p>
