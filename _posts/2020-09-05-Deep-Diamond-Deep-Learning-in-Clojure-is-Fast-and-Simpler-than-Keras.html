@@ -2,8 +2,8 @@
 date: 2020-09-05 18:30
 author: dragan
 layout: post
-title: Deep Diamond - Deep Learning in Clojure is Fast and Simpler than Keras
-categories:
+title: Deep Diamond - Deep Learning in Clojure is Fast, Simpler than Keras
+categories: 
 - Deep
 - Learning,
 - Deep
@@ -12,7 +12,7 @@ categories:
 - DNNL,
 - cuBLAS,
 - Clojure
-tags:
+tags: 
 excerpt: Deep Diamond preview release is in Clojars, and is already quite useful! And fast! In accordance with my philosophy, "less talk, more walk", I introduce Deep Diamond
 ---
 <p>
@@ -20,7 +20,7 @@ through the direct equivalent of a fine Convolutional network example in Keras.
 </p>
 
 <p>
-Good News: <a href="https://github.com/uncomplicte/deep-diamond">Deep Diamond</a> preview release is in Clojars, and is already quite useful! And fast!
+Good News: <a href="https://github.com/uncomplicate/deep-diamond">Deep Diamond</a>(<iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=deep-diamond&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>) preview release is in Clojars, and is already quite useful! And fast!
 It is yet to be fully polished, but you can try it now and, I hope, you'll like it.
 </p>
 
@@ -34,9 +34,9 @@ In accordance with my philosophy, "less talk, more walk", I introduce Deep Diamo
 through the direct equivalent of this fine <a href="https://github.com/keras-team/keras/blob/master/examples/mnist_cnn.py">MNIST CNN example in Keras</a>.
 </p>
 
-<div id="outline-container-org8cb0cdf" class="outline-2">
-<h2 id="org8cb0cdf">Specify the network blueprint</h2>
-<div class="outline-text-2" id="text-org8cb0cdf">
+<div id="outline-container-org54ea652" class="outline-2">
+<h2 id="org54ea652">Specify the network blueprint</h2>
+<div class="outline-text-2" id="text-org54ea652">
 <p>
 We specify the network by plain Clojure vectors and functions, and create the blueprint.
 No need for special compilers and whatnot. The structure of internal parts would be
@@ -60,9 +60,9 @@ picked up automatically, or we can specify these explicitly.
 </div>
 </div>
 
-<div id="outline-container-org0af317d" class="outline-2">
-<h2 id="org0af317d">Create the network</h2>
-<div class="outline-text-2" id="text-org0af317d">
+<div id="outline-container-orgb8d8bce" class="outline-2">
+<h2 id="orgb8d8bce">Create the network</h2>
+<div class="outline-text-2" id="text-orgb8d8bce">
 <p>
 The blueprint is a Clojure function that can instantiate the network
 object that holds the parameter tensors that the network should learn by using
@@ -82,9 +82,9 @@ That's it! The network is ready to learn.
 </div>
 </div>
 
-<div id="outline-container-orgbe59067" class="outline-2">
-<h2 id="orgbe59067">Train the network on MNIST data (CPU)</h2>
-<div class="outline-text-2" id="text-orgbe59067">
+<div id="outline-container-orgae4dec0" class="outline-2">
+<h2 id="orgae4dec0">Train the network on MNIST data (CPU)</h2>
+<div class="outline-text-2" id="text-orgae4dec0">
 <p>
 The original MNIST data is distributed through four binary files that
 you can download <a href="http://yann.lecun.com/exdb/mnist/">here</a>. To demonstrate how nice Clojure is, I'm not
@@ -117,9 +117,9 @@ and in the meantime you can try for yourself!).
 </div>
 </div>
 
-<div id="outline-container-orgdd575b6" class="outline-2">
-<h2 id="orgdd575b6">Has it learned anything?</h2>
-<div class="outline-text-2" id="text-orgdd575b6">
+<div id="outline-container-org7c0813e" class="outline-2">
+<h2 id="org7c0813e">Has it learned anything?</h2>
+<div class="outline-text-2" id="text-org7c0813e">
 <p>
 See the metrics:
 </p>
@@ -149,9 +149,9 @@ Accuracy is 99.2% which is in the ballpark of what the Keras example gives.
 </div>
 
 
-<div id="outline-container-orgf50f93b" class="outline-2">
-<h2 id="orgf50f93b">GPU</h2>
-<div class="outline-text-2" id="text-orgf50f93b">
+<div id="outline-container-org78cec4a" class="outline-2">
+<h2 id="org78cec4a">GPU</h2>
+<div class="outline-text-2" id="text-org78cec4a">
 <p>
 Want to go faster? No problem, Deep Diamond supports GPU, in the same process,
 at the same time, with the same code!
@@ -182,9 +182,9 @@ Elapsed time? <b>20 seconds</b> on my Nvidia GTX 1080Ti (which is a few generati
 </div>
 </div>
 
-<div id="outline-container-org6180ee2" class="outline-2">
-<h2 id="org6180ee2">The books</h2>
-<div class="outline-text-2" id="text-org6180ee2">
+<div id="outline-container-org2c2d651" class="outline-2">
+<h2 id="org2c2d651">The books</h2>
+<div class="outline-text-2" id="text-org2c2d651">
 <p>
 Should I mention that the book <a href="https://aiprobook.com/deep-learning-for-programmers/">Deep Learning for Programmers: An Interactive Tutorial with
 CUDA, OpenCL, DNNL, Java, and Clojure</a> teaches the nuts and bolts of neural networks and deep learning
@@ -203,9 +203,9 @@ Please subscribe, read the drafts, get the full book soon, and support my work o
 </div>
 </div>
 
-<div id="outline-container-org44b95cf" class="outline-2">
-<h2 id="org44b95cf">Appendix: Reading, encoding, and decoding data</h2>
-<div class="outline-text-2" id="text-org44b95cf">
+<div id="outline-container-orga8b021d" class="outline-2">
+<h2 id="orga8b021d">Appendix: Reading, encoding, and decoding data</h2>
+<div class="outline-text-2" id="text-orga8b021d">
 <p>
 The code that reads the raw image data and converts it to proper tensors
 should go up in the sequence of execution, but is not that interesting.
