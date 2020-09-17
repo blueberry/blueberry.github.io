@@ -1,0 +1,235 @@
+---
+date: 2020-09-17 21:30
+author: dragan
+layout: post
+title: Deep Learning in Clojure with Fewer Parentheses than Keras and Python
+categories:
+- Deep
+- Learning,
+- Deep
+- Diamond,
+- Neanderthal,
+- DNNL,
+- cuBLAS,
+- Clojure,
+- Keras,
+- Python
+tags:
+excerpt: I demonstrate this by direct comparison with the paragon of simplicity and elegance of deep learning in Python - Keras.
+---
+<p>
+<a href="https://github.com/uncomplicate/deep-diamond">Deep Diamond</a>(<iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=deep-diamond&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>) is a new Deep Learning library written in Clojure.
+Its goal is to be simple, superfast, and to support both CPU and GPU computing. Try it out!
+</p>
+
+<p>
+But it's Clojure, you might say. Why not Python? Python is simple. Python is easy.
+Python is supported by Google and Facebook. And Clojure&#x2026; Clojure is a&#x2026; you know&#x2026;
+a&#x2026; Lisp! Lisp is diiifiiicuuuult. Lisp has soooo many pareentheses. Noone wants to
+write their DL models like <code>((((((model.add (((Conv2d etc.)))))))))))))))))))))))))</code>.
+And Clojure is&#x2026; you know&#x2026; running on JVM, and JVM is heeeeavy and sloooooow.
+And no one is using it except from Rich Hickey and his guitar.
+</p>
+
+<p>
+Both of these are not true! I'll demonstrate this by direct comparison with
+the paragon of simplicity and elegance of deep learning in Python - Keras. In this post, I'll take
+a <a href="https://github.com/keras-team/keras/blob/master/examples/mnist_cnn.py">convolutional neural network from Keras examples</a>.
+</p>
+
+<p>
+Below is the relevant model code, first in Keras, and then in Deep Diamond.
+You can compare them aesthetically. Keras is a high bar to clear, but I think
+that Deep Diamond's code is even more straightforward.
+</p>
+
+<p>
+But the main point is easy to count: parentheses and other punctuation!
+There, it's easy to show (by simple counting) that Deep Diamond uses
+fewer parentheses, fewer punctuation symbols overall, fewer constructs,
+and has less incidental complexity.
+</p>
+
+<p>
+I'll argue that its code has nicer layout, too, and a fine sprinkle
+of colorful symbols in well balanced places, but that's just my
+subjective preference. Don't look at that nice sparkling thing.
+</p>
+
+<div id="outline-container-org15a23f3" class="outline-2">
+<h2 id="org15a23f3">Keras CNN in Python</h2>
+<div class="outline-text-2" id="text-org15a23f3">
+<div class="org-src-container">
+<pre class="src src-clojure">model = Sequential<span style="color: #707183;">()</span>
+model.add<span style="color: #707183;">(</span>Conv2D<span style="color: #7388d6;">(</span>32, kernel_size=<span style="color: #909183;">(</span>3, 3<span style="color: #909183;">)</span>,
+                 activation='relu',
+                 input_shape=<span style="color: #909183;">(</span>28, 28, 1<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+model.add<span style="color: #707183;">(</span>Conv2D<span style="color: #7388d6;">(</span>64, <span style="color: #909183;">(</span>3, 3<span style="color: #909183;">)</span>, activation='relu'<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+model.add<span style="color: #707183;">(</span>MaxPooling2D<span style="color: #7388d6;">(</span>pool_size=<span style="color: #909183;">(</span>2, 2<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+model.add<span style="color: #707183;">(</span>Dropout<span style="color: #7388d6;">(</span>0.25<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+model.add<span style="color: #707183;">(</span>Flatten<span style="color: #7388d6;">()</span><span style="color: #707183;">)</span>
+model.add<span style="color: #707183;">(</span>Dense<span style="color: #7388d6;">(</span>128, activation='relu'<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+model.add<span style="color: #707183;">(</span>Dropout<span style="color: #7388d6;">(</span>0.5<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+model.add<span style="color: #707183;">(</span>Dense<span style="color: #7388d6;">(</span>num_classes, activation='softmax'<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+
+model.compile<span style="color: #707183;">(</span>loss=keras.losses.categorical_crossentropy,
+              optimizer=Adam<span style="color: #7388d6;">(</span>learning_rate=0.01<span style="color: #7388d6;">)</span>,
+              metrics=<span style="color: #7388d6;">[</span>'accuracy'<span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+
+model.fit<span style="color: #707183;">(</span>x_train, y_train,
+          batch_size=128,
+          epochs=12<span style="color: #707183;">)</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org1f65d07" class="outline-2">
+<h2 id="org1f65d07">Deep Diamond CNN in Clojure</h2>
+<div class="outline-text-2" id="text-org1f65d07">
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defonce</span> <span style="color: #0084C8; font-weight: bold;">net-bp</span>
+  <span style="color: #7388d6;">(</span>network <span style="color: #909183;">(</span>desc <span style="color: #709870;">[</span>128 1 28 28<span style="color: #709870;">]</span> <span style="color: #F5666D;">:float</span> <span style="color: #F5666D;">:nchw</span><span style="color: #909183;">)</span>
+           <span style="color: #909183;">[</span><span style="color: #709870;">(</span>convo <span style="color: #907373;">[</span>32<span style="color: #907373;">]</span> <span style="color: #907373;">[</span>3 3<span style="color: #907373;">]</span> <span style="color: #F5666D;">:relu</span><span style="color: #709870;">)</span>
+               <span style="color: #709870;">(</span>convo <span style="color: #907373;">[</span>64<span style="color: #907373;">]</span> <span style="color: #907373;">[</span>3 3<span style="color: #907373;">]</span> <span style="color: #F5666D;">:relu</span><span style="color: #709870;">)</span>
+               <span style="color: #709870;">(</span>pooling <span style="color: #907373;">[</span>2 2<span style="color: #907373;">]</span> <span style="color: #F5666D;">:max</span><span style="color: #709870;">)</span>
+               <span style="color: #709870;">(</span>dropout<span style="color: #709870;">)</span>
+               <span style="color: #709870;">(</span>dense <span style="color: #907373;">[</span>128<span style="color: #907373;">]</span> <span style="color: #F5666D;">:relu</span><span style="color: #709870;">)</span>
+               <span style="color: #709870;">(</span>dropout<span style="color: #709870;">)</span>
+               <span style="color: #709870;">(</span>dense <span style="color: #907373;">[</span>10<span style="color: #907373;">]</span> <span style="color: #F5666D;">:softmax</span><span style="color: #709870;">)</span><span style="color: #909183;">]</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defonce</span> <span style="color: #0084C8; font-weight: bold;">net</span> <span style="color: #7388d6;">(</span>init! <span style="color: #909183;">(</span>net-bp <span style="color: #F5666D;">:adam</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+
+<span style="color: #707183;">(</span>train net train-images y-train <span style="color: #F5666D;">:crossentropy</span> 12 <span style="color: #7388d6;">[]</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org5455e07" class="outline-2">
+<h2 id="org5455e07">Let's count</h2>
+<div class="outline-text-2" id="text-org5455e07">
+<p>
+How about the number of dreaded parentheses, <code>(</code> and <code>)</code>?
+</p>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-right" />
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">&#xa0;</th>
+<th scope="col" class="org-right">Python</th>
+<th scope="col" class="org-right">Clojure</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left">( and )</td>
+<td class="org-right">48</td>
+<td class="org-right">28</td>
+</tr>
+
+<tr>
+<td class="org-left">(, ), [, and ]</td>
+<td class="org-right">50</td>
+<td class="org-right">48</td>
+</tr>
+
+<tr>
+<td class="org-left">Grouped (())</td>
+<td class="org-right">8</td>
+<td class="org-right">2</td>
+</tr>
+
+<tr>
+<td class="org-left">)))</td>
+<td class="org-right">2</td>
+<td class="org-right">1</td>
+</tr>
+
+<tr>
+<td class="org-left">,</td>
+<td class="org-right">17</td>
+<td class="org-right">0</td>
+</tr>
+
+<tr>
+<td class="org-left">model.add</td>
+<td class="org-right">8</td>
+<td class="org-right">0</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+As we can see from the table, on every punctuation metric that I could think
+of, Deep Diamond and Clojure fare better than Keras &amp; Python.
+</p>
+
+<p>
+Keras uses almost twice as much parentheses than Deep Diamond. Clojure uses <code>[]</code>
+for vector literals, which Deep Diamond uses as tensor shapes. You will note that
+there are more than a few of these, and argue that these are parentheses, too.
+Fine. Add them up, and Clojure fares slightly better than Python!
+</p>
+
+<p>
+A parenthesis here and there is not a problem, but there are horror tales of
+<code>(((((((</code> and <code>)))))))</code> in Lisps. Not in Clojure. See that there is not a
+single <code>((</code> in the Clojure example, and only two occurances of <code>))</code>.
+In Python - there are 8.
+</p>
+
+<p>
+Then we come to all additional assorted punctuation in Python: commas, dots, etc.
+In Clojure, there are none, while in Python there are dozens.
+</p>
+
+<p>
+Python is also riddled with redundant stuff such as <code>model.add()</code>.
+</p>
+
+<p>
+Etc., etc. You get my point.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org0a3b1ed" class="outline-2">
+<h2 id="org0a3b1ed">Speed</h2>
+<div class="outline-text-2" id="text-org0a3b1ed">
+<p>
+But, <i>speed</i>! - you might say. Deep Diamond is faster, too (at least for this model), but that is a nice topic for
+some other blog post :) Both tools are free so you can try for yourself in the meantime.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org5a8603d" class="outline-2">
+<h2 id="org5a8603d">The books</h2>
+<div class="outline-text-2" id="text-org5a8603d">
+<p>
+Should I mention that the book <a href="https://aiprobook.com/deep-learning-for-programmers/">Deep Learning for Programmers: An Interactive Tutorial with
+CUDA, OpenCL, DNNL, Java, and Clojure</a> teaches the nuts and bolts of neural networks and deep learning
+by showing you how Deep Diamond is built, <b>from scratch</b>? In interactive sessions. Each line of code
+can be executed and the results inspected in the plain Clojure REPL. The best way to master something is to build
+it yourself!
+</p>
+
+<p>
+It' simple. But fast and powerful!
+</p>
+
+<p>
+Please subscribe, read the drafts, get the full book soon, and support my work on this free open source library.
+</p>
+</div>
+</div>
