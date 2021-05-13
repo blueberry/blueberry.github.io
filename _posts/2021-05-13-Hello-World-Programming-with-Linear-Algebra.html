@@ -1,0 +1,634 @@
+---
+date: 2021-05-13 19:14
+author: dragan
+layout: post
+title: Hello World of Programming with Linear Algebra
+categories: 
+- Neanderthal,
+- Linear
+- Algebra
+tags: 
+excerpt: I hope that a simple Hello World example can at least give you a rough idea of how LA can be applied in programming. I won't dwell on the theory; let's see whether we can make this intuitive.
+---
+<p>
+Recent popularity of Machine Learning brought high performance computing on the radar of most programming.
+You've heard that math in general and linear algebra in particular is central in implementing and using this stuff.
+However, you might have a hard time connecting the linear algebra that you've learned in college (and probably forgot by now)
+to actual programming tasks where you'd use it now.
+</p>
+
+<p>
+I hope that a simple Hello World example can at least give you a rough idea of how LA can be applied in programming.
+I won't dwell on the theory; let's see whether we can make this intuitive.
+</p>
+
+<div id="outline-container-orgc840acd" class="outline-2">
+<h2 id="orgc840acd">Just an ordinary domain model</h2>
+<div class="outline-text-2" id="text-orgc840acd">
+<p>
+Imagine this simplified code for inventory modeling.
+(When I say "simplified" i mean <i>really</i>
+simplified. We're using floats for prices
+(bad), we store the data in global state,
+the architecture is far from even a simple
+web application. But the model is familiar
+enough to a typical software developer.)
+</p>
+
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">products</span> <span style="color: #7388d6;">{</span><span style="color: #F5666D;">:banana</span> <span style="color: #909183;">{</span><span style="color: #F5666D;">:price</span> 1.3 <span style="color: #F5666D;">:id</span> <span style="color: #F5666D;">:banana</span><span style="color: #909183;">}</span>
+               <span style="color: #F5666D;">:mango</span> <span style="color: #909183;">{</span><span style="color: #F5666D;">:price</span> 2.0 <span style="color: #F5666D;">:id</span> <span style="color: #F5666D;">:mango</span><span style="color: #909183;">}</span>
+               <span style="color: #F5666D;">:pineapple</span> <span style="color: #909183;">{</span><span style="color: #F5666D;">:price</span> 1.9 <span style="color: #F5666D;">:id</span> <span style="color: #F5666D;">:pineapple</span><span style="color: #909183;">}</span>
+               <span style="color: #F5666D;">:pears</span> <span style="color: #909183;">{</span><span style="color: #F5666D;">:price</span> 1.8 <span style="color: #F5666D;">:id</span> <span style="color: #F5666D;">:pears</span><span style="color: #909183;">}</span><span style="color: #7388d6;">}</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+This (imaginary) application exists to track sales. A customer
+puts the desired products into a cart, we calculate the total price,
+and, later, perform the delivery. Each cart only stores the products'
+identifiers and quantities (in unspecified units; yes, it's super-simplified).
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">cart1</span> <span style="color: #7388d6;">{</span><span style="color: #F5666D;">:banana</span> 10
+            <span style="color: #F5666D;">:pineapple</span> 7
+            <span style="color: #F5666D;">:pears</span> 3<span style="color: #7388d6;">}</span><span style="color: #707183;">)</span>
+
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">cart2</span> <span style="color: #7388d6;">{</span><span style="color: #F5666D;">:pineapple</span> 3
+            <span style="color: #F5666D;">:mango</span> 9<span style="color: #7388d6;">}</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Having defined product and cart data, we write a function that,
+given the products "database" and a cart, calculates the total price
+of the products in the cart. The <code>cart-price</code> function reduces all
+<code>[product quantity]</code> pairs in the <code>cart</code>, by retrieving the appropriate
+product map in the <code>product-db</code>, and taking the value associated with
+its <code>:price</code> key. It multiplies that price with the quantity, and
+accumulates it in <code>total</code>.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">cart-price</span> <span style="color: #7388d6;">[</span>product-db cart<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>reduce <span style="color: #909183;">(</span><span style="color: #A52A2A; font-weight: bold;">fn</span> <span style="color: #709870;">[</span>total <span style="color: #907373;">[</span>product quantity<span style="color: #907373;">]</span><span style="color: #709870;">]</span>
+            <span style="color: #709870;">(</span>+ total <span style="color: #907373;">(</span>* <span style="color: #6276ba;">(</span><span style="color: #F5666D;">:price</span> <span style="color: #858580;">(</span>product-db product<span style="color: #858580;">)</span><span style="color: #6276ba;">)</span> quantity<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span>
+          0
+          cart<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Let's call this function with the available carts, and see it in action.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>cart-price products cart1<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example" id="orgf49c458">
+=&gt; 31.699999999999996
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>cart-price products cart2<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example" id="org388c72f">
+=&gt; 23.7
+</pre>
+
+<p>
+We hopefully have more than one order. Our code can easily process
+sequences of carts, and compute the total revenue.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>reduce + <span style="color: #7388d6;">(</span>map <span style="color: #909183;">(</span>partial cart-price products<span style="color: #909183;">)</span> <span style="color: #909183;">[</span>cart1 cart2<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example" id="orgec94e79">
+=&gt; 55.39999999999999
+</pre>
+
+<p>
+It's all good; but what does it have to do with linear algebra?
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgfaa73c2" class="outline-2">
+<h2 id="orgfaa73c2">A more general algorithm</h2>
+<div class="outline-text-2" id="text-orgfaa73c2">
+<p>
+In the previous implementation, we entangled the specifics of data
+storage and the algorithm that computes the total price. In this simple
+model, it's not much of a problem, but if the data model is more
+complex, and the algorithm not as simple as the straightforward
+map/reduce, this quickly leads to (at least) two problems:
+</p>
+<ul class="org-ul">
+<li>code becomes too complicated</li>
+<li>program performance degrades quickly</li>
+</ul>
+
+<p>
+Let's first tackle the code complexity by extracting the computation
+logic from the domain into the abstract mathematical notion of vectors
+and operations on these vectors. In this particular example,
+vectors help us encapsulate a bunch of numbers as one atomic unit.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">product-prices</span> <span style="color: #7388d6;">[</span>1.3 2.0 1.9 1.8<span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">cart-vec-1</span> <span style="color: #7388d6;">[</span>10 0 7 3<span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">cart-vec-2</span> <span style="color: #7388d6;">[</span>0 9 3 0<span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+We recognize that the logic we've already developed for computing
+the total price matches a simple and well known mathematical operation,
+known as the <i>dot product</i>, a scalar product of two vectors.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">dot-product-vec</span> <span style="color: #7388d6;">[</span>xs ys<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>reduce + <span style="color: #909183;">(</span>map * xs ys<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Given two vectors, <code>[1 2 3]</code> and <code>[4 5 6]</code>, the dot product computes
+one number, a <i>scalar</i>, that represent a <i>scalar</i> product of these two vectors.
+Right now, we don't even care about theoretical details of the dot
+product; we recognize that it technically computes the same thing
+that we need in our domain, and it seems useful. There are other ways to multiply vectors,
+which return non-scalar structures.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>dot-product-vec <span style="color: #7388d6;">[</span>1 2 3<span style="color: #7388d6;">]</span> <span style="color: #7388d6;">[</span>4 5 6<span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example" id="org21ed478">
+=&gt; 32
+</pre>
+
+<p>
+We can see that, when applied to the vectors holding product prices
+and quantities, it returns the correct results that we've already seen.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>dot-product-vec product-prices cart-vec-1<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example" id="org14ac787">
+=&gt; 31.699999999999996
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>dot-product-vec product-prices cart-vec-2<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example" id="org1db880d">
+=&gt; 23.7
+</pre>
+
+<p>
+Getting the total price requires another map/reduce, but we will
+quickly see that this, too, can be generalized.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>reduce + <span style="color: #7388d6;">(</span>map <span style="color: #909183;">(</span>partial dot-product-vec product-prices<span style="color: #909183;">)</span>
+               <span style="color: #909183;">[</span>cart-vec-1 cart-vec-2<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example" id="org11c44fc">
+=&gt; 55.39999999999999
+</pre>
+</div>
+</div>
+
+<div id="outline-container-orgd6f3540" class="outline-2">
+<h2 id="orgd6f3540">A library of linear algebra operations</h2>
+<div class="outline-text-2" id="text-orgd6f3540">
+<p>
+When we abstract away the specifics of the domain, we end up with
+a number of general operations that can be reused over and over, and
+combined into more complex, but still general, operations. Countless
+such operations have been studied and theoretically developed by
+various branches of mathematics and related applied disciplines for
+a long time. What's more, many have been implemented and optimized
+for popular hardware and software ecosystems, so our main task
+is to learn how to apply that vast resource to the specific domain problems.
+</p>
+
+<p>
+Linear algebra is particularly well supported in implementations.
+Whenever we need to process arrays of numbers, it is likely that at least
+some part of this processing, if not all of it, can be described through
+vector, matrix, or tensor operations.
+</p>
+</div>
+
+<div id="outline-container-org8561f7b" class="outline-3">
+<h3 id="org8561f7b">Vectors</h3>
+<div class="outline-text-3" id="text-org8561f7b">
+<p>
+Instead of developing our own naive implementations, we should
+reuse the well-defined data structures and functions provided by <a href="https://neanderthal.uncomplicate.org">Neanderthal</a> (<iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=neanderthal&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>).
+</p>
+
+<p>
+Here we use vectors of double precision floating point numbers to
+represent products' prices and carts.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">product-prices</span> <span style="color: #7388d6;">(</span>dv <span style="color: #909183;">[</span>1.3 2.0 1.9 1.8<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">cart-vctr-1</span> <span style="color: #7388d6;">(</span>dv <span style="color: #909183;">[</span>10 0 7 3<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">cart-vctr-2</span> <span style="color: #7388d6;">(</span>dv <span style="color: #909183;">[</span>0 9 3 0<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+We use the general <code>dot</code> function in the same way as the matching
+function that we had implemented before.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>dot product-prices cart-vctr-1<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example" id="org5a21d2d">
+=&gt; 31.7
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>dot product-prices cart-vctr-2<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example" id="orgde7bee8">
+=&gt; 23.7
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org556640e" class="outline-3">
+<h3 id="org556640e">Matrices</h3>
+<div class="outline-text-3" id="text-org556640e">
+<p>
+Once we start applying general operations, we can see new ways to
+improve our code, not so obvious at first.
+</p>
+
+<p>
+Instead of maintaining sequences of vectors that represent carts,
+and coding custom functions to process these vectors, we can put that
+data into the rows of a matrix. All carts are now represented by one
+matrix, and each row of the matrix represents one cart.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">carts</span> <span style="color: #7388d6;">(</span>dge 2 4<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example" id="org7f91f1a">
+=&gt;
+#RealGEMatrix[double, mxn:2x4, layout:column, offset:0]
+▥       ↓       ↓       ↓       ↓       ┓
+→       0.00    0.00    0.00    0.00
+→       0.00    0.00    0.00    0.00
+┗                                       ┛
+</pre>
+
+<p>
+We could have populated the matrix manually, but, since we already
+have the data loaded in appropriate vectors, we can copy it, showing
+how these structures are related.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>copy! cart-vctr-1 <span style="color: #7388d6;">(</span>row carts 0<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example" id="org9300c0a">
+=&gt;
+#RealBlockVector[double, n:4, offset: 0, stride:2]
+[  10.00    0.00    7.00    3.00 ]
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>copy! cart-vctr-2 <span style="color: #7388d6;">(</span>row carts 1<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example" id="org41c0c15">
+=&gt;
+#RealBlockVector[double, n:4, offset: 1, stride:2]
+[   0.00    9.00    3.00    0.00 ]
+</pre>
+
+<p>
+The following step is the usual opportunity for a novice to slip.
+Should we now iterate the rows of our newly created matrix, calling
+dot products on each row? No! We should recognize that the equivalent
+operation already exists: matrix-vector multiplication, implemented
+by the <code>mv</code> function!
+</p>
+
+<p>
+Most functions in this domain have
+short names that might sound cryptic
+until you get used to it. There is a
+method to their naming, though, and
+they are usually very descriptive
+mnemonics. For example, <code>mv</code> stands for
+Matrix-Vector multiplication. You'll
+guess that <code>mm</code> is Matrix-Matrix multiplication
+and so on. Like in mathematical
+formulas, this naming makes for code
+that can be viewed in a contained place
+that can be grasped in one view.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>mv carts product-prices<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example" id="orgb6b8483">
+=&gt;
+#RealBlockVector[double, n:2, offset: 0, stride:1]
+[  31.70   23.70 ]
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>asum <span style="color: #7388d6;">(</span>mv carts product-prices<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example" id="orgd7aabac">
+=&gt; 55.4
+</pre>
+
+<p>
+Not only that the <code>mv</code> operation is equivalent to multiple calls to
+<code>dot</code>, but it takes advantage of the structure of the matrix, and optimizes
+the computation to the available hardware. This achieves much
+better performance, which can compound to orders of magnitude in
+improvements.
+</p>
+
+<p>
+These improvements materialize in
+more serious examples. Any implementation
+of a small toy problem
+works fast.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org39c2ed1" class="outline-2">
+<h2 id="org39c2ed1">&#x2026;and more</h2>
+<div class="outline-text-2" id="text-org39c2ed1">
+<p>
+Let's introduce a bit more complication. Say that we want to support
+different discounts for each product, in the form of multipliers.
+That gets us the price reductions, that we should subtract from the
+price. An alternative way, shown in the following snippets is to
+subtract the discount coefficients from <code>1.0</code> to get the direct multiplier
+that gets us to the reduced price.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">discounts</span> <span style="color: #7388d6;">(</span>dv <span style="color: #909183;">[</span>0.07 0 0.33 0.25<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">ones</span> <span style="color: #7388d6;">(</span>entry! <span style="color: #909183;">(</span>dv 4<span style="color: #909183;">)</span> 1<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+We can subtract two vectors by the <code>axpy</code> function. <code>axpy</code> stands for "scalar a times x plus y".
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>axpy -1 discounts ones<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example" id="org05fe023">
+=&gt;
+#RealBlockVector[double, n:4, offset: 0, stride:1]
+[   0.93    1.00    0.67    0.75 ]
+</pre>
+
+<p>
+The <code>mul</code> function multiplies its vector, matrix, or tensor arguments
+element-wise, entry by entry.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>mul <span style="color: #7388d6;">(</span>axpy -1 discounts ones<span style="color: #7388d6;">)</span> product-prices<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example" id="org954f299">
+=&gt;
+#RealBlockVector[double, n:4, offset: 0, stride:1]
+[   1.21    2.00    1.27    1.35 ]
+</pre>
+
+<p>
+The following code seamlessly incorporates this new part of the
+algorithm into the implementation that we already have.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>asum <span style="color: #7388d6;">(</span>mv carts <span style="color: #909183;">(</span>mul <span style="color: #709870;">(</span>axpy -1 discounts ones<span style="color: #709870;">)</span> product-prices<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example" id="org3221288">
+=&gt; 46.87
+</pre>
+
+<p>
+Why stop here? Suppose that we want to simulate the effects of
+multiple discount combinations on the total price. As earlier, we put
+all these hypothetical discount vectors into a matrix, in this case,
+three samples that we'd like to investigate.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">discount-mat</span> <span style="color: #7388d6;">(</span>dge 4 3 <span style="color: #909183;">[</span>0.07 0 0.33 0.25
+                            0.05 0.30 0 0.1
+                            0 0 0.20 0.40<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example" id="orgf180953">
+=&gt;
+#RealGEMatrix[double, mxn:4x3, layout:column, offset:0]
+▥       ↓       ↓       ↓       ┓
+→       0.07    0.05    0.00
+→       0.00    0.30    0.00
+→       0.33    0.00    0.20
+→       0.25    0.10    0.40
+┗                               ┛
+</pre>
+
+<p>
+We have to subtract these numbers from <code>1.0</code>. Instead of populating
+the matrix with <code>1.0</code>, we will demonstrate the outer product operation,
+implemented by the function <code>rk</code>. Given two vectors, it produces a matrix
+that holds all combinations of the product of the entries of the vectors.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>rk ones <span style="color: #7388d6;">(</span>subvector ones 0 3<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example" id="orgc62d01b">
+=&gt;
+#RealGEMatrix[double, mxn:4x3, layout:column, offset:0]
+▥       ↓       ↓       ↓       ┓
+→       1.00    1.00    1.00
+→       1.00    1.00    1.00
+→       1.00    1.00    1.00
+→       1.00    1.00    1.00
+┗                               ┛
+</pre>
+
+<p>
+We can also utilize <code>rk</code> to "lift" product prices vector to a matrix
+whose shape matches the shape of the discount combinations matrix.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">ones-3</span> <span style="color: #7388d6;">(</span>subvector ones 0 3<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">discounted-prices</span> <span style="color: #7388d6;">(</span>mul <span style="color: #909183;">(</span>axpy -1 discount-mat <span style="color: #709870;">(</span>rk ones ones-3<span style="color: #709870;">)</span><span style="color: #909183;">)</span>
+                            <span style="color: #909183;">(</span>rk product-prices ones-3<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+The result is a matrix of hypothetical discount prices that we'd like
+to simulate.
+</p>
+
+<pre class="example" id="org4ab3d88">
+=&gt;
+#RealGEMatrix[double, mxn:4x3, layout:column, offset:0]
+▥       ↓       ↓       ↓       ┓
+→       1.21    1.23    1.30
+→       2.00    1.40    2.00
+→       1.27    1.90    1.52
+→       1.35    1.62    1.08
+┗                               ┛
+</pre>
+
+<p>
+Now, the most interesting part: how do we calculate the totals from
+this matrix and the matrix of carts we've produced earlier. (Not) surprisingly,
+just a <i>single</i> operation, matrix multiplication, completes this task!
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>mm carts discounted-prices<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example" id="orgb661f0a">
+=&gt;
+#RealGEMatrix[double, mxn:2x3, layout:column, offset:0]
+▥       ↓       ↓       ↓       ┓
+→      25.05   30.51   26.88
+→      21.82   18.30   22.56
+┗                               ┛
+</pre>
+
+<p>
+Now we only need to sum the columns up to get the three final totals.
+We won't do this column-by-column. Instead, we'll use the "<code>mv</code> with
+ones" approach we've already encountered. Note that we need to transpose
+the matrix to match the desired structure.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>trans <span style="color: #7388d6;">(</span>mm carts discounted-prices<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example" id="orgb16e33b">
+=&gt;
+#RealGEMatrix[double, mxn:3x2, layout:row, offset:0]
+   ▤       ↓       ↓       ┓
+   →      25.05   21.82
+   →      30.51   18.30
+   →      26.88   22.56
+   ┗                       ┛
+</pre>
+
+<p>
+And, the final answer is&#x2026;
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>mv <span style="color: #7388d6;">(</span>trans <span style="color: #909183;">(</span>mm carts discounted-prices<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span> <span style="color: #7388d6;">(</span>subvector ones 0 2<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example" id="org9a5d42d">
+=&gt;
+#RealBlockVector[double, n:3, offset: 0, stride:1]
+[  46.87   48.81   49.44 ]
+</pre>
+
+<p>
+Given three (or three million) possible discount combinations, we get
+a vector of the total revenue amounts. Of course, being a toy example,
+this code doesn't take into account that lower prices would (likely)
+induce more sales; let's not carry a Hello World example too far.
+</p>
+
+<p>
+So, the first major benefit of using a library, such as <a href="https://neanderthal.uncomplicate.org">Neanderthal</a> (<iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=neanderthal&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>),
+based on many decades of numerical computing research and development
+is that <i>we have access to a large treasure trove of useful, well thought,</i>
+<i>general functions for developing useful, general or customized, number</i>
+<i>processing algorithms</i>.
+</p>
+
+<p>
+Another major improvement is performance. Although toy examples
+may be implemented in any way you'd like, and they'd still work reasonably
+well, real-world data processing almost always involves either
+many data points, or many computation steps, or, often &#x2013; both.
+</p>
+
+<p>
+I'm not talking about a couple dozen percentages,
+but improvements of many orders of magnitude. But that's a story that has to be looked at in more depth.
+I've written two books where I go into much, much, more depth and width on this. You can also check some earlier articles on this blog; there's
+many examples that demonstrate how fast this approach is!
+</p>
+</div>
+</div>
