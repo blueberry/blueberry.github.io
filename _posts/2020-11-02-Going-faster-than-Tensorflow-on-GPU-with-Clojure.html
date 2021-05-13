@@ -1,0 +1,133 @@
+---
+date: 2020-11-02 14:58
+author: dragan
+layout: post
+title: Going faster than TensorFlow on the GPU with Clojure (GTX 1080Ti)
+categories: 
+- Deep
+- Learning,
+- Deep
+- Diamond,
+- DNNL,
+- Clojure,
+- Keras,
+- Python,
+- TensorFlow,
+- CUDA,
+- Nvidia
+tags: 
+excerpt: In this article, we're measuring the performance of Deep Diamond on the GPU. Deed Diamond's lead even increased!
+---
+<p>
+A few weeks ago I've shown you how simple Clojure's
+<a href="https://github.com/uncomplicate/deep-diamond">Deep Diamond</a>(<iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=deep-diamond&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>) is, even compared to Keras. I've also mentioned
+that it's superfast. Here's how fast it is on the GPU!
+</p>
+
+<div id="outline-container-orgc0a2ae3" class="outline-2">
+<h2 id="orgc0a2ae3">TL;DR Much faster than Keras+TensorFlow on the GPU, too!</h2>
+<div class="outline-text-2" id="text-orgc0a2ae3">
+<p>
+In the <a href="./Going-faster-than-TensorFlow-with-Clojure">previous article</a>, we have only compared the libraries on the CPU.
+Deep Diamond was considerably faster: 368 seconds vs 509 seconds. Most readers were intrigued,
+but, being skeptical as they should be, they complained that CPU performance doesn't matter
+anyway, since everybody uses GPU for training convolution networks;
+let's do the GPU comparison then.
+</p>
+
+<p>
+Both Deep Diamond, and Keras with TensorFlow, use <a href="https://developer.nvidia.com/cudnn">Nvidia's cuDNN</a> low level performance
+library under the hood, and any difference is due to the higher-level implementation.
+</p>
+
+<p>
+Deep Diamond completes this training in <b>21</b> seconds while Keras + TensorFlow takes <b>35</b> seconds.
+The gap even increased in favor of Deep Diamond! Now the ratio is <b>1.67</b>, in place of 1.38 on the CPU.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org0601d75" class="outline-2">
+<h2 id="org0601d75">Keras CNN in Python</h2>
+<div class="outline-text-2" id="text-org0601d75">
+<p>
+I repeat the relevant model code for reference. We're
+interested in the running time of <code>model.fit</code>, with minimal verbosity,
+for 12 epochs. I'm using Nvidia's GTX 1080Ti GPU. Keras code is taken from official Keras examples.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure">model = Sequential<span style="color: #707183;">()</span>
+model.add<span style="color: #707183;">(</span>Conv2D<span style="color: #7388d6;">(</span>32, kernel_size=<span style="color: #909183;">(</span>3, 3<span style="color: #909183;">)</span>,
+                 activation='relu',
+                 input_shape=<span style="color: #909183;">(</span>28, 28, 1<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+model.add<span style="color: #707183;">(</span>Conv2D<span style="color: #7388d6;">(</span>64, <span style="color: #909183;">(</span>3, 3<span style="color: #909183;">)</span>, activation='relu'<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+model.add<span style="color: #707183;">(</span>MaxPooling2D<span style="color: #7388d6;">(</span>pool_size=<span style="color: #909183;">(</span>2, 2<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+model.add<span style="color: #707183;">(</span>Dropout<span style="color: #7388d6;">(</span>0.25<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+model.add<span style="color: #707183;">(</span>Flatten<span style="color: #7388d6;">()</span><span style="color: #707183;">)</span>
+model.add<span style="color: #707183;">(</span>Dense<span style="color: #7388d6;">(</span>128, activation='relu'<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+model.add<span style="color: #707183;">(</span>Dropout<span style="color: #7388d6;">(</span>0.5<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+model.add<span style="color: #707183;">(</span>Dense<span style="color: #7388d6;">(</span>num_classes, activation='softmax'<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+
+model.compile<span style="color: #707183;">(</span>loss=keras.losses.categorical_crossentropy,
+              optimizer=Adam<span style="color: #7388d6;">(</span>learning_rate=0.01<span style="color: #7388d6;">)</span>,
+              metrics=<span style="color: #7388d6;">[</span>'accuracy'<span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+
+s = time.time_ns<span style="color: #707183;">()</span>
+model.fit<span style="color: #707183;">(</span>x_train, y_train,
+          batch_size=128,
+          verbose=2,
+          epochs=12<span style="color: #707183;">)</span>
+e = time.time_ns<span style="color: #707183;">()</span>
+print<span style="color: #707183;">(</span><span style="color: #7388d6;">(</span>e-s<span style="color: #7388d6;">)</span>/<span style="color: #7388d6;">(</span>10**9<span style="color: #7388d6;">)</span>, <span style="color: #4E9A06;">" seconds"</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org7c1e24e" class="outline-2">
+<h2 id="org7c1e24e">Deep Diamond CNN in Clojure</h2>
+<div class="outline-text-2" id="text-org7c1e24e">
+<p>
+In Clojure, we're measuring the runtime of the <code>train</code> function.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defonce</span> <span style="color: #0084C8; font-weight: bold;">net-bp</span>
+  <span style="color: #7388d6;">(</span>network <span style="color: #909183;">(</span>desc <span style="color: #709870;">[</span>128 1 28 28<span style="color: #709870;">]</span> <span style="color: #F5666D;">:float</span> <span style="color: #F5666D;">:nchw</span><span style="color: #909183;">)</span>
+           <span style="color: #909183;">[</span><span style="color: #709870;">(</span>convo <span style="color: #907373;">[</span>32<span style="color: #907373;">]</span> <span style="color: #907373;">[</span>3 3<span style="color: #907373;">]</span> <span style="color: #F5666D;">:relu</span><span style="color: #709870;">)</span>
+            <span style="color: #709870;">(</span>convo <span style="color: #907373;">[</span>64<span style="color: #907373;">]</span> <span style="color: #907373;">[</span>3 3<span style="color: #907373;">]</span> <span style="color: #F5666D;">:relu</span><span style="color: #709870;">)</span>
+            <span style="color: #709870;">(</span>pooling <span style="color: #907373;">[</span>2 2<span style="color: #907373;">]</span> <span style="color: #F5666D;">:max</span><span style="color: #709870;">)</span>
+            <span style="color: #709870;">(</span>dropout<span style="color: #709870;">)</span>
+            <span style="color: #709870;">(</span>dense <span style="color: #907373;">[</span>128<span style="color: #907373;">]</span> <span style="color: #F5666D;">:relu</span><span style="color: #709870;">)</span>
+            <span style="color: #709870;">(</span>dropout<span style="color: #709870;">)</span>
+            <span style="color: #709870;">(</span>dense <span style="color: #907373;">[</span>10<span style="color: #907373;">]</span> <span style="color: #F5666D;">:softmax</span><span style="color: #709870;">)</span><span style="color: #909183;">]</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defonce</span> <span style="color: #0084C8; font-weight: bold;">net</span> <span style="color: #7388d6;">(</span>init! <span style="color: #909183;">(</span>net-bp <span style="color: #F5666D;">:adam</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+
+<span style="color: #707183;">(</span>time <span style="color: #7388d6;">(</span>train net train-images y-train <span style="color: #F5666D;">:crossentropy</span> 12 <span style="color: #909183;">[]</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgf9c6799" class="outline-2">
+<h2 id="orgf9c6799">The books</h2>
+<div class="outline-text-2" id="text-orgf9c6799">
+<p>
+The book <a href="https://aiprobook.com/deep-learning-for-programmers/">Deep Learning for Programmers: An Interactive Tutorial with
+CUDA, OpenCL, DNNL, Java, and Clojure</a> teaches the nuts and bolts of neural networks and deep learning
+by showing you how Deep Diamond is built, <b>from scratch</b>, in interactive sessions. Each line of code
+can be executed and the results inspected in the plain Clojure REPL. The best way to master something is to build
+it yourself!
+</p>
+
+<p>
+It' simple. But fast and powerful!
+</p>
+
+<p>
+Please subscribe, read the drafts, get the full book soon, and support my work on this free open source library.
+</p>
+</div>
+</div>
