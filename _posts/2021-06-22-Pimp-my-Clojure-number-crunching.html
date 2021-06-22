@@ -8,7 +8,7 @@ categories:
 - Linear
 - Algebra
 tags: 
-excerpt: PLACEHOLDER
+excerpt: Or, Why I sometimes like to write my own number crunching code.
 ---
 <p>
 Let's start right in the middle of the story, and play with cosine similarity. I'll
@@ -60,7 +60,7 @@ Now, the <i>dot product</i> can be naively implemented as following.
 </pre>
 </div>
 
-<pre class="example" id="orgf79407a">
+<pre class="example" id="org8a08d3f">
 =&gt; 100.0
 </pre>
 
@@ -73,7 +73,7 @@ It's much easier and faster to use the staple linear algebra function called <co
 </pre>
 </div>
 
-<pre class="example" id="org87b3126">
+<pre class="example" id="orgfba4941">
 =&gt; 100.0
 </pre>
 </div>
@@ -100,7 +100,7 @@ dot product of a vector with itself.
 </pre>
 </div>
 
-<pre class="example" id="org662724e">
+<pre class="example" id="org7e5f84c">
 =&gt; 3.7416573867739413
 </pre>
 
@@ -128,7 +128,7 @@ This is cosine similarity between vectors <code>x</code> and <code>y</code>:
 </pre>
 </div>
 
-<pre class="example" id="orga76c8a4">
+<pre class="example" id="org60844d8">
 =&gt; 0.7142857142857142
 </pre>
 
@@ -263,7 +263,7 @@ we can simply matrix multiply <code>xs</code> by its transpose!
 </pre>
 </div>
 
-<pre class="example" id="org8f854fe">
+<pre class="example" id="org1f0bc7b">
 =&gt;
 #RealGEMatrix[double, mxn:2x2, layout:column, offset:0]
    ▥       ↓       ↓       ┓
@@ -316,7 +316,7 @@ Again, this is not some one-off trick, but a standard linear algebra stuff expla
 </pre>
 </div>
 
-<pre class="example" id="org5492ec9">
+<pre class="example" id="orgea40ef1">
 =&gt;
 #RealGEMatrix[double, mxn:2x2, layout:column, offset:0]
    ▥       ↓       ↓       ┓
