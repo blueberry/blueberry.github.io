@@ -1,0 +1,399 @@
+---
+date: 2021-06-22 12:45
+author: dragan
+layout: post
+title: Pimp my Clojure number crunching
+categories: 
+- Neanderthal,
+- Linear
+- Algebra
+tags: 
+excerpt: PLACEHOLDER
+---
+<p>
+Let's start right in the middle of the story, and play with cosine similarity. I'll
+tell you why in a few minutes.
+</p>
+
+<p>
+I assume that most programmers have forgotten their math classes, so
+"cosine similarity" sounds somewhat grandiose. Quick skimming at <a href="https://en.wikipedia.org/wiki/Cosine_similarity">Wikipedia</a> might puzzle
+you even more, but, scrolling down to the definition, you can
+see that it's just a normalized dot product. I know, I know - now you might wonder what
+dot product really is. Please read my recent <a href="./Hello-World-Programming-with-Linear-Algebra">linear algebra Hello World article</a> if that's the case.
+</p>
+
+<div id="outline-container-org46da9d8" class="outline-2">
+<h2 id="org46da9d8">A little warm up coding</h2>
+<div class="outline-text-2" id="text-org46da9d8">
+<p>
+We are programmers; it will all be clear after we code this.
+</p>
+
+<p>
+Here are two vectors:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">x</span> <span style="color: #7388d6;">(</span>dv 1 2 3<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">y</span> <span style="color: #7388d6;">(</span>dv 30 20 10<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org372bf6f" class="outline-3">
+<h3 id="org372bf6f">Dot product</h3>
+<div class="outline-text-3" id="text-org372bf6f">
+<p>
+Now, the <i>dot product</i> can be naively implemented as following.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">naive-dot</span> <span style="color: #7388d6;">[</span>x y<span style="color: #7388d6;">]</span>
+ <span style="color: #7388d6;">(</span>reduce + <span style="color: #909183;">(</span>map * x y<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>naive-dot x y<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example" id="orgf79407a">
+=&gt; 100.0
+</pre>
+
+<p>
+It's much easier and faster to use the staple linear algebra function called <code>dot</code>:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>dot x y<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example" id="org87b3126">
+=&gt; 100.0
+</pre>
+</div>
+</div>
+
+<div id="outline-container-orgf31cb68" class="outline-3">
+<h3 id="orgf31cb68">Normalization</h3>
+<div class="outline-text-3" id="text-orgf31cb68">
+<p>
+Next, the normalization part. That might seem grandioze too, but
+it is, again, a staple LA function <code>nrm2</code> (the second norm of a vector). Not
+only that it's a staple function, but it's just a square root of the
+dot product of a vector with itself.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">naive-nrm2</span> <span style="color: #7388d6;">[</span>x<span style="color: #7388d6;">]</span>
+ <span style="color: #7388d6;">(</span>sqrt <span style="color: #909183;">(</span>naive-dot x x<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>naive-nrm2 x<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example" id="org662724e">
+=&gt; 3.7416573867739413
+</pre>
+
+<p>
+A better choice in higher level code is to use the optimized <code>nrm2</code> function available in Neanderthal:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>nrm2 x<span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>nrm2 y<span style="color: #707183;">)</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgab8b234" class="outline-3">
+<h3 id="orgab8b234">Cosine similarity</h3>
+<div class="outline-text-3" id="text-orgab8b234">
+<p>
+This is cosine similarity between vectors <code>x</code> and <code>y</code>:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>/ <span style="color: #7388d6;">(</span>dot x y<span style="color: #7388d6;">)</span> <span style="color: #7388d6;">(</span>nrm2 x<span style="color: #7388d6;">)</span> <span style="color: #7388d6;">(</span>nrm2 y<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example" id="orga76c8a4">
+=&gt; 0.7142857142857142
+</pre>
+
+<p>
+OK, nice exercise, but not that interesting. There's no particularily
+useful insight there. I implemented everything naively, and then wrote
+my own <code>cosine-similarity</code>, which is, <code>after all</code>, the same thing as any
+library's cosine-similarity (it's probably faster but that's irrelevant here).
+</p>
+
+<p>
+We now have a way to compute a measurement of similarity of two vectors (cosine similarity),
+which is a number between -1 (opposite), 0 (not similar at all), 1 (they match), or somewhere in between.
+In our case, <code>x</code> and <code>y</code> are somewhat similar (<code>0.714</code>) which does not tell us that much, but it can
+tell us that they are more similar that <code>z</code> if cosine similarity with <code>z</code> is, say, <code>0.5</code>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org57898cb" class="outline-3">
+<h3 id="org57898cb">So what?</h3>
+<div class="outline-text-3" id="text-org57898cb">
+<p>
+This was only a warm-up, and the insight follows after the intermezzo: we can compute
+cosine similarity of many vectors in a batch much faster than one by one. But why? And when?
+Well, if we would have only blindly used what the library is providing,
+we probably wouldn't even been asking these questions!
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgcbcee2a" class="outline-2">
+<h2 id="orgcbcee2a">Now, the motivation for all this</h2>
+<div class="outline-text-2" id="text-orgcbcee2a">
+<p>
+A few weeks ago a Clojurist was asking about a weird result returned by
+a function in a Clojure/Java machine learning library. There's nothing unexpected
+there; bugs are caught in all software all the time, and the author of
+that (open source and free) library fixed the bug immediately. It's a
+good pretext to make a point, though, so let's make it :)
+</p>
+
+<p>
+We often rely on software libraries. Layers of abstraction make our work
+possible. Something we stretch the tendency to rely on 3rd party
+abstractions too much, intentionally giving up control of the central
+part of our code. The irony is that many times the simplest thing is to
+implement the thing using the right lower layer, than to configure a
+function call of the higher layer.
+</p>
+
+<p>
+In this case, the bug was that a cosine similarity funciton returned a value larger than 1. The
+user (correctly) wondered whether it's an impossible value for cosine
+similarity. Several people helped with theoretical knowledge and
+practical guesses where the bug might be. How such a simple thing such
+as cosine similarity could be the source of any fuss? Probably because
+most programmers rely on libraries so much that they don't build
+confidence even for the simplest things related to math.
+</p>
+
+<p>
+That's why I like to <b>not</b> skip the step of implementing custom functions for central parts of
+the algorithms that I rely on. Sometimes the existing solutions serve
+well, and I use them in the final code, but <b>by building at least a naive
+prototype I build up my understanding and confidence</b>. I also found out
+that my solution is often much better than the one implemented in a
+library. If that seems unexpected, consider that machine learning
+libraries are frequently written by grad students on their path to
+discovery. It's a domain expert with poor programming skills.
+Or it might be a case of a good programmer who only barely understands the domain&#x2026;
+</p>
+</div>
+</div>
+
+<div id="outline-container-org39a0de4" class="outline-2">
+<h2 id="org39a0de4">Is that it? NO :)</h2>
+<div class="outline-text-2" id="text-org39a0de4">
+<p>
+So, we implemented our naive cosine similarity (nothing special).
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">cosine-similarity</span> <span style="color: #7388d6;">[</span>x y<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>/ <span style="color: #909183;">(</span>dot x y<span style="color: #909183;">)</span> <span style="color: #909183;">(</span>nrm2 x<span style="color: #909183;">)</span> <span style="color: #909183;">(</span>nrm2 y<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+We choose this, or the (hypothetical) library function with the same name,
+and proceed with looping, mapping, reducing and other Clojure-fu?
+<b>NO! This would limit us to calling such function for each pair of vectors</b>.
+What works well in number crunching is finding an operation that does the same
+for the whole bunch in one sweep!
+</p>
+
+<p>
+But, how do we do that? If we hadn't explored the internals of cosine similarity,
+that'd be a mystery. But, since we had, we can recognize that matrix multiplication
+is a bunch of dot products. Explaining the details of this insight would digress
+too much; I cover this kind of knowledge in the <a href="https://aiprobook.com/numerical-linear-algebra-for-programmers">Numerical Linear Algebra for Programmers</a> book.
+</p>
+
+<p>
+So, let's put these two vectors, <code>x</code> and <code>y</code>, in a matrix and call it <code>xs</code>.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">xs</span> <span style="color: #7388d6;">(</span>dge 2 3
+             <span style="color: #909183;">[</span><span style="color: #709870;">[</span>1 2 3<span style="color: #709870;">]</span>
+              <span style="color: #709870;">[</span>30 20 10<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+             <span style="color: #909183;">{</span><span style="color: #F5666D;">:layout</span> <span style="color: #F5666D;">:row</span><span style="color: #909183;">}</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+When we multiply two matrices, we get a third matrix, and each entry in the result
+is the dot product of the respective row of the first matrix and column of the second.
+For example, entry (2,3) is the dot product of the second row of the first and the third
+column of the second matrix.
+</p>
+
+<p>
+In our trivialized case, we have one matrix, <code>xs</code>, with two rows, and we don't have
+any other matrix. What now? Since we want all combinations of dot products of our vectors,
+we can simply matrix multiply <code>xs</code> by its transpose!
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>mm xs <span style="color: #7388d6;">(</span>trans xs<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example" id="org8f854fe">
+=&gt;
+#RealGEMatrix[double, mxn:2x2, layout:column, offset:0]
+   ▥       ↓       ↓       ┓
+   →      14.00  100.00
+   →     100.00 1400.00
+   ┗                       ┛
+</pre>
+
+<p>
+Do you recognize the familiar number 100.0? That's the dot product of <code>x</code> and <code>y</code>.
+</p>
+
+<p>
+Notice that this matrix is symmetric, so we can optimize this by using a dedicated function
+optimized for matrix multiply with transpose, <code>mmt</code>.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">x-dots</span> <span style="color: #7388d6;">(</span>mmt xs<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Now we only need to normalize these. But how? There's no trick with matrix multiplication for <code>nrm2</code>. Or is there?
+</p>
+
+<p>
+Remember that we also learned how <code>nrm2</code> is computed: as the square root of the dot product of a vector with itself.
+The diagonal holds the dot products of <code>x</code> and <code>x</code> \((1,1)\), and <code>y</code> \((2,2)\)! We only need to square the diagonal.
+While we're at it, we might also invert it, so we can later deal with multiplication instead of division (but this is a minor detail).
+All these vector operations that we need are available in Neanderthal's <code>vect-math</code> namespace.
+</p>
+
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">x-norms</span> <span style="color: #7388d6;">(</span>inv! <span style="color: #909183;">(</span>sqrt! <span style="color: #709870;">(</span>copy <span style="color: #907373;">(</span>dia x-dots<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Now we have the dot products in matrix <code>x-dots</code>, and the norms in <i>vector</i> <code>x-norms</code>.
+Whoops&#x2026; How do we combine that? The formula for cosine similarity uses each <i>combination</i> of
+norms for vector pairs, not single norms. No problem! We pull the <code>rk</code> function from our pocket.
+It does the outer product of two vectors, making a matrix that contains the product of each pair of their entries!
+Again, this is not some one-off trick, but a standard linear algebra stuff explained in the book.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>mul! <span style="color: #7388d6;">(</span>view-ge x-dots<span style="color: #7388d6;">)</span> <span style="color: #7388d6;">(</span>rk x-norms x-norms<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example" id="org5492ec9">
+=&gt;
+#RealGEMatrix[double, mxn:2x2, layout:column, offset:0]
+   ▥       ↓       ↓       ┓
+   →       1.00    0.00
+   →       0.71    1.00
+   ┗                       ┛
+</pre>
+
+<p>
+BAM! Here it is! 0.71! Ones on the diagonal show that each vector is perfectly similar to itself :)
+</p>
+
+<p>
+This might seem much fuss for nothing! Isn't the vector code simpler? Yes, but it only can compute one combination of two vectors.
+In this example, we've done the most trivial example with the same two vectors. But this code computes as many vectors as we give it!
+No need for loops or recursions!
+</p>
+</div>
+</div>
+
+<div id="outline-container-org2b6dc4f" class="outline-2">
+<h2 id="org2b6dc4f">Pimp my cosine similarity!</h2>
+<div class="outline-text-2" id="text-org2b6dc4f">
+<p>
+I've added some bookkeeping code. Clean up our memory and reuse matrices if possible for maximum speed gains.
+</p>
+
+<p>
+Note the plural in the function name.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">cosine-similarities</span> <span style="color: #7388d6;">[</span>a<span style="color: #7388d6;">]</span>
+ <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">let-release</span> <span style="color: #909183;">[</span>a-dots <span style="color: #709870;">(</span>mmt a<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>with-release <span style="color: #709870;">[</span>a-norms <span style="color: #907373;">(</span>inv! <span style="color: #6276ba;">(</span>sqrt! <span style="color: #858580;">(</span>copy <span style="color: #80a880;">(</span>dia a-dots<span style="color: #80a880;">)</span><span style="color: #858580;">)</span><span style="color: #6276ba;">)</span><span style="color: #907373;">)</span>
+                   ab-norms <span style="color: #907373;">(</span>rk a-norms a-norms<span style="color: #907373;">)</span><span style="color: #709870;">]</span>
+      <span style="color: #709870;">(</span>mul! <span style="color: #907373;">(</span>view-ge a-dots<span style="color: #907373;">)</span> ab-norms<span style="color: #709870;">)</span>
+      a-dots<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Here's a matrix with 4 vectors.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">a</span> <span style="color: #7388d6;">(</span>dge 4 3
+            <span style="color: #909183;">[</span><span style="color: #709870;">[</span>1 2 3<span style="color: #709870;">]</span>
+             <span style="color: #709870;">[</span>-3 8 0<span style="color: #709870;">]</span>
+             <span style="color: #709870;">[</span>30 20 10<span style="color: #709870;">]</span>
+             <span style="color: #709870;">[</span>-7 1 -5<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+            <span style="color: #909183;">{</span><span style="color: #F5666D;">:layout</span> <span style="color: #F5666D;">:row</span><span style="color: #909183;">}</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+And, here are their cosine similarities.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure">#RealUploMatrix<span style="color: #707183;">[</span>double, type<span style="color: #F5666D;">:sy</span>, mxn:4x4, layout<span style="color: #F5666D;">:column</span>, offset:0<span style="color: #707183;">]</span>
+   &#9637;       &#8595;       &#8595;       &#8595;       &#8595;       &#9491;
+   &#8594;       1.00    *       *       *
+   &#8594;       0.41    1.00    *       *
+   &#8594;       0.71    0.22    1.00    *
+   &#8594;      -0.62    0.39   -0.74    1.00
+   &#9495;                                       &#9499;
+</pre>
+</div>
+
+<p>
+See? All the <i>combinations</i> of the vectors with one single blow! And, if we have thousands of vectors
+it's <i>orders of magnitude</i> faster than calling the single cosine similarity function thousands of times!
+</p>
+
+<p>
+Vectorization FTW!
+</p>
+</div>
+</div>
