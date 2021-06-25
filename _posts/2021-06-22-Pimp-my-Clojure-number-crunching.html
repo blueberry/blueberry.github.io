@@ -2,13 +2,13 @@
 date: 2021-06-22 12:45
 author: dragan
 layout: post
-title: Pimp my Clojure number crunching
-categories: 
+title: Why I sometimes like to write my own number crunching code.
+categories:
 - Neanderthal,
 - Linear
 - Algebra
-tags: 
-excerpt: Or, Why I sometimes like to write my own number crunching code.
+tags:
+excerpt: As the title says, I sometimes like to write my own number crunching code.
 ---
 <p>
 Let's start right in the middle of the story, and play with cosine similarity. I'll
@@ -60,7 +60,7 @@ Now, the <i>dot product</i> can be naively implemented as following.
 </pre>
 </div>
 
-<pre class="example" id="org8a08d3f">
+<pre class="example" id="orgca4341a">
 =&gt; 100.0
 </pre>
 
@@ -73,7 +73,7 @@ It's much easier and faster to use the staple linear algebra function called <co
 </pre>
 </div>
 
-<pre class="example" id="orgfba4941">
+<pre class="example" id="orgd8396e1">
 =&gt; 100.0
 </pre>
 </div>
@@ -100,7 +100,7 @@ dot product of a vector with itself.
 </pre>
 </div>
 
-<pre class="example" id="org7e5f84c">
+<pre class="example" id="org160512f">
 =&gt; 3.7416573867739413
 </pre>
 
@@ -128,7 +128,7 @@ This is cosine similarity between vectors <code>x</code> and <code>y</code>:
 </pre>
 </div>
 
-<pre class="example" id="org60844d8">
+<pre class="example" id="org3596329">
 =&gt; 0.7142857142857142
 </pre>
 
@@ -263,7 +263,7 @@ we can simply matrix multiply <code>xs</code> by its transpose!
 </pre>
 </div>
 
-<pre class="example" id="org1f0bc7b">
+<pre class="example" id="org4f06afe">
 =&gt;
 #RealGEMatrix[double, mxn:2x2, layout:column, offset:0]
    ▥       ↓       ↓       ┓
@@ -316,7 +316,7 @@ Again, this is not some one-off trick, but a standard linear algebra stuff expla
 </pre>
 </div>
 
-<pre class="example" id="orgea40ef1">
+<pre class="example" id="orgc90c7a3">
 =&gt;
 #RealGEMatrix[double, mxn:2x2, layout:column, offset:0]
    ▥       ↓       ↓       ┓
@@ -388,7 +388,7 @@ And, here are their cosine similarities.
 </div>
 
 <p>
-See? All the <i>combinations</i> of the vectors with one single blow! And, if we have thousands of vectors
+SCee? All the <i>combinations</i> of the vectors with one single blow! And, if we have thousands of vectors
 it's <i>orders of magnitude</i> faster than calling the single cosine similarity function thousands of times!
 </p>
 
