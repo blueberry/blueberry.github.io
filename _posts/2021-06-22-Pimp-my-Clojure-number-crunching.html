@@ -2,12 +2,12 @@
 date: 2021-06-22 12:45
 author: dragan
 layout: post
-title: Why I sometimes like to write my own number crunching code.
-categories:
+title: Why I sometimes like to write my own number crunching code
+categories: 
 - Neanderthal,
 - Linear
 - Algebra
-tags:
+tags: 
 excerpt: As the title says, I sometimes like to write my own number crunching code.
 ---
 <p>
@@ -60,12 +60,13 @@ Now, the <i>dot product</i> can be naively implemented as following.
 </pre>
 </div>
 
-<pre class="example" id="orgca4341a">
+<pre class="example" id="orgfffd721">
 =&gt; 100.0
 </pre>
 
 <p>
-It's much easier and faster to use the staple linear algebra function called <code>dot</code>:
+It's much easier and faster to use the staple linear algebra function called <code>dot</code>,
+available in  <a href="https://neanderthal.uncomplicate.org">Neanderthal</a> (<iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=neanderthal&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>):
 </p>
 
 <div class="org-src-container">
@@ -73,7 +74,7 @@ It's much easier and faster to use the staple linear algebra function called <co
 </pre>
 </div>
 
-<pre class="example" id="orgd8396e1">
+<pre class="example" id="org9883827">
 =&gt; 100.0
 </pre>
 </div>
@@ -83,7 +84,7 @@ It's much easier and faster to use the staple linear algebra function called <co
 <h3 id="orgf31cb68">Normalization</h3>
 <div class="outline-text-3" id="text-orgf31cb68">
 <p>
-Next, the normalization part. That might seem grandioze too, but
+Next, the normalization part. This too might seem mystic to you, but
 it is, again, a staple LA function <code>nrm2</code> (the second norm of a vector). Not
 only that it's a staple function, but it's just a square root of the
 dot product of a vector with itself.
@@ -100,12 +101,12 @@ dot product of a vector with itself.
 </pre>
 </div>
 
-<pre class="example" id="org160512f">
+<pre class="example" id="org9339072">
 =&gt; 3.7416573867739413
 </pre>
 
 <p>
-A better choice in higher level code is to use the optimized <code>nrm2</code> function available in Neanderthal:
+A better choice in higher level code is to use the optimized <code>nrm2</code> function (available in <a href="https://neanderthal.uncomplicate.org">Neanderthal</a> (<iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=neanderthal&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>), or any other similar library):
 </p>
 
 <div class="org-src-container">
@@ -128,7 +129,7 @@ This is cosine similarity between vectors <code>x</code> and <code>y</code>:
 </pre>
 </div>
 
-<pre class="example" id="org3596329">
+<pre class="example" id="orge563291">
 =&gt; 0.7142857142857142
 </pre>
 
@@ -153,7 +154,7 @@ tell us that they are more similar that <code>z</code> if cosine similarity with
 <div class="outline-text-3" id="text-org57898cb">
 <p>
 This was only a warm-up, and the insight follows after the intermezzo: we can compute
-cosine similarity of many vectors in a batch much faster than one by one. But why? And when?
+cosine similarity of many vectors in a batch much faster than if we did it one by one. But why? And when?
 Well, if we would have only blindly used what the library is providing,
 we probably wouldn't even been asking these questions!
 </p>
@@ -176,8 +177,8 @@ good pretext to make a point, though, so let's make it :)
 We often rely on software libraries. Layers of abstraction make our work
 possible. Something we stretch the tendency to rely on 3rd party
 abstractions too much, intentionally giving up control of the central
-part of our code. The irony is that many times the simplest thing is to
-implement the thing using the right lower layer, than to configure a
+part of our code. The irony is that many times the simplest thing to do is to
+implement our thing using the right lower layer, rather than to configure a
 function call of the higher layer.
 </p>
 
@@ -231,6 +232,9 @@ But, how do we do that? If we hadn't explored the internals of cosine similarity
 that'd be a mystery. But, since we had, we can recognize that matrix multiplication
 is a bunch of dot products. Explaining the details of this insight would digress
 too much; I cover this kind of knowledge in the <a href="https://aiprobook.com/numerical-linear-algebra-for-programmers">Numerical Linear Algebra for Programmers</a> book.
+If you'd like to see this stuff applied to the full blown (and super fast) Deep Learning
+library, then you might be interested in <a href="https://aiprobook.com/deep-learning-for-programmers/">Deep Learning for Programmers</a>. Both books
+are part of my <a href="https://aiprobook.com">Interactive Programming for Artificial Intelligence book series</a>.
 </p>
 
 <p>
@@ -263,7 +267,7 @@ we can simply matrix multiply <code>xs</code> by its transpose!
 </pre>
 </div>
 
-<pre class="example" id="org4f06afe">
+<pre class="example" id="org14380a7">
 =&gt;
 #RealGEMatrix[double, mxn:2x2, layout:column, offset:0]
    ▥       ↓       ↓       ┓
@@ -316,7 +320,7 @@ Again, this is not some one-off trick, but a standard linear algebra stuff expla
 </pre>
 </div>
 
-<pre class="example" id="orgc90c7a3">
+<pre class="example" id="org23b3c83">
 =&gt;
 #RealGEMatrix[double, mxn:2x2, layout:column, offset:0]
    ▥       ↓       ↓       ┓
@@ -388,7 +392,7 @@ And, here are their cosine similarities.
 </div>
 
 <p>
-SCee? All the <i>combinations</i> of the vectors with one single blow! And, if we have thousands of vectors
+See? All the <i>combinations</i> of the vectors with one single blow! And, if we have thousands of vectors
 it's <i>orders of magnitude</i> faster than calling the single cosine similarity function thousands of times!
 </p>
 
