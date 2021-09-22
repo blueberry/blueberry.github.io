@@ -3,6 +3,8 @@ layout: full-width
 title: Clojure & GPU Software
 ---
 
+I'm open to (selected) contract work. If you need specialized software please let's have a chat.
+
 Here's some of my work that is available as open source:
 
 - [Neanderthal](https://neanderthal.uncomplicate.org): Clojure & Java GPU & CPU Matrix and Linear Algebra
