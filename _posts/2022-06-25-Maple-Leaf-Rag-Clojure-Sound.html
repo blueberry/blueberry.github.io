@@ -1,0 +1,431 @@
+---
+date: 2022-06-25 00:47
+author: dragan
+layout: post
+title: Maple Leaf Rag with Clojure Sound
+categories: 
+- Clojure,
+- Clojure
+- Sound,
+- Music
+tags: 
+excerpt: A couple of months ago I released a new library - Clojure Sound, but I've not had time to write about it. Now that it's time to revive my blog, is there a better way than with music?
+---
+<p>
+I've just noticed that it's been one year since the last post on this blog. It's not because I've been lazy.
+I had just finished two books (<a href="https://aiprobook.com">check them out!</a>) and I probably suffered a bit from the writer's exhaustion afterwards.
+I'm joking. I wasn't <i>that</i> exhausted; I've been busy with programming. Thanks to generous support from <a href="https://www.clojuriststogether.org/">Clojurists Together</a>,
+and thanks to people who bought or subscribed to my books, I've been able to take on some bigger chunks of time to work on
+Uncomplicate libraries, old and new. OK, enough talking; you're not here to read my reports,
+but to see some nice Clojure code.
+</p>
+
+<p>
+A couple of months ago I released a new library - <a href="https://github.com/uncomplicate/clojure-sound">Clojure Sound</a>(<iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=clojure-sound&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>), but I haven't had time to write about it.
+Now that it's time to revive my blog, is there a better way to start than with music?
+</p>
+
+<div id="outline-container-org80f7c87" class="outline-2">
+<h2 id="org80f7c87">How to access Clojure Sound</h2>
+<div class="outline-text-2" id="text-org80f7c87">
+<p>
+First I'll show you a basic code example and then I'll tell you what Clojure Sound is some other time.
+It's a programming library, available from Clojars. Include Clojure Sound in your <code>project.clj</code> by adding
+<code>[org.uncomplicate/clojure-sound "0.1.0"]</code> to <code>:dependencies</code>. Start the REPL and connect your
+preferred Clojure editor.
+</p>
+
+<p>
+First, we require the appropriate namespaces. In this example, we're using functions from <code>core</code> and <code>midi</code>.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span>uncomplicate.clojure-sound
+             <span style="color: #909183;">[</span>core <span style="color: #F5666D;">:refer</span> <span style="color: #F5666D;">:all</span><span style="color: #909183;">]</span>
+             <span style="color: #909183;">[</span>midi <span style="color: #F5666D;">:refer</span> <span style="color: #F5666D;">:all</span><span style="color: #909183;">]</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org7165683" class="outline-2">
+<h2 id="org7165683">Playing a nice song with virtual piano</h2>
+<div class="outline-text-2" id="text-org7165683">
+<p>
+We're now going to instruct a virtual piano on our computer to play something.
+But, instead of playing a few random notes, we would like to hear a wonderful song.
+I've chosen a cheerful <a href="https://en.wikipedia.org/wiki/Maple_Leaf_Rag">Maple Leaf Rag</a>. You might think: "What song is that?", but I can bet that you'll instantly recognize it as soon as you
+hear your REPL sing (I hope that you follow along by typing the code yourself).
+</p>
+
+<p>
+There's plenty of ways to specify the notes that our virtual piano should play.
+Since I'm lazy, I'll take a score that already specifies all details in a MIDI file.
+Since the song is 123 years old, it's in public domain, so there are many free
+MIDI transcriptions. Please find a version on the Internet, rename the file to maple.mid,
+and put it in the classpath of your project. If you're not feeling adventurous, you can use <a href="https://github.com/uncomplicate/clojure-sound/blob/master/test/resources/maple.mid">the one I'm using</a>.
+</p>
+
+<p>
+The data that should be played is stored in <i>sequences</i>. Not Clojure sequences, but sound sequences
+(sorry about this name duplication, but that's a general domain-specific term). We can make a sequence
+in several ways, from adding each note programmatically, to loading the sequence stored in a MIDI file
+that someone else prepared. I access the file as a Clojure resource, and give it to Clojure Sound <code>sequence</code> function.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">maple</span> <span style="color: #7388d6;">(</span>sequence <span style="color: #909183;">(</span><span style="color: #2F8B58; font-weight: bold;">clojure.java.io</span>/resource <span style="color: #4E9A06;">"maple.mid"</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+maple
+</pre>
+</div>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-left" />
+</colgroup>
+<tbody>
+<tr>
+<td class="org-left">#'user/maple</td>
+</tr>
+
+<tr>
+<td class="org-left">{:ticks 110592, :id 1336053642}</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+Now, we have a sequence object that contains more than 100.000 ticks (basically, things that our piano has to do).
+But, the music sheet is not going to play itself. It needs someone to see the actual instructions, and to
+press the right places at the instrument. This is what <i>sequencer</i> is for. Sequencer as just like a player.
+When a real person plays the instrument, that real person is the sequencer. In Clojure Sound, the <code>sequencer</code>
+function creates that player. In this example, I'll use the default sequencer, which already has its default
+instruments collection.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">sqcr</span> <span style="color: #7388d6;">(</span>sequencer<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#'user/sqcr
+</pre>
+
+
+<p>
+While sequencer plays music, it has to access the sound card on your computer, and produce
+side-effects, the actual sounds that you enjoy. That requires careful opening and closing
+protocols, so it interferes with other multimedia software on your computer as little as possible.
+Before we use our sequencer, we have to open it.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>open! sqcr<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+</colgroup>
+<tbody>
+<tr>
+<td class="org-left">:class</td>
+<td class="org-left">RealTimeSequencer</td>
+<td class="org-left">:status</td>
+<td class="org-left">:open</td>
+<td class="org-left">:micro-position</td>
+<td class="org-right">0</td>
+<td class="org-left">:description</td>
+<td class="org-left">Software sequencer</td>
+<td class="org-left">:name</td>
+<td class="org-left">Real Time Sequencer</td>
+<td class="org-left">:vendor</td>
+<td class="org-left">Oracle Corporation</td>
+<td class="org-left">:version</td>
+<td class="org-left">Version 1.0</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+Now, we tell our sequencer to take the music sheet (the <code>maple</code> sequence) that it's going to perform.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>sequence! sqcr maple<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+</colgroup>
+<tbody>
+<tr>
+<td class="org-left">:class</td>
+<td class="org-left">RealTimeSequencer</td>
+<td class="org-left">:status</td>
+<td class="org-left">:open</td>
+<td class="org-left">:micro-position</td>
+<td class="org-right">0</td>
+<td class="org-left">:description</td>
+<td class="org-left">Software sequencer</td>
+<td class="org-left">:name</td>
+<td class="org-left">Real Time Sequencer</td>
+<td class="org-left">:vendor</td>
+<td class="org-left">Oracle Corporation</td>
+<td class="org-left">:version</td>
+<td class="org-left">Version 1.0</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+Finally, we're ready to <del>rock</del> rag!
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>start! sqcr<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+</colgroup>
+<tbody>
+<tr>
+<td class="org-left">:class</td>
+<td class="org-left">RealTimeSequencer</td>
+<td class="org-left">:status</td>
+<td class="org-left">:open</td>
+<td class="org-left">:micro-position</td>
+<td class="org-right">0</td>
+<td class="org-left">:description</td>
+<td class="org-left">Software sequencer</td>
+<td class="org-left">:name</td>
+<td class="org-left">Real Time Sequencer</td>
+<td class="org-left">:vendor</td>
+<td class="org-left">Oracle Corporation</td>
+<td class="org-left">:version</td>
+<td class="org-left">Version 1.0</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+Normally, the Maple's gonna rag for 2-3 minutes. If you'd like to stop it, here's how to do it.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>stop! sqcr<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+</colgroup>
+<tbody>
+<tr>
+<td class="org-left">:class</td>
+<td class="org-left">RealTimeSequencer</td>
+<td class="org-left">:status</td>
+<td class="org-left">:open</td>
+<td class="org-left">:micro-position</td>
+<td class="org-right">145833</td>
+<td class="org-left">:description</td>
+<td class="org-left">Software sequencer</td>
+<td class="org-left">:name</td>
+<td class="org-left">Real Time Sequencer</td>
+<td class="org-left">:vendor</td>
+<td class="org-left">Oracle Corporation</td>
+<td class="org-left">:version</td>
+<td class="org-left">Version 1.0</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+Finally, when you're tired from dancing, you can tell the player to go get some rest, too:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span>uncomplicate.commons.core <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>close!<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>close! sqcr<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+</colgroup>
+<tbody>
+<tr>
+<td class="org-left">:class</td>
+<td class="org-left">RealTimeSequencer</td>
+<td class="org-left">:status</td>
+<td class="org-left">:closed</td>
+<td class="org-left">:micro-position</td>
+<td class="org-right">0</td>
+<td class="org-left">:description</td>
+<td class="org-left">Software sequencer</td>
+<td class="org-left">:name</td>
+<td class="org-left">Real Time Sequencer</td>
+<td class="org-left">:vendor</td>
+<td class="org-left">Oracle Corporation</td>
+<td class="org-left">:version</td>
+<td class="org-left">Version 1.0</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+That's it, I hope you're enjoyed this little demonstration. I'll be back with more music! :)
+</p>
+</div>
+</div>
