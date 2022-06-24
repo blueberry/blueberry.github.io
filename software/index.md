@@ -13,5 +13,6 @@ Here's some of my work that is available as open source:
 - [ClojureCL](https://clojurecl.uncomplicate.org): Clojure & Java GPU programming at full speed on AMD, Intel & Nvidia hardware
 - [Bayadera](https://github.com/uncomplicate/bayadera): Clojure & Java Bayesian Data Analysis on the GPU Library
 - [Fluokitten](https://fluokitten.uncomplicate.org): Clojure & Java & Category Theory & Monads
+- [Clojure Sound](https://github.com/uncomplicate/clojure-sound): Clojure Sound and MIDI library.
 - [Most of my code on GitHub is part of Uncomplicate](https://github.com/uncomplicate)
 - [Uncomplicate.org](https://uncomplicate.org)
