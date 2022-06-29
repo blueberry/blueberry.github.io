@@ -1,0 +1,203 @@
+---
+date: 2022-06-29 22:35
+author: dragan
+layout: post
+title: My experience with Clojurists Together open source funding
+categories: 
+- Clojurists
+- Toogether,
+- Open
+- Source,
+- Funding,
+- Deep
+- Diamond
+tags: 
+excerpt: In March, April, and May, I've been funded by Clojurists Together to work on Recurrent Neural Networks support in Deep Diamond. I hope that this experience report will encourage other open source developers to apply for Clojurists Together funding. I show my complete reporsts here. They show how paper overhead is almost non-existing. You can concentrate on doing what you enjoy best - coding!
+---
+<p>
+In case you haven't heard about <a href="https://www.clojuriststogether.org/">Clojurists Together</a> yet, you might be surprised to hear that there's
+such awesome initiative that funds critical Clojure open source software. You've never heard of <a href="https://clojure.org/">Clojure</a>?
+Now I don't believe you! A programmer that hasn't at least heard of this awesome practical and yet elegant
+programming language? Huh. OK.
+</p>
+
+<p>
+Yet, a language that is not that awesome wouldn't attract such an enthusiastic
+people, who recognized the problem of funding work on open source software (they wouldn't be the first),
+<i>and did something about it</i>. They created <a href="https://www.clojuriststogether.org/">Clojurists Together</a>, a non-profit organization that
+receives donations from individuals and companies who would like to see Clojure open source
+ecosystem thrive, and regularly opens calls for projects that need funding. There are not many
+constraints; if you believe in your project and if you're willing to put some serious time
+in making it better, you can apply, and there is a fair chance that you'll get funded!
+</p>
+
+<p>
+Now, I know that programmers were burned too many times in investing too much energy into
+initiatives that turn out to be too good to be true, or that are over-hyped, or&#x2026; but this
+has been working for several years now, and Clojurists Together is the real deal. They <i>do</i>
+<a href="https://www.clojuriststogether.org/projects/">fund many people</a>, and, which is equally important, <i>step aside and don't demand a ton of paperwork</i>!
+</p>
+
+<p>
+Yes, that's it: They give you money and let you do what you want to do, <i>develop open source software</i>!
+</p>
+
+<p>
+That is why I decided to describe my 3-month funding experience through my reports, which took more or less
+3 times 30 minutes or so in 3 months to write. This is literally the only thing I had to do, besides doing the actual development
+on my project, <a href="https://github.com/uncomplicate/deep-diamond">Deep Diamond</a>(<iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=deep-diamond&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>).
+I hope my experience will encourage you to apply.
+</p>
+
+<p>
+(My reports here are verbatim, and unedited):
+</p>
+
+<div id="outline-container-org069e932" class="outline-2">
+<h2 id="org069e932">Deep Diamond Q1-2022 report 1</h2>
+<div class="outline-text-2" id="text-org069e932">
+<p>
+My goal with this round is to implement Recurrent Neural Networks (RNN) support in Deep Diamond.
+The first month was dedicated to literature review (and other hammock-located work), exploration
+of OneDNN implementation of RNN layers, and implementation of RNN prototype in Clojure in Deep Diamond.
+</p>
+
+<p>
+Deep Diamond currently supports general tensor operations, fully connected NN layers, and convolutional (CNN) layers, on CPU and GPU.
+Based on this, relatively stable, infrastructure, I started adding Vanilla RNN implementation backed by OneDNN (Intel, CPU).
+</p>
+
+<p>
+OneDNN RNN implementation is, like all the low-level backends that leading DL frameworks use, very heavy, convoluted, and rather unclojure-y.
+So it takes some time to discover how it should be properly used, and how to best hide its complexity under a nice high level Clojure.
+</p>
+
+<p>
+Specifically, this was implemented in the first month of Q1:
+</p>
+
+<ul class="org-ul">
+<li>a prototype of developer-friendly implementation of RNN in Clojure</li>
+<li>Vanilla RNN support (as the stepping stone for more serious LSTM and GRU)</li>
+<li>The first iteration of an extension infrastructure for various backend implementations of RNN.</li>
+<li>a clean low-level integration with Intel's oneDNN RNN on the CPU (for Vanilla RNN).</li>
+<li>TESTS. Not ideal amount of, but enough for this phase.</li>
+</ul>
+
+<p>
+So far, I'm pretty satisfied with the progress, as I think I have discovered the roughest edges of
+Intel's implementation, and found ways to fit this into existing Deep Diamond code. I expect
+the following 2 months of the project to require lots of work and tests, but I feel I shouldn't
+expect nasty surprises. I believe that by the end of the funding period I'll be able to release
+the version of Deep Diamond that will have the functionality I've proposed.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org8ecbd1c" class="outline-2">
+<h2 id="org8ecbd1c">Deep Diamond Q1-2022 report 2</h2>
+<div class="outline-text-2" id="text-org8ecbd1c">
+<p>
+My goal with this round is to implement Recurrent Neural Networks (RNN) support in Deep Diamond.
+The first month was dedicated to literature review (and other hammock-located work), exploration
+of OneDNN implementation of RNN layers, and implementation of RNN prototype in Clojure in Deep Diamond.
+</p>
+
+<p>
+Now, in the second month, I managed to make the first iteration of fully functional RNN layer
+based on the DNNL backend (currently only Vanilla RNN implementation) that fits into the existing
+high-level network building code. (more details follow)
+</p>
+
+<p>
+Deep Diamond currently supports general tensor operations, fully connected NN layers, and convolutional (CNN) layers, on CPU and GPU.
+Based on this, relatively stable, infrastructure, in the first month I added Vanilla RNN <span class="underline">operation</span> implementation backed by OneDNN (Intel, CPU).
+</p>
+
+<p>
+Now, in the second month, I only managed to make a couple of commits, but the last one is pretty big.
+I couldn't break it into many smaller ones, because I had to make a couple of subtle changes
+that affected the internal implementation and broke existing code (<sub>does</sub> not affect users, just me!).
+I didn't want to commit a completely broken code into the github repository.
+</p>
+
+<p>
+Now, what does this commit do?
+A. It adds the first complete implementation of RNN layer that
+</p>
+<ol class="org-ol">
+<li>technically works and pushes the numbers to the right places connected to it</li>
+<li>is tested in isolation</li>
+<li>is supported in high-level Deep Diamond code together with other layers type</li>
+</ol>
+<p>
+B. I implemented a supporting "Ending" layer for feeding the time-based RNN output to other layer types (Dense, CNN, etc.)
+C. I improved the existing infrastructure to support this, and also made it more flexible
+D. I fixed bugs and wrote tests&#x2026;
+</p>
+
+<p>
+That is fine, but I am not completely satisfied with this milestone. I hoped to make a fully working example of a network
+that learns something useful, but that proved a bit harder than I expected. I couldn't make
+the RNN I have so far actually learn. It appears to be working, but even simple examples for RNN
+applications are not <span class="underline">that</span> simple, so I wasn't be able to make it learn the artificial one
+I tried it with. I am not sure whether it's due to bugs, or the example is simply pathological,
+and the Vanilla RNN (which is currently the only type I implemented) can't do anything with it anyway.
+This is something that I'll be doing the following days/weeks, and I expect to discover more when I implement
+more advanced LSTM and/or GRU RNN types.
+</p>
+
+<p>
+Beside that, the CUDA backend is broken in the current commit since I haven't updated it to the last changes,
+but it's not a problem; once I nail DNNL, making CUDA compatible will be more or less routine.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org0cc280d" class="outline-2">
+<h2 id="org0cc280d">Deep Diamond Q1-2022 report 3</h2>
+<div class="outline-text-2" id="text-org0cc280d">
+<p>
+My goal with this round (Q1-2022) is to implement Recurrent Neural Networks (RNN) support in Deep Diamond.
+The first month was dedicated to literature review (and other hammock-located work), exploration
+of OneDNN implementation of RNN layers, and implementation of a RNN prototype in Clojure with Deep Diamond.
+In the second month, I made the first iteration of fully functional vanilla RNN layer
+based on the DNNL backend that fits into the existing high-level network building code.
+</p>
+
+<p>
+Building on this, in the third month I finally managed to crack that tough nut called "recurrent networks implementation libraries"
+and make:
+</p>
+
+<ol class="org-ol">
+<li>A nice RNN layer implementation that seamlessly fits into the existing low-level and high level Deep Diamond infrastructure.</li>
+<li>The DNNL implementation of Vanilla RNN, LSTM, and GRU layers for the CPU (fully functional, but not ideal).</li>
+<li>The low-level integration of Nvidia's CUDNN GPU library, including TESTS.</li>
+<li>The high-level integration of CUDNN into Deep Diamond's layers (tests show that I need to improve this).</li>
+<li>A functional test that demonstrates learning of the said layers with Adam and SGD learning algorithms.</li>
+<li>I released a new version of Deep Diamond 0.23.0 with these improvements (RNN support should be considered a preview, as I still need to fix and polish some parts of CUDNN GPU implementation).</li>
+</ol>
+
+<p>
+Some notes about this milestone:
+</p>
+
+<ul class="org-ul">
+<li>Some things were smoother and easier than I expected. In general, I managed to find a way to fit RNNs into existing DD learning implementations, which was a pleasant surprise, as well as a sign of Clojure's qualities (and my ever increasing Clojure skills, if I am to stop being modest :)</li>
+<li>Some other things were harder than I expected. Notably, RNN implementation in both DNNL and CUDNN has many moving parts and are notoriously cumbersome to configure.</li>
+<li>There is total lack of simple examples of RNNs. Low level code examples of both of these libraries are practically non-existent in the wild. That slowed me a lot, since I had to discover everything by poking around.</li>
+<li>The documentation for DNNL and CUDNN related to RNNs is helpful, but most details still had to be discovered through trial and error. That too made me go at a snail's pace compared to my earlier work on other parts of Deep Diamond.</li>
+<li>Lacking simple examples, RNNs are very difficult to test. I am sure that this milestone, although usable, needs a lot more care to reach the level of usefulness of other parts of Deep Diamond.</li>
+<li>On the bright side, I am very satisfied with the high level API. The user virtually has three simple functions: rnn, lstm, gru, and ending, which fit into the existing infrastructure, and don't require any work from the user other than putting them at the right place; everything gets configured automatically under the hood by Deep Diamond. This part, I like a lot.</li>
+</ul>
+
+<p>
+All in all, I am 80% satisfied with what I achieved in these 3 months. I hoped for a more complete implementation. On the other hand, I solved all tricky problems, and have clear idea how to fix and improve what is still not up to Uncomplicate standards, so I'll have something to work on in the following weeks/months. And it's finally time to update the book with these new goodies!
+</p>
+
+<p>
+Thank you Clojurists for your continued trust in my work!
+</p>
+</div>
+</div>
