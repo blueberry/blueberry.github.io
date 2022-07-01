@@ -1,0 +1,536 @@
+---
+date: 2022-06-30 23:59
+author: dragan
+layout: post
+title: Clojure Sound - Hello MIDI Controller
+categories: 
+- Clojure,
+- Clojure
+- Sound,
+- Music
+tags: 
+excerpt: TODO
+---
+<p>
+You may not know that music instrument were connected devices even in the Stone Age, that is,
+many decades ago. In the 80's that even resulted in the standard that facilitated connectivity
+of heterogeneous devices. Typically, you'd have a keyboard, a synthesizer, some external knobs,
+maybe effect boxes, and many of them could be connected by cable and talk to each other, even
+though that synth might be 27 years old, and the keyboard 2 years old.
+</p>
+
+<p>
+That's the power of standard. MIDI might not be technically impressive. Especially
+for 2022, its transfer rate is unbelievably slow. On the other hand, a random
+device that you'd pick up at the store, on a yard sale, e-bay, or even
+at the dumpster, is almost guaranteed to have a MIDI connector.
+</p>
+
+<p>
+So, even though you'd have a hard time connecting your iPhone with your Linux laptop,
+my guitar can talk with my Arch Linux desktop just fine (I'm not kidding, it really does!).
+</p>
+
+<p>
+Making that guitar send a meaningful data to my computer is another pair of shoes.
+MIDI is very basic, and it's up to the user program to make sense of the data it receives.
+It is likely that you'll want to use a random exotic device in a very specific way;
+after all, music and art are all about originality. But, to walk on the Moon, we first
+have to get up from our bed. That's today's objective: taking input from a MIDI device,
+and controlling something on our computer by twisting knobs.
+</p>
+
+<div id="outline-container-org60d416b" class="outline-2">
+<h2 id="org60d416b">The software</h2>
+<div class="outline-text-2" id="text-org60d416b">
+<p>
+As for the software, we need nothing more than <a href="https://github.com/uncomplicate/clojure-sound">Clojure Sound</a>(<iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=clojure-sound&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>), of course!
+</p>
+
+<p>
+You can read how to prepare a fairly basic Clojure project in <a href="./Maple-Leaf-Rag-Clojure-Sound">the first article in Clojure Sound tutorial series</a>.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span>uncomplicate.commons.core <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>close! info<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>uncomplicate.clojure-sound
+           <span style="color: #909183;">[</span>core <span style="color: #F5666D;">:refer</span> <span style="color: #F5666D;">:all</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>midi <span style="color: #F5666D;">:refer</span> <span style="color: #F5666D;">:all</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>sampled <span style="color: #F5666D;">:refer</span> <span style="color: #F5666D;">:all</span><span style="color: #909183;">]</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgf9d2623" class="outline-2">
+<h2 id="orgf9d2623">The hardware</h2>
+<div class="outline-text-2" id="text-orgf9d2623">
+<p>
+It is unlikely that you'll have the same controller that I do, but so what? Any MIDI
+device that has a button or a knob on it will do!
+</p>
+
+<p>
+At this moment, I'm using <a href="http://www.faderfox.de/mx12.html">Faderfox MX12</a>, not because it's a great device (which it is!),
+but because it conveniently sat next to my table. Also, being a newer device, it supports
+MIDI-over-USB connectivity (otherwise, I'd have to use an old-school MIDI cable, and plug it into
+an external USB sound card that also has a MIDI jack, which I do have, but you likely do not).
+</p>
+
+
+<div id="org8a059d4" class="figure">
+<p><img src="../img/clojure-sound/faderfox-mx12.jpg" alt="faderfox-mx12.jpg" />
+</p>
+</div>
+
+<p>
+If you have any device at home that is remotely related to music, please check it for MIDI support.
+If you don't, and you'll like to follow along, you may find a cheap old controller, any
+working MIDI device will do, as long as you can connect it and as long as it has at least
+one area to press or stick to twist!
+</p>
+</div>
+</div>
+
+<div id="outline-container-org930787c" class="outline-2">
+<h2 id="org930787c">What I would like</h2>
+<div class="outline-text-2" id="text-org930787c">
+<p>
+In the past several months, I've been learning to play guitar, which includes some basic
+of music theory. There is a nice ear training exercise where you listen to a chord (several notes played at the same time)
+and try to guess the exact chord that you've heard. If you have a training buddy, that is easy:
+one of you can play the chord, and the other could try to guess. Most of us do this alone, though.
+If I play the chord, I spoil the guessing part, which is the whole point of the exercise.
+</p>
+
+<p>
+So, I thought of a solution. What if I could record a bunch of chords, and then somehow randomly
+play them? I would like this. There is a challenge, though: to record chords, I'd have to move fingers
+away from my guitar, and put them on my keyboard. Then, when guessing, I'd have to press keys for start,
+repeat, or end. But ear training likely requires that I actively strum my guitar to help my guessing
+by comparing with the recorded sample. That leaves the keyboard out.
+</p>
+
+<p>
+Ideally, I'd use a <i>foot</i> controller, such as this <a href="https://www.roland.com/global/products/fc-300/">Roland FC-300</a> (short of Foot Controller, I suppose with 300 feet :)
+</p>
+
+
+<div id="org628abdd" class="figure">
+<p><img src="../img/clojure-sound/fc_300_angle_gal.jpg" alt="fc_300_angle_gal.jpg" />
+</p>
+</div>
+
+<p>
+I would press one of stomps 1-5 to record 5 different chord examples, and then press
+buttons 1 and 2 to play and stop random samples, pressing stomps 2-6 to enter my answers.
+The software, Clojure program running in REPL, might display results of my guessing,
+or accumulate them for later scoring. There are many possibilities, but the first
+step that we need to solve is: how does our program talk with these controllers
+in the first place?
+</p>
+
+<p>
+Roland FC-300 has an additional obstacle of not supporting USB, so I'd have to
+use additional MIDI-to-USB sound card. I'll leave that for later,
+and in this article we will talk to the Faderfox.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org5b9382f" class="outline-2">
+<h2 id="org5b9382f">MIDI device</h2>
+<div class="outline-text-2" id="text-org5b9382f">
+<p>
+First, thing, we make sure the device is connected to our computer. Then,
+we list all MIDI devices that our computer know of with <code>(device-info)</code>.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>device-info<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+</colgroup>
+<tbody>
+<tr>
+<td class="org-left">:description</td>
+<td class="org-left">Software MIDI Synthesizer</td>
+<td class="org-left">:name</td>
+<td class="org-left">Gervill</td>
+<td class="org-left">:vendor</td>
+<td class="org-left">OpenJDK</td>
+<td class="org-left">:version</td>
+<td class="org-left">1.0</td>
+</tr>
+
+<tr>
+<td class="org-left">:description</td>
+<td class="org-left">Software sequencer</td>
+<td class="org-left">:name</td>
+<td class="org-left">Real Time Sequencer</td>
+<td class="org-left">:vendor</td>
+<td class="org-left">Oracle Corporation</td>
+<td class="org-left">:version</td>
+<td class="org-left">Version 1.0</td>
+</tr>
+
+<tr>
+<td class="org-left">:description</td>
+<td class="org-left">Scarlett 2i4 USB, USB MIDI, Scarlett 2i4 USB</td>
+<td class="org-left">:name</td>
+<td class="org-left">USB [hw:2,0,0]</td>
+<td class="org-left">:vendor</td>
+<td class="org-left">ALSA (<a href="http://www.alsa-project.org">http://www.alsa-project.org</a>)</td>
+<td class="org-left">:version</td>
+<td class="org-left">5.18.7-arch1-1</td>
+</tr>
+
+<tr>
+<td class="org-left">:description</td>
+<td class="org-left">Faderfox MX12, USB MIDI, Faderfox MX12</td>
+<td class="org-left">:name</td>
+<td class="org-left">MX12 [hw:3,0,0]</td>
+<td class="org-left">:vendor</td>
+<td class="org-left">ALSA (<a href="http://www.alsa-project.org">http://www.alsa-project.org</a>)</td>
+<td class="org-left">:version</td>
+<td class="org-left">5.18.7-arch1-1</td>
+</tr>
+
+<tr>
+<td class="org-left">:description</td>
+<td class="org-left">Scarlett 2i4 USB, USB MIDI, Scarlett 2i4 USB</td>
+<td class="org-left">:name</td>
+<td class="org-left">USB [hw:2,0,0]</td>
+<td class="org-left">:vendor</td>
+<td class="org-left">ALSA (<a href="http://www.alsa-project.org">http://www.alsa-project.org</a>)</td>
+<td class="org-left">:version</td>
+<td class="org-left">5.18.7-arch1-1</td>
+</tr>
+
+<tr>
+<td class="org-left">:description</td>
+<td class="org-left">Faderfox MX12, USB MIDI, Faderfox MX12</td>
+<td class="org-left">:name</td>
+<td class="org-left">MX12 [hw:3,0,0]</td>
+<td class="org-left">:vendor</td>
+<td class="org-left">ALSA (<a href="http://www.alsa-project.org">http://www.alsa-project.org</a>)</td>
+<td class="org-left">:version</td>
+<td class="org-left">5.18.7-arch1-1</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+We see two devices that we already recognize from earlier articles,
+two appearances of my Scarlett 2i4 external audio card,
+and two appearance of Faderfox MX12. Why do these appear twice?
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">mx12</span> <span style="color: #7388d6;">(</span>map device <span style="color: #909183;">(</span>filter #<span style="color: #709870;">(</span><span style="color: #2F8B58; font-weight: bold;">clojure.string</span>/includes? <span style="color: #907373;">(</span>info <span style="color: #0084C8; font-weight: bold;">%</span> <span style="color: #F5666D;">:name</span><span style="color: #907373;">)</span> <span style="color: #4E9A06;">"MX12"</span><span style="color: #709870;">)</span> <span style="color: #709870;">(</span>device-info<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#'user/mx12
+</pre>
+
+
+<p>
+Here's the first one.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>first mx12<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+</colgroup>
+<tbody>
+<tr>
+<td class="org-left">:class</td>
+<td class="org-left">MidiOutDevice</td>
+<td class="org-left">:status</td>
+<td class="org-left">:closed</td>
+<td class="org-left">:micro-position</td>
+<td class="org-right">-1</td>
+<td class="org-left">:description</td>
+<td class="org-left">Faderfox MX12, USB MIDI, Faderfox MX12</td>
+<td class="org-left">:name</td>
+<td class="org-left">MX12 [hw:3,0,0]</td>
+<td class="org-left">:vendor</td>
+<td class="org-left">ALSA (<a href="http://www.alsa-project.org">http://www.alsa-project.org</a>)</td>
+<td class="org-left">:version</td>
+<td class="org-left">5.18.7-arch1-1</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+Note the <code>:class</code> <code>MidiOutDevice</code>. This instance can only send MIDI messages from computer to the device.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>second mx12<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+</colgroup>
+<tbody>
+<tr>
+<td class="org-left">:class</td>
+<td class="org-left">MidiInDevice</td>
+<td class="org-left">:status</td>
+<td class="org-left">:open</td>
+<td class="org-left">:micro-position</td>
+<td class="org-right">13220527818</td>
+<td class="org-left">:description</td>
+<td class="org-left">Faderfox MX12, USB MIDI, Faderfox MX12</td>
+<td class="org-left">:name</td>
+<td class="org-left">MX12 [hw:3,0,0]</td>
+<td class="org-left">:vendor</td>
+<td class="org-left">ALSA (<a href="http://www.alsa-project.org">http://www.alsa-project.org</a>)</td>
+<td class="org-left">:version</td>
+<td class="org-left">5.18.7-arch1-1</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+The second one is <code>MidiInDevice</code>, which receives data, but doesn't know anything about sending.
+</p>
+
+<p>
+In this case, the system sees the device through these two lenses. In other cases, one object might
+be capable of both sending and receiving, as in the case of the <code>"Real Time Sequencer"</code>.
+</p>
+
+<p>
+But how would our program know this, without us deciphering this from the <code>:class</code> output?
+The program could check for transmitter and receiver capabilities by calling appropriate predicates,
+and filter devices that match our requirements. In this case, we're interested in detecting button
+presses and knob turnings from the device, so we are looking for the transmitter.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">mx12in</span> <span style="color: #7388d6;">(</span>first <span style="color: #909183;">(</span>filter transmitter? mx12<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#'user/mx12in
+</pre>
+
+
+<div class="org-src-container">
+<pre class="src src-clojure">mx12in
+</pre>
+</div>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+</colgroup>
+<tbody>
+<tr>
+<td class="org-left">:class</td>
+<td class="org-left">MidiInDevice</td>
+<td class="org-left">:status</td>
+<td class="org-left">:open</td>
+<td class="org-left">:micro-position</td>
+<td class="org-right">13220813146</td>
+<td class="org-left">:description</td>
+<td class="org-left">Faderfox MX12, USB MIDI, Faderfox MX12</td>
+<td class="org-left">:name</td>
+<td class="org-left">MX12 [hw:3,0,0]</td>
+<td class="org-left">:vendor</td>
+<td class="org-left">ALSA (<a href="http://www.alsa-project.org">http://www.alsa-project.org</a>)</td>
+<td class="org-left">:version</td>
+<td class="org-left">5.18.7-arch1-1</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+
+<div id="outline-container-orgd7aa1ef" class="outline-2">
+<h2 id="orgd7aa1ef">Receiver</h2>
+<div class="outline-text-2" id="text-orgd7aa1ef">
+<p>
+All right, we have a device object that sends MIDI messages. But how do we access these messages?
+We need to implement a receiver to our liking (or use an existing one in unlikely case that someone
+already implemented our custom creative requirements; remember, this is music, not accounting).
+</p>
+
+<p>
+Usually, it's a PITA. Clojure Sound makes it easy by:
+</p>
+<ul class="org-ul">
+<li>Decoding raw byte MIDI data into nice Clojure maps and keywords, and integers, and floats.</li>
+<li>Helping plain functions to listen for MIDI events.</li>
+</ul>
+
+<p>
+We'll create a trivial listener that just prints the messages to the REPL output,
+and connect it to <code>mx12in</code>. First, we have to <code>open!</code> the device, or it will refuse connections.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>open! mx12in<span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>connect! mx12in <span style="color: #7388d6;">(</span>receiver <span style="color: #909183;">(</span>partial println <span style="color: #4E9A06;">"Hello Fiderfox"</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-left" />
+</colgroup>
+<tbody>
+<tr>
+<td class="org-left">{:class "MidiInDevice", :status :open, :micro-position 13220961811, :description "Faderfox MX12, USB MIDI, Faderfox MX12", :name "MX12 [hw:3,0,0]", :vendor "ALSA (<a href="http://www.alsa-project.org">http://www.alsa-project.org</a>)", :version "5.18.7-arch1-1"}</td>
+</tr>
+
+<tr>
+<td class="org-left">{:class "MidiInTransmitter", :id 2000879663}</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+Here's what I get when I start turning a knob.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure">Hello Fiderfox <span style="color: #707183;">{</span><span style="color: #F5666D;">:channel</span> 0, <span style="color: #F5666D;">:command</span> <span style="color: #F5666D;">:cc</span>, <span style="color: #F5666D;">:controller</span> 13, <span style="color: #F5666D;">:value</span> 1, <span style="color: #F5666D;">:control</span> <span style="color: #F5666D;">:effect-control-2</span><span style="color: #707183;">}</span> 1273<span style="color: #ee82ee; background-color: #333333;">2693869</span>
+Hello Fiderfox <span style="color: #707183;">{</span><span style="color: #F5666D;">:channel</span> 0, <span style="color: #F5666D;">:command</span> <span style="color: #F5666D;">:cc</span>, <span style="color: #F5666D;">:controller</span> 13, <span style="color: #F5666D;">:value</span> 1, <span style="color: #F5666D;">:control</span> <span style="color: #F5666D;">:effect-control-2</span><span style="color: #707183;">}</span> 1273<span style="color: #ee82ee; background-color: #333333;">2693869</span>
+Hello Fiderfox <span style="color: #707183;">{</span><span style="color: #F5666D;">:channel</span> 0, <span style="color: #F5666D;">:command</span> <span style="color: #F5666D;">:cc</span>, <span style="color: #F5666D;">:controller</span> 13, <span style="color: #F5666D;">:value</span> 2, <span style="color: #F5666D;">:control</span> <span style="color: #F5666D;">:effect-control-2</span><span style="color: #707183;">}</span> 1273<span style="color: #ee82ee; background-color: #333333;">2704461</span>
+Hello Fiderfox <span style="color: #707183;">{</span><span style="color: #F5666D;">:channel</span> 0, <span style="color: #F5666D;">:command</span> <span style="color: #F5666D;">:cc</span>, <span style="color: #F5666D;">:controller</span> 13, <span style="color: #F5666D;">:value</span> 2, <span style="color: #F5666D;">:control</span> <span style="color: #F5666D;">:effect-control-2</span><span style="color: #707183;">}</span> 1273<span style="color: #ee82ee; background-color: #333333;">2704461</span>
+Hello Fiderfox <span style="color: #707183;">{</span><span style="color: #F5666D;">:channel</span> 0, <span style="color: #F5666D;">:command</span> <span style="color: #F5666D;">:cc</span>, <span style="color: #F5666D;">:controller</span> 13, <span style="color: #F5666D;">:value</span> 3, <span style="color: #F5666D;">:control</span> <span style="color: #F5666D;">:effect-control-2</span><span style="color: #707183;">}</span> 1273<span style="color: #ee82ee; background-color: #333333;">2718154</span>
+Hello Fiderfox <span style="color: #707183;">{</span><span style="color: #F5666D;">:channel</span> 0, <span style="color: #F5666D;">:command</span> <span style="color: #F5666D;">:cc</span>, <span style="color: #F5666D;">:controller</span> 13, <span style="color: #F5666D;">:value</span> 3, <span style="color: #F5666D;">:control</span> <span style="color: #F5666D;">:effect-control-2</span><span style="color: #707183;">}</span> 1273<span style="color: #ee82ee; background-color: #333333;">2718154</span>
+</pre>
+</div>
+
+<p>
+Nice! My computer understands my controller!
+</p>
+
+<p>
+As this article is getting big, and it's 2 AM, I'll consider this a milestone, publish it,
+play guitar for a short time, and go to sleep. I deserve sleep, too :) In the next article,
+we'll create a more useful receiver that will use the information from these messages
+to control these chords I've been singing praises for!
+</p>
+</div>
+</div>
