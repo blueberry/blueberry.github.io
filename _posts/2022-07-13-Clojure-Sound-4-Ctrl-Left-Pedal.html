@@ -1,0 +1,401 @@
+---
+date: 2022-07-13 20:45
+author: dragan
+layout: post
+title: Clojure Sound - 4 - Ctrl-Left-Pedal
+categories: 
+- Clojure,
+- Clojure
+- Sound,
+- Music
+tags: 
+excerpt: In this article, we program a simple play/pause action that react to MIDI commands received from hardware controllers.
+---
+<p>
+In the last article we managed to connect a MIDI controller and receive
+updates whenever something happens to its knobs and buttons. So what?
+As it is, nothing. Printing out messages is not of much use, beyond perhaps
+getting informed about how these messages look like, and what kind of data they
+typically contain. On another thought, exactly <i>that</i> is often valuable,
+because how else can we debug what's happening and learn how to use
+these devices. They typically don't come with terrific manuals.
+</p>
+
+<p>
+Luckily, basic use revolves around receiving one of a few kind of standard
+messages, that typically contain only a handful of bytes, more or less conforming
+to the MIDI standard, so it's up to us to assign the meaning according to
+our use case. If we care to read the standard, we could try to pick the closest
+meaning in our application, but if that's not possible, or practical, well&#x2026;
+you live only once. Let's celebrate creativity and be silly.
+</p>
+
+<div id="outline-container-org56a36fb" class="outline-2">
+<h2 id="org56a36fb">What I would like</h2>
+<div class="outline-text-2" id="text-org56a36fb">
+<p>
+Cool, so, at first, I have an audio recording of a few chords interposed with some talk and noise,
+just a single <code>wav</code> file. I'd like to discover how to play only selected segments (i.e. the chords I'm interested in guessing),
+with arbitrary repetitions. The purpose of this is not to create a perfect looper or learning device, at least not yet.
+At first, I'm just interested in creating the crudest audio player, and discovering how to
+connect the player to react to the input from the MIDI controller that we connected last week.
+</p>
+
+
+<div id="org9cadb83" class="figure">
+<p><img src="../img/clojure-sound/faderfox-mx12.jpg" alt="faderfox-mx12.jpg" />
+</p>
+</div>
+
+<p>
+After that, it would be nice to see whether the foot pedal works in the same way,
+or it needs more poking.
+</p>
+
+
+<div id="org7c8a2e7" class="figure">
+<p><img src="../img/clojure-sound/fc_300_angle_gal.jpg" alt="fc_300_angle_gal.jpg" />
+</p>
+</div>
+
+<p>
+As we discovered last week, the more modern Faderfox MX12 connects through USB and is listed as one of
+the connected MIDI devices. The Roland FC-300 foot pedal, does not support USB, so I connect it
+via a 5-pin MIDI cable to my USB sound card. It will probably be displayed as a MIDI in/out of
+that sound card (more on that later).
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgc7be1b8" class="outline-2">
+<h2 id="orgc7be1b8">MIDI Controller (hands)</h2>
+<div class="outline-text-2" id="text-orgc7be1b8">
+<p>
+The usual imports:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">ns</span> <span style="color: #2F8B58; font-weight: bold;">my-midi</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span>uncomplicate.commons.core <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>close! info<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>uncomplicate.clojure-sound
+           <span style="color: #909183;">[</span>core <span style="color: #F5666D;">:refer</span> <span style="color: #F5666D;">:all</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>midi <span style="color: #F5666D;">:refer</span> <span style="color: #F5666D;">:all</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>sampled <span style="color: #F5666D;">:refer</span> <span style="color: #F5666D;">:all</span><span style="color: #909183;">]</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+The following code is what we've done previously: find out the Fiderfox input device and open it.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>device-info<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example" id="orge48c433">
+| :description | Software MIDI Synthesizer                    | :name | Gervill             | :vendor | OpenJDK                            | :version | 1.0             |
+| :description | Software sequencer                           | :name | Real Time Sequencer | :vendor | Oracle Corporation                 | :version | Version 1.0     |
+| :description | Faderfox MX12, USB MIDI, Faderfox MX12       | :name | MX12 [default]      | :vendor | ALSA (http://www.alsa-project.org) | :version | 5.18.10-arch1-1 |
+| :description | Faderfox MX12, USB MIDI, Faderfox MX12       | :name | MX12 [hw:0,0,0]     | :vendor | ALSA (http://www.alsa-project.org) | :version | 5.18.10-arch1-1 |
+| :description | Scarlett 2i4 USB, USB MIDI, Scarlett 2i4 USB | :name | USB [hw:1,0,0]      | :vendor | ALSA (http://www.alsa-project.org) | :version | 5.18.10-arch1-1 |
+| :description | Faderfox MX12, USB MIDI, Faderfox MX12       | :name | MX12 [default]      | :vendor | ALSA (http://www.alsa-project.org) | :version | 5.18.10-arch1-1 |
+| :description | Faderfox MX12, USB MIDI, Faderfox MX12       | :name | MX12 [hw:0,0,0]     | :vendor | ALSA (http://www.alsa-project.org) | :version | 5.18.10-arch1-1 |
+| :description | Scarlett 2i4 USB, USB MIDI, Scarlett 2i4 USB | :name | USB [hw:1,0,0]      | :vendor | ALSA (http://www.alsa-project.org) | :version | 5.18.10-arch1-1 |
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">mx12</span> <span style="color: #7388d6;">(</span>map device <span style="color: #909183;">(</span>filter #<span style="color: #709870;">(</span><span style="color: #2F8B58; font-weight: bold;">clojure.string</span>/includes? <span style="color: #907373;">(</span>info <span style="color: #0084C8; font-weight: bold;">%</span> <span style="color: #F5666D;">:name</span><span style="color: #907373;">)</span> <span style="color: #4E9A06;">"MX12"</span><span style="color: #709870;">)</span> <span style="color: #709870;">(</span>device-info<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">mx12in</span> <span style="color: #7388d6;">(</span>first <span style="color: #909183;">(</span>filter transmitter? mx12<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>open! mx12in<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example" id="org99ee8f7">
+| {:class "MidiInDevice", :status :open, :micro-position 464, :description "Faderfox MX12, USB MIDI, Faderfox MX12", :name "MX12 [default]", :vendor "ALSA (http://www.alsa-project.org)", :version "5.18.10-arch1-1"} |
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org97b8d90" class="outline-2">
+<h2 id="org97b8d90">Receiver</h2>
+<div class="outline-text-2" id="text-org97b8d90">
+<p>
+Now, we should receive the input from MX12, but instead of printing it out to the REPL,
+we would like to control something. The first thing that comes to my mind is to start and stop
+the playback. Nothing more. Let's say that I choose one of the buttons, for example the leftmost
+gray one. When it's pressed, and its led light is on, my sound recording should be playing.
+When it's off, my clip should stop.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgc54d481" class="outline-2">
+<h2 id="orgc54d481">The Clip</h2>
+<div class="outline-text-2" id="text-orgc54d481">
+<p>
+But how do I access the recording at all?
+In Clojure Sound, the simplest (and the most straightforward) way of playing a pre-recorded
+sound is as a <i>clip</i>. I can load the actual <code>wav</code> as a (Java/Clojure) resource, or URL,
+or any number of supported methods, create an <code>audio-input-stream</code>, and then create a <code>clip</code>
+out of it.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">ssr</span> <span style="color: #7388d6;">(</span>audio-input-stream <span style="color: #909183;">(</span><span style="color: #2F8B58; font-weight: bold;">clojure.java.io</span>/resource <span style="color: #4E9A06;">"justin/ssr-1.2.wav"</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">ssr-clip</span> <span style="color: #7388d6;">(</span>line <span style="color: #909183;">(</span>line-info <span style="color: #F5666D;">:clip</span> <span style="color: #709870;">(</span>audio-format ssr<span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Now the clip can be manipulated by Clojure Sound functions whose names speak for themselves, such
+as <code>open!</code>, <code>start!</code>, <code>stop!</code>, <code>frame-position!</code>, etc. Let's try it!
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>open! ssr-clip ssr<span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>start! ssr-clip<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example" id="org1eabcd0">
+| {:class "Clip", :status :open, :level -1.0, :active false, :running false} |
+| {:class "Clip", :status :open, :level -1.0, :active true, :running true}   |
+</pre>
+
+<p>
+The clip that you provided (obviously, different than the one I'm using) should start playing.
+We could wait until it reaches the end, or we can stop it at any time.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>stop! ssr-clip<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example" id="org3d7ff31">
+| :class | Clip | :status | :closed | :level | -1.0 | :active | false | :running | false |
+</pre>
+
+<p>
+Note that wen you start it again, it picks up where it stopped, instead of starting all over from the beginning.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>start! ssr-clip<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example" id="orgbe2d900">
+| :class | Clip | :status | :closed | :level | -1.0 | :active | false | :running | false |
+</pre>
+
+<p>
+Should we want it to jump to any position, including the beginning, we can call the <code>frame-position!</code>, or the =tick-position! function.
+The following code rewinds the clip to the very beginning.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>frame-position! ssr-clip 0<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example" id="org6c07b97">
+| :class | Clip | :status | :open | :level | -1.0 | :active | true | :running | true |
+</pre>
+</div>
+</div>
+
+<div id="outline-container-orgf525606" class="outline-2">
+<h2 id="orgf525606">Receiver, again</h2>
+<div class="outline-text-2" id="text-orgf525606">
+<p>
+Now we can return to the receiver function. One thing that comes to my mind is that
+I can dedicate a button to toggle between starting and stopping the playback. Let's say
+that I dedicate the first gray button from the left on the MX12 for that task. How do I know
+how to access its events? One way is to read that in the documentation, but the problem is
+that the documentation is often cryptic or nonexistent. The other is to poke at the device,
+and see the event log through the printing function that we've already used. That's how
+I've discovered that the gray button I'm interested has a <code>:controller</code> id <code>37</code>, and sends
+<code>:value</code> 0 for <i>off</i>, and value 127 for the <i>on</i> state, in accordance to the MIDI standard.
+The on/off state is indicated on the device by a red LED light. A basic receiver would then
+just check for controller 37, and <code>start!</code> or <code>stop!</code> the clip (<code>line</code>) that we provide,
+depending on its value.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">play</span> <span style="color: #7388d6;">[</span>line<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">fn</span> <span style="color: #909183;">[</span>message _<span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #709870;">[</span>data <span style="color: #907373;">(</span>decode message<span style="color: #907373;">)</span><span style="color: #709870;">]</span>
+      <span style="color: #709870;">(</span><span style="color: #A52A2A; font-weight: bold;">when</span> <span style="color: #907373;">(</span><span style="color: #A52A2A; font-weight: bold;">and</span> <span style="color: #6276ba;">(</span>map? data<span style="color: #6276ba;">)</span> <span style="color: #6276ba;">(</span>= 37 <span style="color: #858580;">(</span><span style="color: #F5666D;">:controller</span> data<span style="color: #858580;">)</span><span style="color: #6276ba;">)</span><span style="color: #907373;">)</span>
+        <span style="color: #907373;">(</span><span style="color: #A52A2A; font-weight: bold;">if</span> <span style="color: #6276ba;">(</span>&lt; 64 <span style="color: #858580;">(</span><span style="color: #F5666D;">:value</span> data<span style="color: #858580;">)</span><span style="color: #6276ba;">)</span>
+          <span style="color: #6276ba;">(</span>start! line<span style="color: #6276ba;">)</span>
+          <span style="color: #6276ba;">(</span>stop! line<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+The <code>play</code> function assumes that we're going to receive a Control Change MIDI message,
+and expects that the decoded data identifies the controller and value. We will talk
+more about different kinds of MIDI messages and how to handle the bytes that they
+deliver. Fortunately, Clojure Sound helps with decoding these bytes according to
+the message type, but it couldn't help if we'd asked for nonexistent data in
+a wrong format. That's why <code>play</code> is not a universal, do-it-all, function.
+The programmer (you!) has to put some thinking in designing it to fit the use case.
+</p>
+
+<p>
+Now we connect this receiver function to MX12.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>connect! mx12in <span style="color: #7388d6;">(</span>receiver <span style="color: #909183;">(</span>play ssr-clip<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example" id="orgfc8a690">
+| :class | MidiInTransmitter | :id | 1772000663 |
+</pre>
+
+<p>
+Now I'll press the button and I expect the clip to start playing&#x2026;.
+</p>
+
+<p>
+Yes, I hear the sound. When I press the button again, the sound stops. Press it again, it continues.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgef35c97" class="outline-2">
+<h2 id="orgef35c97">Controlling playback with Roland FC-300 pedalboard</h2>
+<div class="outline-text-2" id="text-orgef35c97">
+<p>
+Now that I've connected my clip with my Faderfox MX12, I wonder how difficult it can be to control it with the pedal.
+The first challenge is connection: FC-300 does not support USB. Fortunately, my external USB sound card
+does have 5-pin MIDI ports, so I connected the pedal through this.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">scarlett</span> <span style="color: #7388d6;">(</span>map device <span style="color: #909183;">(</span>filter #<span style="color: #709870;">(</span><span style="color: #2F8B58; font-weight: bold;">clojure.string</span>/includes? <span style="color: #907373;">(</span>info <span style="color: #0084C8; font-weight: bold;">%</span> <span style="color: #F5666D;">:description</span><span style="color: #907373;">)</span> <span style="color: #4E9A06;">"Scarlett"</span><span style="color: #709870;">)</span> <span style="color: #709870;">(</span>devi<span style="color: #ee82ee; background-color: #333333;">ce-info</span><span style="color: #709870; background-color: #333333;">)</span><span style="color: #909183; background-color: #333333;">)</span><span style="color: #7388d6; background-color: #333333;">)</span><span style="color: #707183; background-color: #333333;">)</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">scarlett-in</span> <span style="color: #7388d6;">(</span>first <span style="color: #909183;">(</span>filter transmitter? scarlett<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>open! scarlett-in<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Now I'm going to press some buttons on the pedal, and spy the output.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>connect! scarlett-in <span style="color: #7388d6;">(</span>receiver <span style="color: #909183;">(</span>partial println <span style="color: #4E9A06;">"Hello FC-300"</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+The output looks something like this.
+</p>
+
+<pre class="example" id="org996d915">
+Hello FC-300 {:channel 14, :command nil, :data nil} 80025801
+Hello FC-300 {:channel 14, :command nil, :data nil} 80226589
+Hello FC-300 {:channel 14, :command nil, :data nil} 80426603
+Hello FC-300 {:channel 0, :command :control-change, :controller 80, :value 127, :control :gp-control-5} 80517901
+Hello FC-300 {:channel 14, :command nil, :data nil} 80626739
+Hello FC-300 {:channel 14, :command nil, :data nil} 80826209
+</pre>
+
+<p>
+Note that there is an empty message at channel 14 every 200 milliseconds regardless
+of me pressing any of the buttons. I am not sure why this occurs, nor I found
+the explanation in the (70 page long) manual, or on Internet forums.
+I suspect it's some signal for time synchronization, but that's just me,
+an inexperienced MIDI beginner, guessing. On the other hand,
+the rest of the output is familiar.
+</p>
+
+<p>
+There are two stomps (foot buttons?) dedicated to general purpose control, that fit my need.
+As per MIDI standard, they send controller ID 80. I can change that in the pedal
+settings to 37, and re-use the same function I've used for MX12, but this
+is cumbersome, might break what standard programs expect from this pedal,
+and 37 was arbitrary in my use case to begin with. I think, in general,
+this hardware is rather cumbersome to program, so it might be good idea
+to just accept what they send by default, and then do any re-mapping and
+re-routing in Clojure-world, where automation is much easier!
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">pedal-play</span> <span style="color: #7388d6;">[</span>line<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">fn</span> <span style="color: #909183;">[</span>message _<span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #709870;">[</span><span style="color: #907373;">{</span>controller <span style="color: #F5666D;">:controller</span>
+           value <span style="color: #F5666D;">:value</span><span style="color: #907373;">}</span> <span style="color: #907373;">(</span>decode message<span style="color: #907373;">)</span><span style="color: #709870;">]</span>
+      <span style="color: #709870;">(</span><span style="color: #A52A2A; font-weight: bold;">case</span> controller
+        80 <span style="color: #907373;">(</span>start! line<span style="color: #907373;">)</span>
+        81 <span style="color: #907373;">(</span>stop! line<span style="color: #907373;">)</span>
+        <span style="color: #F5666D;">true</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+I varied the setup a bit, and now one button is dedicated for start, and the other to stop command.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>close! scarlett-in<span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>connect! scarlett-in <span style="color: #7388d6;">(</span>receiver <span style="color: #909183;">(</span>pedal-play ssr-clip<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>open! scarlett-in<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Does it work? Yes, it does!
+</p>
+
+<p>
+Note that I haven't used any fancy GUI reactive library. I wanted to show a simple
+example. But we can guess that this forest of message codes and filtering can
+quickly become unwieldy. Maybe we need a state machine to handle this. Or we
+might use some atoms and refs? Or core.async channels? Sure, and you are
+free to use any of these in specific use cases. Maybe I'll discover some
+nice patterns that work elegantly. "Hardware" user interface and the
+challenges it brings is not <i>that</i> dissimilar from <i>graphical</i> user interface.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org76a0261" class="outline-2">
+<h2 id="org76a0261">Two-way communication</h2>
+<div class="outline-text-2" id="text-org76a0261">
+<p>
+Regardless of whether I press control buttons on MX12 or FC-300, the clip acts accordingly.
+</p>
+
+<p>
+The only glitch in this setup is the LED indication for these buttons: if I change
+the state of the clip from one controller, the other is unaware of that change.
+For example, if I start the clip from the MX12, its LED will flash, but then when
+I stop it from the FC-300, it just keeps flashing. When I press the button 37 on MX12
+it initiate stopping, but the clip has already been stopped, so this achieves nothing.
+</p>
+
+<p>
+What we really need is a way to notify controller of this change. You might guess
+that we should send the same control change message to the controller, and it
+will update its hardware. Easy!
+</p>
+
+<p>
+However, when I did this, nothing changes. It seems that the controller is built
+only to control other things, not to be controlled. I can't find any reference
+in the manuals that would indicate that these two controllers can react to
+appropriate messages to do what I need here. Information I've found on the
+Internet is very obscure, and seems to confirm my suspicions here, for FC-300.
+In general, it seems that most MIDI controllers are built to control other things,
+not to be updated themselves. When I think about this, it's expected: if the pedal
+is in position X, what is controller to do when I try to update? Turn on a motor
+and bring the pedal in the appropriate physical position? I guess that
+would be too much trouble for little gain. How much would such pedal cost?
+</p>
+</div>
+</div>
