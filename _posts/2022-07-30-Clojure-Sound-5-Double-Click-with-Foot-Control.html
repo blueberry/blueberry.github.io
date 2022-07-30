@@ -1,0 +1,230 @@
+---
+date: 2022-07-30 17:45
+author: dragan
+layout: post
+title: Clojure Sound - 5 - Double Click with Foot Control
+categories: 
+- Clojure,
+- Clojure
+- Sound,
+- Music
+tags: 
+excerpt: In this article, we program simple foot gestures that we use to send more than two commands with one button.
+---
+<p>
+In the <a href="./Clojure-Sound-4-Ctrl-Left-Pedal">last article</a> we created a receiver function that listened to signals from our
+foot controller and started or stopped playback on consecutive clicks. The trouble
+with our player it that it only works until the end of the track. The <code>start!</code> function
+does not automatically rewind the playback. Neither <code>stop!</code> does that. Our program is
+responsible for detecting that the track should be rewound, perhaps by detecting that
+we reached the end of track (but even that is not fool proof, since audio infrastructure
+is not that precise). Now we have to think about a foot user interface that is useful
+and simple at the same time - there's not many different precise actions that a foot can do.
+</p>
+
+<p>
+My idea at this time is the following: distinguish three gestures:
+</p>
+<ul class="org-ul">
+<li>Button (un)pressed (value 0)</li>
+<li>Button pressed (value 127)</li>
+<li>Button pressed twice in a short time span (doubleclick). This can have two varieties:
+<ul class="org-ul">
+<li>First pressed (value 127), then (un)pressed (value 0)</li>
+<li>(Un)pressed (value 0), then pressed (value 127).</li>
+<li>The values 0 and 127 always interchange, there's no way to send the same value twice in a row (with the MIDI controller I have).</li>
+</ul></li>
+</ul>
+
+
+<div id="org0144506" class="figure">
+<p><img src="../img/clojure-sound/fc_300_angle_gal.jpg" alt="fc_300_angle_gal.jpg" />
+</p>
+</div>
+
+<p>
+This gives us 4 different signals from one button that we can work with, which doesn't seem <i>that</i> much,
+but on the other hand, we can't assume that the feet of our user that is doing all this stomping is
+able or eager for much more complicated stuff.
+</p>
+
+<p>
+So, if I assume that the particular button is dedicated to a particular clip playback,
+I see the following actions:
+</p>
+<ul class="org-ul">
+<li>If the button is (un)pressed (value 0), the clip should stop, regardless of the previous state. If the clip has not been playing, nothing changes.</li>
+<li>If the button is pressed (value 127), the clip should start, regardless of the previous state. If the clip has been playing, it just keeps playing.</li>
+<li>If the button is clicked twice in a row, the things might get complicated!</li>
+</ul>
+
+<p>
+It's not exactly rocket science level complicated, but we still need to think what to do.
+In our desktop user interface toolkits, we are accustomed to working with a very high level
+API. We write functions that react to gestures (click, left click, right click, double click, wheel scroll, touch, etc.)
+but we are not responsible for detecting these gestures from the signals that our Magic Trackpad sends;
+the drivers and the operating system take care of that complexity. We just write actions that happen <code>onDoubleclick</code>.
+</p>
+
+<p>
+But here, we have to take care of the whole stream of raw signals. How should we distinguish between
+an action that happens when the button is clicked once, and an action that should register that first click, and
+wait for the second one, which may never come? And, we would like the solution to be simple!
+</p>
+
+<p>
+I drew a simple state transition diagram (with a pen on a napkin) and concluded that for our limited
+foot control it can be simplified to this:
+</p>
+<ul class="org-ul">
+<li>As soon as the button is pressed, evaluate either <code>start!</code> (value 127), or <code>stop!</code> (value 0) function.</li>
+<li>When the button is pressed shortly after it has been pressed the previous time (say, 600 milliseconds), treat it as a double click, and initiate the alternative action.</li>
+</ul>
+
+<p>
+This leaves us with two tasks:
+</p>
+<ul class="org-ul">
+<li>Detecting doubleclick</li>
+<li>Deciding on a simple decision process for the alternative action (remember, the user should anticipate the action while playing the guitar).</li>
+</ul>
+
+<p>
+The usual imports:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">ns</span> <span style="color: #2F8B58; font-weight: bold;">my-midi</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span>uncomplicate.commons.core <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>close! info<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>uncomplicate.clojure-sound
+           <span style="color: #909183;">[</span>core <span style="color: #F5666D;">:refer</span> <span style="color: #F5666D;">:all</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>midi <span style="color: #F5666D;">:refer</span> <span style="color: #F5666D;">:all</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>sampled <span style="color: #F5666D;">:refer</span> <span style="color: #F5666D;">:all</span><span style="color: #909183;">]</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div id="outline-container-org98665ef" class="outline-2">
+<h2 id="org98665ef">Detecting doubleclick</h2>
+<div class="outline-text-2" id="text-org98665ef">
+<p>
+If you went back to one of the previous articles and connect the <code>println</code> as a receiver for
+the controller you have, you'd see that each message contains its timestamps in microseconds.
+We can detect whether a "click" message comes shortly after the previous "unclick" simply by
+subtracting the previous message timestamp. The only trouble is that we don't have access
+to message history.
+</p>
+
+<p>
+If we saved the last message, we have all the information we need; not only that we know both timestamps,
+we can even recognized whether the last message is of the same kind, and coming from the same button!
+Fast pressing <i>different</i> buttons does not count as "doubleclick". Clojure gives us several elegant
+facilities for state management. In this case, the state is internal, so we don't have to care about
+synchronization. We don't need what refs, agents, or atoms offer. I think that the simple <code>volatile!</code>
+can serve our needs rather well.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">play</span> <span style="color: #7388d6;">[</span>line<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #909183;">[</span>previous-message <span style="color: #709870;">(</span>volatile! <span style="color: #907373;">(</span>short-message <span style="color: #F5666D;">:control-change</span> 0 0<span style="color: #907373;">)</span><span style="color: #709870;">)</span>
+        previous-timestamp <span style="color: #709870;">(</span>volatile! 0<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span><span style="color: #A52A2A; font-weight: bold;">fn</span> <span style="color: #709870;">[</span>message timestamp<span style="color: #709870;">]</span>
+      <span style="color: #709870;">(</span>future
+        <span style="color: #907373;">(</span><span style="color: #A52A2A; font-weight: bold;">case</span> <span style="color: #6276ba;">(</span>command-type-key <span style="color: #858580;">(</span>status message<span style="color: #858580;">)</span><span style="color: #6276ba;">)</span>
+          <span style="color: #F5666D;">:control-change</span> <span style="color: #6276ba;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #858580;">[</span>doubleclick <span style="color: #80a880;">(</span><span style="color: #A52A2A; font-weight: bold;">and</span> <span style="color: #887070;">(</span>= <span style="color: #707183;">(</span>data1 @previous-message<span style="color: #707183;">)</span> <span style="color: #707183;">(</span>data1 message<span style="color: #707183;">)</span><span style="color: #887070;">)</span>
+                                                 <span style="color: #887070;">(</span>&lt; <span style="color: #707183;">(</span>- timestamp @previous-timestamp<span style="color: #707183;">)</span> 600000<span style="color: #887070;">)</span><span style="color: #80a880;">)</span><span style="color: #858580;">]</span>
+                            <span style="color: #858580;">(</span>vreset! previous-timestamp timestamp<span style="color: #858580;">)</span>
+                            <span style="color: #858580;">(</span>vreset! previous-message message<span style="color: #858580;">)</span>
+                            <span style="color: #858580;">(</span><span style="color: #A52A2A; font-weight: bold;">case</span> <span style="color: #80a880;">(</span>data1 message<span style="color: #80a880;">)</span>
+                              80 <span style="color: #80a880;">(</span>play-control <span style="color: #887070;">(</span>data2 message<span style="color: #887070;">)</span> repeated<span style="color: #80a880;">)</span>
+                              <span style="color: #F5666D;">true</span><span style="color: #858580;">)</span><span style="color: #6276ba;">)</span>
+          <span style="color: #F5666D;">:program-change</span> <span style="color: #4E9A06;">"We'll do something with other buttons later!"</span>
+          <span style="color: #F5666D;">:default</span><span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Building on the <code>play</code> function from the last article, I've added closures via <code>let</code> to keep track of the previous
+message and its timestamp, and a simple case to distinguish <code>:control-change</code> vs <code>:program-change</code> messages.
+I've also delegated the action logic to an extracted function <code>play-control</code>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org8113ef8" class="outline-2">
+<h2 id="org8113ef8">Alternative action</h2>
+<div class="outline-text-2" id="text-org8113ef8">
+<p>
+The <code>play-control</code> function receives the value and whether the click is double. What should it do? Of course, the first click
+starts or stops the clip. But, what happens with doubleclick when value is 0, and what when value is 127?
+The first detailed state transition chart was not that trivial. It all depends whether the clip position was 0, maximum value,
+or something in between. My idea is to enable rewind, so the main theme is "doubleclick should rewind the clip". But,
+is there a difference whether the clip was stopped or not?
+</p>
+
+<p>
+For example, let's say that the clip was in the middle, and stopped. The first click starts it, and the second is detected
+after 300 milliseconds. We can rewind the clip, and it's logical to me that the clip should stop, instead of instantly
+emitting sound. After I analyzed all other situations, it turned out that the simplest logic does quite a logical thing.
+</p>
+
+<p>
+I left out the state transition diagram and my analysis on purpose. I hope that this inspire you to
+think about <i>your own</i> applications that use similar controllers. It's unlikely that you practice guitar at this moment,
+and it's equally unlikely that you have the same foot controller. Or you do! Anyway, here's very simple logic of
+my <code>play-control</code>:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">play-control</span> <span style="color: #7388d6;">[</span>clip <span style="color: #2E3436; background-color: #EDEDED;">^</span><span style="color: #2F8B58; font-weight: bold;">long</span> v rewind<span style="color: #7388d6;">]</span>
+    <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">if</span> <span style="color: #909183;">(</span>&lt; 64 v<span style="color: #909183;">)</span>
+      <span style="color: #909183;">(</span>start! clip<span style="color: #909183;">)</span>
+      <span style="color: #909183;">(</span>stop! clip<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+    <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">when</span> <span style="color: #909183;">(</span><span style="color: #A52A2A; font-weight: bold;">or</span> rewind <span style="color: #709870;">(</span>&lt; 0 <span style="color: #907373;">(</span>frame-length clip<span style="color: #907373;">)</span> <span style="color: #907373;">(</span>+ <span style="color: #6276ba;">(</span>frame-position clip<span style="color: #6276ba;">)</span> 1000000<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span>
+      <span style="color: #909183;">(</span>frame-position! clip 0<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>
+  clip<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Here's what it does. At the start, the clip is not playing, and the button 80 is either in on (value 127) or off state (value 0),
+depending on the state you left it when you used it prior to that. If the button is in on state, the first click stops the clip,
+effectively doing nothing that changes what you hear, since the clip was stopped anyway. That was needed because on my controller,
+there is a red led light that indicates the on/off state, and I want it to match the playback.
+</p>
+
+<p>
+Then, when you press the button again, the clip starts playing. Whenever you press it again, it starts or stops
+the playback, matching the red light. But, you might want to rewind it for whatever reason in the middle of the clip.
+If the clip was playing, the first click will stop it, and the subsequent (double) click will start it again, and immediately
+move its position to the beginning. If the clip was stopped, the first click will start it, but the second will stop it immediately,
+and rewind it, so it's ready to play when you click it the third time. Effectively, if you press the button
+twice in a short timeframe in the middle of the clip, it will just continue what it did (play or wait) but from the beginning.
+</p>
+
+<p>
+If the clip reaches the end, it will be silent, but the red light will still be bright (there's no way I know of that
+I can direct my controller to change that, as it seems to not listen to MIDI commands). The first
+click will issue the stop command, and the second will start the playback. Now, I decided to relax the requirement
+for rewind in that case. Even if these two commands were not issued quickly, there's no reason for the clip
+to stay at the end, because there's no sound there whatever you do, which is not very useful (in this use case).
+</p>
+
+<p>
+If the clip somehow ended in end of clip, but stopped state, with the led light off, the first click
+will start it, and immediately rewind it to the beginning.
+</p>
+
+<p>
+I have also noticed that the clip that is very close to its end, but not exactly there, is a good candidate
+for rewinding. So, everything under a second until the end is treated as "rewind whatever happens" (in this use case!).
+</p>
+
+<p>
+At the end, the playback logic turned out to be much simpler than I anticipated when I analyzed
+all states where clip and the controller (with its red LED light) can be.
+It is an easy trap to overcomplicate things and create sophisticated universal solutions. In this case,
+even if we had a more high level API, it would need to be configured, and we would miss the special
+case when the clip is near the end. Sometimes the humble code is the right stuff. Clojure and simple go well together!
+</p>
+</div>
+</div>
