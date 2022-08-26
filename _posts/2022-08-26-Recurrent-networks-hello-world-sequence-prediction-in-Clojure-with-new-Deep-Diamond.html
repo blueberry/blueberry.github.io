@@ -1,0 +1,639 @@
+---
+date: 2022-08-26 16:25
+author: dragan
+layout: post
+title: Recurrent Networks Hello World in Clojure with new Deep Diamond RNN support on CPU and GPU
+categories: 
+- Clojure,
+- RNN,
+- Deep
+- Diamond,
+- Deep
+- Learning,
+- Recurrent
+- Neural
+- Networks
+tags: 
+excerpt: The support for Recurrent Neural Networks has just landed in Deep Diamond. Let's walk through a complete Hello World example!
+---
+<p>
+I've been busy in the last period working on new major features in Deep Diamond, one of which
+is the support for Recurrent Neural Networks (RNN). It's not been an easy ride, but I can finally
+show you some results! Big thanks for everyone that's helping me with this by buying my books
+(or subscribing to the upcoming editions), and Clojurists Together, who generously funded
+me in the past year to work on this.
+</p>
+
+<p>
+I know that most of you probably don't have much more than passing familiarity
+with deep learning, let alone recurrent neural networks, and that's why I'll try
+to show a very simple example on the level of Hello World that anyone interested
+in machine learning and programming can understand and try.
+</p>
+
+<p>
+So, enough talk, let's get down to business.
+</p>
+
+<div id="outline-container-orga87de2e" class="outline-2">
+<h2 id="orga87de2e">What are we doing</h2>
+<div class="outline-text-2" id="text-orga87de2e">
+<p>
+We are demonstrating a hammer: recurrent neural networks. Just kidding; we would like
+to create a (software) device that can learn to predict the next data point in a series.
+Depending on the data, this can be done in a number of ways (even
+by convolutional neural networks (CNN) that Deep Diamond already supported), one of
+which is RNN. So, we are creating a recurrent network, and training it with a set
+of data for this task.
+</p>
+
+<p>
+An example of data that fits this task would be temperature at some place, stock prices,
+and any other (possibly infinite) sequence of numbers in one of more dimensions that
+have an ordinal relation, that is, has an abstract notion of time attached to it. Then,
+we are trying to forecast one or more values that are happening in the future (temperature
+the next day, or the closing price of a stock, etc.).
+</p>
+
+<p>
+Since Hello World has to be dead simple, a real example would have too many opaque
+numbers, so we'll solve an artificially trivial task of teaching our network
+to predict the next number in the series for obvious series such as 1, 2, 3, 4, 5.
+Of course, in real life we rarely need to solve that exact task with such a bazooka
+as RNN, but if this is your first contact with time series prediction with deep
+learning, I guess it'd be just what works best.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org1560cc6" class="outline-2">
+<h2 id="org1560cc6">Let's get down to code</h2>
+<div class="outline-text-2" id="text-org1560cc6">
+<p>
+First, we'll require a bunch of Clojure namespaces that we need.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span>uncomplicate.commons.core <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>with-release <span style="color: #A52A2A; font-weight: bold;">let-release</span> release<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>uncomplicate.neanderthal
+           <span style="color: #909183;">[</span>core <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>ge dim amax submatrix subvector mrows trans transfer transfer! view-vctr
+                         native view-ge cols mv! rk! raw col row nrm2 scal! ncols dim rows axpby!<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>native <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>fge native-float fv iv<span style="color: #709870;">]</span><span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>uncomplicate.diamond
+           <span style="color: #909183;">[</span>tensor <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span><span style="color: #0084C8; font-weight: bold;">*diamond-factory*</span> tensor offset! connector transformer
+                           desc revert shape input output view-tz batcher<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>dnn <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>rnn infer sum activation inner-product dense
+                        network init! train cost train train-shuffle ending<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>native <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[]</span><span style="color: #909183;">]</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+All the AI in the world would be useless to us if we hadn't measured some data from the real world
+to feed it. Suppose (for the sake of Hello World), that I "measured" a narrow range of whole number domain
+by generating it from thin air. Does this data tell us anything about stock market? Of course not, and
+please does not expect any model that we train on this data to magically be informed on anything that
+could not be learned from the data it has seen.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">simple-sequence</span> <span style="color: #7388d6;">(</span>range -100 100<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example" id="org4f7e086">
+(-100 -99 -98 -97 -96 -95 -94 -93 -92 -91 -90 -89 -88 -87 -86 -85 ...)
+</pre>
+
+<p>
+Now, I'll create a blueprint for an arbitrary recurrent neural network (RNN). This network has 3
+recurrent layers (Gated Recurrent Unit cells), an abbreviation to one timestep, and
+two dense layers at the end. Please note that I used a completely arbitrary architecture.
+Neither this layer structure, nor the number of hidden neurons are optimal for this data;
+we are not even sure it's any good. If anything, it's probably a huge overkill.
+I chose it simply to show you how it's easy to construct with <a href="https://github.com/uncomplicate/deep-diamond">Deep Diamond</a>(<iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=deep-diamond&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>),
+as it will practically do everything on its own if you specify the bare minimum,
+that is "what you want". And we hope it'll at least learn to work well at the end,
+as non-optimal as it is.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">net-bp</span> <span style="color: #7388d6;">(</span>network <span style="color: #909183;">(</span>desc <span style="color: #709870;">[</span>5 32 1<span style="color: #709870;">]</span> <span style="color: #F5666D;">:float</span> <span style="color: #F5666D;">:tnc</span><span style="color: #909183;">)</span>
+                     <span style="color: #909183;">[</span><span style="color: #709870;">(</span>rnn <span style="color: #907373;">[</span>128<span style="color: #907373;">]</span> <span style="color: #F5666D;">:gru</span><span style="color: #709870;">)</span>
+                      <span style="color: #709870;">(</span>rnn 2<span style="color: #709870;">)</span>
+                      <span style="color: #709870;">(</span>abbreviate<span style="color: #709870;">)</span>
+                      <span style="color: #709870;">(</span>dense <span style="color: #907373;">[</span>128<span style="color: #907373;">]</span> <span style="color: #F5666D;">:relu</span><span style="color: #709870;">)</span>
+                      <span style="color: #709870;">(</span>dense <span style="color: #907373;">[</span>1<span style="color: #907373;">]</span> <span style="color: #F5666D;">:linear</span><span style="color: #709870;">)</span><span style="color: #909183;">]</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+There is no place here to explain what RNN is and how it works internally, other than pointing that
+recurrent layers have an ability to handle sequential relations of its input by "memorizing"
+the signals that pass through it. The upcoming version of my book  <a href="https://aiprobook.com/deep-learning-for-programmers/">Deep Learning for Programmers</a> (2.0)
+discusses RNNs in more detail.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgbe3f6b0" class="outline-2">
+<h2 id="orgbe3f6b0">Formatting the input data</h2>
+<div class="outline-text-2" id="text-orgbe3f6b0">
+<p>
+The input of this network differs from fully connected or convolutional networks by explicitly
+modeling the time dimension, "t" in the ":tnc" format. Technically, you can feed it with any
+3D tensor that matches its <code>[5 32 1]</code> shape, but for that data to be in context, it has to
+actually be arranged as 5 timesteps of a minibatch of 32 samples of 1-dimensional data.
+</p>
+
+<p>
+We do have 1-dimensional data, but how do we fit our <code>(range -100 100)</code> sequence to
+its input? We do have more than 5 timesteps (we have 400), and we are far from 32 samples, since
+we only have one! We could try to just cram the sequence as-is by doing <code>(transfer! simple-sequence (input net))</code>
+but this would be the "garbage in" part of "garbage in - garbage out". No. The solution is,
+as always in machine learning, to actually think what our data represents, and matching it
+with our knowledge of how the actual model intends to process its input.
+</p>
+
+<p>
+What we do need is a bunch of 5-long sequences, such as <code>[1 2 3 4 5]</code> and the output
+that we would deem correct. In this case, <b>I choose</b> that the goal is to teach the network
+to output <b>6</b> to this input (or a number sufficiently close to it). So, the training
+data should be input sequences such as <code>[3 4 5 6 7]</code> and <code>[-12 -11 -10 -9 -8]</code>, and
+target outputs such as <code>[8]</code> and <code>[-7]</code>. I hope you see how a bunch of these sequences,
+almost 400, and their respective target outputs could be extracted from <code>simple-sequence</code>.
+</p>
+
+<p>
+The following function employs some stock <a href="https://neanderthal.uncomplicate.org">Neanderthal</a> (<iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=neanderthal&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>) matrix functions to process
+the data and pack it into input and target output tensors <code>[x-train]</code> and <code>[y-train]</code>.
+I don't have time to explain each step, which is not trivial, but this is fairly standard
+vector/matrix/tensor stuff, well explained in both books from my <a href="https://aiprobook.com">Interactive Programming for Artificial Intelligence book series</a>.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">defn</span> <span style="color: #00578E; font-weight: bold;">split-series</span> <span style="color: #7388d6;">[</span>fact s <span style="color: #2E3436; background-color: #EDEDED;">^</span><span style="color: #2F8B58; font-weight: bold;">long</span> t<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span><span style="color: #A52A2A; font-weight: bold;">let</span> <span style="color: #909183;">[</span>n <span style="color: #709870;">(</span>- <span style="color: #907373;">(</span>ncols s<span style="color: #907373;">)</span> t<span style="color: #709870;">)</span>
+        c <span style="color: #709870;">(</span>mrows s<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span><span style="color: #A52A2A; font-weight: bold;">let-release</span> <span style="color: #709870;">[</span>x-tz <span style="color: #907373;">(</span>tensor fact <span style="color: #6276ba;">[</span>t n c<span style="color: #6276ba;">]</span> <span style="color: #F5666D;">:float</span> <span style="color: #F5666D;">:tnc</span><span style="color: #907373;">)</span>
+                  y-tz <span style="color: #907373;">(</span>tensor fact <span style="color: #6276ba;">[</span>n c<span style="color: #6276ba;">]</span> <span style="color: #F5666D;">:float</span> <span style="color: #F5666D;">:nc</span><span style="color: #907373;">)</span>
+                  x-ge <span style="color: #907373;">(</span>trans <span style="color: #6276ba;">(</span>view-ge <span style="color: #858580;">(</span>view-vctr x-tz<span style="color: #858580;">)</span> <span style="color: #858580;">(</span>* n c<span style="color: #858580;">)</span> t<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span>
+                  s-vctr <span style="color: #907373;">(</span>view-vctr s<span style="color: #907373;">)</span><span style="color: #709870;">]</span>
+      <span style="color: #709870;">(</span>transfer! <span style="color: #907373;">(</span>submatrix s 0 t c n<span style="color: #907373;">)</span> <span style="color: #907373;">(</span>view-ge <span style="color: #6276ba;">(</span>view-vctr y-tz<span style="color: #6276ba;">)</span> c n<span style="color: #907373;">)</span><span style="color: #709870;">)</span>
+      <span style="color: #709870;">(</span><span style="color: #A52A2A; font-weight: bold;">dotimes</span> <span style="color: #907373;">[</span>j t<span style="color: #907373;">]</span>
+        <span style="color: #907373;">(</span>transfer! <span style="color: #6276ba;">(</span>subvector s-vctr <span style="color: #858580;">(</span>* j c<span style="color: #858580;">)</span> <span style="color: #858580;">(</span>* c n<span style="color: #858580;">)</span><span style="color: #6276ba;">)</span> <span style="color: #6276ba;">(</span>row x-ge j<span style="color: #6276ba;">)</span><span style="color: #907373;">)</span><span style="color: #709870;">)</span>
+      <span style="color: #709870;">[</span>x-tz y-tz<span style="color: #709870;">]</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+
+</pre>
+</div>
+
+<p>
+Here's how the output looks like on an ever simpler example of 2-step sample sequences produced from
+5 element long full sequence.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">dummy</span> <span style="color: #7388d6;">(</span>fge 1 5 <span style="color: #909183;">(</span>range 5<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example" id="orgbda5dd2">
+#RealGEMatrix[float, mxn:1x5, layout:column, offset:0]
+   ▥       ↓       ↓       ↓       ↓       ↓       ┓
+   →       0.00    1.00    2.00    3.00    4.00
+   ┗                                               ┛
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">dummy-split</span> <span style="color: #7388d6;">(</span>split-series <span style="color: #0084C8; font-weight: bold;">*diamond-factory*</span> dummy 2<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example" id="orgb48fd65">
+[{:shape [2 3 1], :data-type :float, :layout [3 1 1]} (0.0 1.0 2.0 1.0 2.0 3.0)
+ {:shape [3 1], :data-type :float, :layout [1 1]} (2.0 3.0 4.0)]
+</pre>
+
+<p>
+This split produces 3 samples for training, each sample has 2 entries, and for each sample there is a desired output.
+The tensor printout does not show dimensions, which would be super hard to make sense anyway due to large
+dimensionality and enormous number of entries in any tensor of any use. We can extract a matrix view,
+in cases when it makes sense.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>view-ge <span style="color: #7388d6;">(</span>view-vctr <span style="color: #909183;">(</span>dummy-split 0<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span> 3 2<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example" id="org77f14ff">
+#RealGEMatrix[float, mxn:3x2, layout:column, offset:0]
+   ▥       ↓       ↓       ┓
+   →       0.00    1.00
+   →       1.00    2.00
+   →       2.00    3.00
+   ┗                       ┛
+</pre>
+
+<p>
+So, inputs are arranged in rows: <code>[0 1]</code>, <code>[1 2]</code>, and <code>[2 3]</code>. That's because tensor's
+default layout is <code>:tnc</code>, meaning that innermost grouping is channels (\(C=1\)), (mini)batch size (\(N=3\))
+and time ($T=2).
+</p>
+
+<p>
+Ok, so, finally, we transform our own data so that the network can learn from it.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">full-series</span> <span style="color: #7388d6;">(</span>fge 1 200 simple-sequence<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example" id="org571a5a0">
+#RealGEMatrix[float, mxn:1x200, layout:column, offset:0]
+   ▥       ↓       ↓       ↓       ↓       ↓       ┓
+   →    -100.00  -99.00    ⁙      98.00   99.00
+   ┗                                               ┛
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">train-data</span> <span style="color: #7388d6;">(</span>split-series <span style="color: #0084C8; font-weight: bold;">*diamond-factory*</span> full-series 5<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example" id="org02f92de">
+[{:shape [5 195 1], :data-type :float, :layout [195 1 1]} (-100.0 -99.0 -98.0 -97.0 -96.0 -95.0 -94.0 -93.0 -92.0 -91.0 -90.0 -89.0 -88.0 -87.0 -86.0 -85.0)
+ {:shape [195 1], :data-type :float, :layout [1 1]} (-95.0 -94.0 -93.0 -92.0 -91.0 -90.0 -89.0 -88.0 -87.0 -86.0 -85.0 -84.0 -83.0 -82.0 -81.0 -80.0)]
+</pre>
+
+<p>
+The printouts of long tensors show only a subset of the content of the tensor.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org186bca1" class="outline-2">
+<h2 id="org186bca1">The actual network</h2>
+<div class="outline-text-2" id="text-org186bca1">
+<p>
+The blueprint that we've created at the beginning of the article can be simplified
+for later reuse. Please note that it's not some super-opaque magical compiler.
+The network architecture is defined as a simple Clojure vector of straight Clojure
+functions!
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">architecture</span> <span style="color: #7388d6;">[</span><span style="color: #909183;">(</span>rnn <span style="color: #709870;">[</span>128<span style="color: #709870;">]</span> <span style="color: #F5666D;">:gru</span><span style="color: #909183;">)</span>
+                   <span style="color: #909183;">(</span>rnn 2<span style="color: #909183;">)</span>
+                   <span style="color: #909183;">(</span>abbreviate<span style="color: #909183;">)</span>
+                   <span style="color: #909183;">(</span>dense <span style="color: #709870;">[</span>128<span style="color: #709870;">]</span> <span style="color: #F5666D;">:relu</span><span style="color: #909183;">)</span>
+                   <span style="color: #909183;">(</span>dense <span style="color: #709870;">[</span>1<span style="color: #709870;">]</span> <span style="color: #F5666D;">:linear</span><span style="color: #909183;">)</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example" id="org7edb365">
+[#function[uncomplicate.diamond.dnn/rnn/fn--43604]
+ #function[uncomplicate.diamond.dnn/rnn/fn--43604]
+ #function[uncomplicate.diamond.dnn/abbreviate/fn--43609]
+ #function[uncomplicate.diamond.dnn/fully-connected/fn--43493]
+ #function[uncomplicate.diamond.dnn/fully-connected/fn--43493]]
+</pre>
+
+<p>
+This architecture is independent from the specific input dimensions.
+We create a blueprint by specifying the dimensions and the architecture.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">net-bp</span> <span style="color: #7388d6;">(</span>network <span style="color: #909183;">(</span>desc <span style="color: #709870;">[</span>5 32 1<span style="color: #709870;">]</span> <span style="color: #F5666D;">:float</span> <span style="color: #F5666D;">:tnc</span><span style="color: #909183;">)</span>
+                     architecture<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+This blueprint is independent of the learning algorithm. It is a function
+that creates the actual network training program. In this case, I will
+use gradient descent with adaptive moments (:adam). Before we start learning,
+we initialize the network with random weights, automatically chosen by
+ <a href="https://github.com/uncomplicate/deep-diamond">Deep Diamond</a>(<iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=deep-diamond&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>) according to good practices, but you are free to use another
+initialization function that is more to your liking. Everything in Deep Diamond
+is modular and implemented in Clojure fashion of "assemble your own if you wish".
+If you are content with my choices, then everything is automatic!
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">net</span> <span style="color: #7388d6;">(</span>init! <span style="color: #909183;">(</span>net-bp <span style="color: #F5666D;">:adam</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Here's the network printout, in case you
+</p>
+
+<pre class="example" id="orgd1b0c68">
+=======================================================================
+#SequentialNetwork[train, input:[5 32 1], layers:5, workspace:1]
+-----------------------------------------------------------------------
+#Adam[topology::gru, shape:[5 32 128], activation: :identity]
+ parameters: [{:shape [1 1 129 3 128], :data-type :float, :layout [49536 49536 384 128 1]} (2.1676771211787127E-5 -5.19975537827122E-6 5.7575953178456984E-6 2.380384103162214E-5 -2.894530371122528E-5 -2.4803119913485716E-7 -1.6729745766497217E-5 -2.902976348195807E-6 4.530028309090994E-5 5.464621608552989E-6 -5.7127394939016085E-6 1.593221713847015E-5 -1.1793279554694891E-5 -7.507987476174094E-8 -1.1438844921940472E-5 5.965541276964359E-6) {:shape [1 1 3 128], :data-type :float, :layout [384 384 128 1]} (0.0035437364131212234 -0.001584756188094616 0.0013698132243007421 -1.2431709910742939E-4 1.7048766312655061E-4 0.002398068318143487 0.00372034078463912 -0.0021170536056160927 8.799560600891709E-4 -0.0023348634131252766 8.223060867749155E-4 -1.1841517698485404E-4 -0.004045043606311083 9.459585417062044E-4 -0.0037800846621394157 -0.002804018324241042)]
+-----------------------------------------------------------------------
+#Adam[topology::gru, shape:[5 32 128], activation: :identity]
+ parameters: [{:shape [2 1 256 3 128], :data-type :float, :layout [98304 98304 384 128 1]} (2.276021717761978E-7 3.804875632340554E-6 1.058972247847123E-5 2.8063212198503606E-7 1.8309128790860996E-5 -9.416969078301918E-6 -7.987003414200444E-8 1.0779360309243202E-5 2.222931470896583E-6 -1.2704362234217115E-5 1.5140467439778149E-5 -2.0407780539244413E-5 -1.5779027080498054E-6 -1.0661310625437181E-5 -3.834541985270334E-6 -1.0737002412497532E-5) {:shape [2 1 3 128], :data-type :float, :layout [384 384 128 1]} (8.910018368624151E-4 0.003690000157803297 -4.8378523206338286E-4 -0.0034620240330696106 0.0031146425753831863 6.610305863432586E-4 0.00204548635520041 0.001728582545183599 -0.0027434946969151497 0.007643579971045256 0.00425624568015337 -0.00295245717279613 1.8937387721962295E-5 -0.0027048818301409483 -0.0012806318700313568 -0.0028582836966961622)]
+-----------------------------------------------------------------------
+{:shape [32 128], :topology :abbreviate}
+#Adam[topology::dense, shape:[32 128], activation: :relu]
+ parameters: [{:shape [128 128], :data-type :float, :layout [8192 1024]} (-0.004568892996758223 -0.004355841316282749 0.005139997228980064 -0.005750759970396757 -0.004274052567780018 0.005599929019808769 -0.003351157531142235 -0.008299742825329304 -0.0031023912597447634 0.0013810413656756282 0.002118719043210149 0.0023180078715085983 -0.005323362536728382 -0.013326002284884453 7.393552223220468E-4 -0.013735005632042885) {:shape [128], :data-type :float, :layout [1]} (0.5049463510513306 -0.47153180837631226 -1.3509427309036255 -1.3017100095748901 -0.39814749360084534 0.8303372263908386 0.6530964970588684 -0.22249580919742584 -1.326366901397705 0.16360507905483246 -0.022157425060868263 2.0535836219787598 1.8076190948486328 -0.0799550786614418 -1.6791125535964966 -0.7451670169830322)]
+-----------------------------------------------------------------------
+#Adam[topology::dense, shape:[32 1], activation: :linear]
+ parameters: [{:shape [1 128], :data-type :float, :layout [1 1]} (0.003621552372351289 -0.004416522569954395 2.548426273278892E-4 0.006995228119194508 0.0013199367094784975 -0.0018220240017399192 0.009454095736145973 0.003091101534664631 -0.01203352864831686 -0.014204473234713078 -0.007159397471696138 0.0039085038006305695 0.0029486482962965965 -0.009481357410550117 0.009158425033092499 -0.004999339580535889) {:shape [1], :data-type :float, :layout [1]} (-0.09112684428691864)]
+=======================================================================
+</pre>
+</div>
+</div>
+
+<div id="outline-container-orga09ae80" class="outline-2">
+<h2 id="orga09ae80">Training, finally!</h2>
+<div class="outline-text-2" id="text-orga09ae80">
+<p>
+Hey, I promised you a Hello World, and I've been beating the bush for half an hour
+formatting the data. And we didn't even touched the biggest obstacle: actually training
+the network. Is it hard? Yes, but not for the user. Now it's time for <a href="https://github.com/uncomplicate/deep-diamond">Deep Diamond</a>(<iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=deep-diamond&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>) to beat the hell out of your
+CPU or GPU. But it will at leas do this on its own :)
+</p>
+
+<p>
+Since this is a Hello World, we'll start with 50 epochs and see how it's going.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>time <span style="color: #7388d6;">(</span>train-shuffle net <span style="color: #909183;">(</span>train-data 0<span style="color: #909183;">)</span> <span style="color: #909183;">(</span>train-data 1<span style="color: #909183;">)</span> <span style="color: #F5666D;">:quadratic</span> 50 <span style="color: #909183;">[</span>0.005<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example" id="orgc9d095f">
+"Elapsed time: 769.986155 msecs"
+3238.298712769756
+</pre>
+
+<p>
+Hmmmm. The cost of 3000 and change does not look very good. Would more training help?
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>time <span style="color: #7388d6;">(</span>train-shuffle net <span style="color: #909183;">(</span>train-data 0<span style="color: #909183;">)</span> <span style="color: #909183;">(</span>train-data 1<span style="color: #909183;">)</span> <span style="color: #F5666D;">:quadratic</span> 50 <span style="color: #909183;">[</span>0.005<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example" id="org9bea272">
+"Elapsed time: 744.456035 msecs"
+708.0862449675478
+</pre>
+
+<p>
+Still bad, but it's improving! For the sake of experinmenting, I've run this ten(ish) times,
+and the cost has been steadily decreasing, to the point that it looks good now.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>time <span style="color: #7388d6;">(</span>train-shuffle net <span style="color: #909183;">(</span>train-data 0<span style="color: #909183;">)</span> <span style="color: #909183;">(</span>train-data 1<span style="color: #909183;">)</span> <span style="color: #F5666D;">:quadratic</span> 50 <span style="color: #909183;">[</span>0.005<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example" id="org94fe921">
+"Elapsed time: 720.427332 msecs"
+0.13662090173881225
+</pre>
+
+<p>
+We don't have to stick to 50-epoch runs. Let's do 500 at once.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>time <span style="color: #7388d6;">(</span>train-shuffle net <span style="color: #909183;">(</span>train-data 0<span style="color: #909183;">)</span> <span style="color: #909183;">(</span>train-data 1<span style="color: #909183;">)</span> <span style="color: #F5666D;">:quadratic</span> 500 <span style="color: #909183;">[</span>0.005<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example" id="orgb7cb238">
+"Elapsed time: 6325.427605 msecs"
+0.008672867995529465
+</pre>
+
+<p>
+This looks nice. A thousand epochs might seem a lot, but considering the large network size,
+recurrent layers, and the scarceness of the training data, it might actually be appropriate.
+On the other hand, Deep Diamond did it blazingly fast, in a mere dozen seconds! In the world
+of machine learning, this is nothing.
+</p>
+
+
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">question</span> <span style="color: #7388d6;">(</span>tensor <span style="color: #909183;">[</span>5 1 1<span style="color: #909183;">]</span> <span style="color: #F5666D;">:float</span> <span style="color: #F5666D;">:tnc</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>transfer! <span style="color: #7388d6;">[</span>1 2 3 4 5<span style="color: #7388d6;">]</span> question<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example" id="org62e7889">
+{:shape [5 1 1], :data-type :float, :layout [1 1 1]} (1.0 2.0 3.0 4.0 5.0)
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>infer net question<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example" id="org8d055e2">
+Dragan says: Requested subtensor is outside of bounds.
+{:src-index -31, :src-cnt 1, :dst-index 0, :dst-cnt 32, :mb-size 1}
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org2a87b99" class="outline-2">
+<h2 id="org2a87b99">Using the network for inference</h2>
+<div class="outline-text-2" id="text-org2a87b99">
+<p>
+Now that we have our super useful network, we can stop and think: but how do we use it?
+First, we need data that could be interpreted as a "question". Our network needs a sequence
+of five numbers, and when fed, will answer with one number. Obviously, these should be
+provided as tensors of appropriate dimensions.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">question</span> <span style="color: #7388d6;">(</span>tensor <span style="color: #909183;">[</span>5 1 1<span style="color: #909183;">]</span> <span style="color: #F5666D;">:float</span> <span style="color: #F5666D;">:tnc</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>transfer! <span style="color: #7388d6;">[</span>1 2 3 4 5<span style="color: #7388d6;">]</span> question<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+However, invoking inference would cause the complaint from the network.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>infer net question<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure">Execution error <span style="color: #707183;">(</span>ExceptionInfo<span style="color: #707183;">)</span> at <span style="color: #2F8B58; font-weight: bold;">uncomplicate.commons.utils</span>/dragan-says-ex <span style="color: #707183;">(</span>utils.clj:105<span style="color: #707183;">)</span>.
+Dragan says: Requested subtensor is outside of bounds.
+</pre>
+</div>
+
+<p>
+Our network's input requires a minibatch of 32 samples. The <code>infer</code> function
+can handle more, and do the inference in mini batches of 32, but it can't handle
+fewer samples.
+</p>
+
+<p>
+One of the solutions is to create another blueprint with the same structure, and transfer
+learned weights to the new network.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">net1-bp</span> <span style="color: #7388d6;">(</span>network <span style="color: #909183;">(</span>desc <span style="color: #709870;">[</span>5 1 1<span style="color: #709870;">]</span> <span style="color: #F5666D;">:float</span> <span style="color: #F5666D;">:tnc</span><span style="color: #909183;">)</span>
+                      architecture<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+While we're at it, we don't need to create a complex network capable of learning
+(:adam or :sgd). We can create a much cheaper inference network that takes fewer resources.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">net1-infer</span> <span style="color: #7388d6;">(</span>net1-bp<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>transfer! net net1-infer<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Now, finally, give us the answer, network!
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>infer net1-infer question<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example" id="org3c752ba">
+{:shape [1 1], :data-type :float, :layout [1 1]} (6.016137599945068)
+</pre>
+
+<p>
+So, being asked what is the next element in the sequence of <code>[1.0 2.0 3.0 4.0 5.0]</code>
+(remember, we specified data type :float), our network answers <code>[6.0161]</code> which is
+close enough to the actual target value that we can mark this as correct.
+But, it's not a great achievement, since our network already saw this sequence in
+training. A hash map would have done much better job at guessing this. Let's try
+a previously unseen sequence.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>transfer! <span style="color: #7388d6;">[</span>10 12 14 16 18<span style="color: #7388d6;">]</span> question<span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>infer net1-infer question<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example" id="orgb175460">
+{:shape [1 1], :data-type :float, :layout [1 1]} (17.750324249267578)
+</pre>
+
+<p>
+Not that off, but one would expect 19.0. What went wrong? We trained our network
+with ducks \((x+1)\) and asked it about geese \((x+2)\). What about griffons?
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>transfer! <span style="color: #7388d6;">[</span>10 1 100 16 34<span style="color: #7388d6;">]</span> question<span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>infer net1-infer question<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example" id="orgedddbbb">
+{:shape [1 1], :data-type :float, :layout [1 1]} (-6.679039001464844)
+</pre>
+
+<p>
+Now the answer does not make any sense, but would you be able to come with a better answer?
+</p>
+
+<p>
+All, right, let's try with a sequence that is similar to the one we used in training,
+but is out of the range of data that the network has seen.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>transfer! <span style="color: #7388d6;">[</span>1000 1001 1002 1003 1004<span style="color: #7388d6;">]</span> question<span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>infer net1-infer question<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example" id="orga438f17">
+{:shape [1 1], :data-type :float, :layout [1 1]} (96.41997528076172)
+</pre>
+
+<p>
+Nope, not much success, but we should not have expected any. The network can not
+answer question outside its domain of expertise.
+</p>
+
+<p>
+Let's try with previously unseen data, but inside the domain that we used for training (floats from -100.0 to 1000).
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>transfer! <span style="color: #7388d6;">[</span>37.4 38.4 39.4 40.4 41.4<span style="color: #7388d6;">]</span> question<span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>infer net1-infer question<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example" id="org96991c4">
+{:shape [1 1], :data-type :float, :layout [1 1]} (42.39200210571289)
+</pre>
+
+<p>
+This is actually pretty close!
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgd6b4463" class="outline-2">
+<h2 id="orgd6b4463">What about GPU?</h2>
+<div class="outline-text-2" id="text-orgd6b4463">
+<p>
+Sure!
+</p>
+
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">nvidia</span> <span style="color: #7388d6;">(</span>cudnn-factory<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">gpu-net-bp</span> <span style="color: #7388d6;">(</span>network nvidia
+                         <span style="color: #909183;">(</span>desc <span style="color: #709870;">[</span>5 32 1<span style="color: #709870;">]</span> <span style="color: #F5666D;">:float</span> <span style="color: #F5666D;">:tnc</span><span style="color: #909183;">)</span>
+                         architecture<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">gpu-net</span> <span style="color: #7388d6;">(</span>init! <span style="color: #909183;">(</span>gpu-net-bp <span style="color: #F5666D;">:adam</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">gpu-train-data</span> <span style="color: #7388d6;">(</span>split-series nvidia full-series 5<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+
+<p>
+Let's hit it with 1000 epochs right away.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>time <span style="color: #7388d6;">(</span>train-shuffle gpu-net <span style="color: #909183;">(</span>gpu-train-data 0<span style="color: #909183;">)</span> <span style="color: #909183;">(</span>gpu-train-data 1<span style="color: #909183;">)</span> <span style="color: #F5666D;">:quadratic</span> 1000 <span style="color: #909183;">[</span>0.005<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example" id="orgf957073">
+"Elapsed time: 5734.688665 msecs"
+4.561427662266859E-4
+</pre>
+</div>
+</div>
