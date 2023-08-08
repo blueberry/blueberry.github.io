@@ -2,3 +2,6 @@
 title:
 layout: page
 ---
+
+User-agent: GPTBot
+Disallow: /
