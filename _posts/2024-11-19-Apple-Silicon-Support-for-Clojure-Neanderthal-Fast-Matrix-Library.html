@@ -1,0 +1,101 @@
+---
+date: 2024-11-19 22:15
+author: dragan
+layout: post
+title: Apple silicon support in Clojure's Neanderthal Fast Matrix Library
+categories: 
+- Clojure,
+- AI,
+- Matrices,
+- Neanderthal,
+- Vectors,
+- Linear
+- Algebra,
+- Apple
+tags: 
+excerpt: I've applied for Clojurists Together funding to explore and hopefully implement a Neanderthal Apple silicon backend. If you are a Clojurists Together member, and you think that this functionality is important, please have that in mind when voting. Here's my proposal.
+---
+<p>
+I've applied for Clojurists Together funding to explore and hopefully implement a Neanderthal
+Apple silicon backend. If you are a Clojurists Together member, and you think that this functionality
+is important, please have that in mind when voting. Here's the proposal that I've sent. Of course,
+any suggestions are welcome and highly appreciated!
+</p>
+
+<div id="outline-container-orgc980671" class="outline-2">
+<h2 id="orgc980671">The proposal</h2>
+<div class="outline-text-2" id="text-orgc980671">
+<p>
+My goal with this funding in 2025 is to support Apple silicon (M cpus) in Neanderthal
+(and other Uncomplicate libraries where that makes sense and where it's possible).
+</p>
+
+<p>
+This will hugely streamline user experience regarding high performance computing in Clojure for Apple macOS users,
+which is a considerable chunk of Clojure community. They ask for it all the time, and I am always sorry to tell them
+that I still don't have a solution. Once upon a time, Neanderthal worked on Mac too, but then Apple did one of their
+complete turnarounds with M1&#x2026; This basically broke all number crunching software on macs, and the world is slow to catch up.
+Several Clojure developers started exploring high performance computing on Apple, but didn't get too far; it's LOTS of functionality.
+So, having Neandeathal support Apple would enable several Clojure data processing communities to leapfrog the whole milestone
+and concentrate on more high-level tasks.
+</p>
+
+<p>
+This affects Neanderthal (matrices &amp; vectors), and Deep Diamond (tensors &amp; deep learning) the most. Nvidia's CUDA is not physically available
+on Macs at all, while OpenCL is discontinued in favor of Apple's proprietary Metal (and who knows what else they've came up with since).
+</p>
+
+<p>
+Neanderthal is a Clojure library for fast matrix computations based on the highly optimized native libraries and computation routines for both CPU and GPU.
+It is a lean, high performance, infrastructure for working with vectors and matrices in Clojure, which is the foundation for implementing high performance computing related tasks, including, but not limited to, machine learning and artificial intelligence.
+Deep Diamond is a tensor and deep learning Clojure library that uses Neanderthal and ClojureCUDA under the hood (among other things).
+</p>
+
+<p>
+So, what are the missing parts for Apple silicon?
+</p>
+
+<ol class="org-ol">
+<li>A good C++/native interop. That is more or less solved by JavaCPP, but their ARM support is still in its infancy, especially regarding distribution. But it is improving.</li>
+<li>A good BLAS/LAPACK alternative. There's OpenBLAS, and there's Apple's Accelerate. Both support only a part of Intel's MKL functionality. But, if we don't insist on 100% coverage (we're not) and are willing to accept missing operations to be slower, I could implement the most important ones in Clojure if nothing else is available.</li>
+<li>A good GPU computing alternative. CUDA is not supported on Apple, and OpenCL has been discontinued by Apple. So that leaves us with Apple's Metal, which is a mess (or so I hear). So I wouldn't put too much hope on GPU, at the moment. Maybe much, much, later, with much, much, more experience&#x2026;</li>
+<li>Assorted auxiliary operations that are not in BLAS/LAPACK/Apple Accelerate, which are usually programmed in C++ in native-land. I'd have to see how many appear, and what I have to do with them.</li>
+<li>Explore what's the situation related to tensors and deep learning on Apple. I doubt that Intel's DNNL can cover this, but who knows. Also, Apple certainly supports something, but how compatible it is with cuDNN and DNNL, is a complete unknown to me&#x2026;</li>
+<li>Who knows which roadblocks can pop up.</li>
+</ol>
+
+<p>
+So, there's a lots of functionality to be implemented, and there's a lots of unknowns.
+</p>
+
+<p>
+I propose to * Implement an Apple M engine for Neanderthal.* This involves:
+</p>
+<ul class="org-ul">
+<li>buying an Apple M2/3 Mac (the cheapest M3 in Serbia is almost 3000 USD (with VAT).</li>
+<li>learning enough macOS tools (Xcode was terrible back in the days) to be able to do anything.</li>
+<li>exploring JavaCPP support for ARM and macOS.</li>
+<li>exploring relevant libraries (OpenBLAS may even work through JavaCPP).</li>
+<li>exploring Apple Accelerate.</li>
+<li>learning enough JavaCPP tooling to be able to see whether it is realistic that I build Accelerate wrapper (and if I can't, at least to know how much I don't know).</li>
+<li>I forgot even little C/C++ that I did know back in the day. This may also give me some headaches, as I'll have to quickly pick up whatever is needed.</li>
+<li>writing articles about relevant topics so Clojurians can pick this functionality as it arrives.</li>
+</ul>
+
+<p>
+It may include implementing Tensor &amp; Deep Learning support for Apple in Deep Diamond, but
+that depends on how far I get with Neanderthal. I hope that I can do it, but can't promise it.
+</p>
+
+<p>
+By the end of 2025, I am fairly sure that I can provide Apple support for Neanderthal (and ClojureCPP) and I hope that I can  even add it for Deep Diamond.
+</p>
+
+<p>
+Projects directly involved:
+<a href="https://github.com/uncomplicate/neanderthal">https://github.com/uncomplicate/neanderthal</a>
+<a href="https://github.com/uncomplicate/deep-diamond">https://github.com/uncomplicate/deep-diamond</a>
+<a href="https://github.com/uncomplicate/clojure-cpp">https://github.com/uncomplicate/clojure-cpp</a>
+</p>
+</div>
+</div>
