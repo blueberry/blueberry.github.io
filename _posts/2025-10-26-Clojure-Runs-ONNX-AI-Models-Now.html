@@ -1,0 +1,364 @@
+---
+date: 2025-10-26 16:56
+author: dragan
+layout: post
+title: Clojure Runs ONNX AI Models Now - Join the AI fun!
+categories: 
+- Clojure,
+- AI,
+- Deep
+- Diamond,
+- Tensors
+tags: 
+excerpt: Join the AI fun directly from Clojure. Although (sadly) Clojure has not find its way in the big guns AI arena, Clojure is a very capable technology for integrating stuff into real-world applications! Here is the new library that integrates ONNX AI models into Clojure, making them first-class citizens. Now you can go to Hugging Face, choose an existing model, and make a Clojure function out of it. Here's the hello world tutorial.
+---
+<p>
+Hello, Clojurians! I haven't written here in a long time. Was I tired? Is anybody reading blogs
+anymore? Who knows. But that was not the main reason.
+</p>
+
+<p>
+I've been working on several Clojure projects sponsored by the <a href="https://www.clojuriststogether.org/news/clojurists-together-2025-long-term-funding-announcement/">Clojurists Together</a> Foundation.
+I did a ton of things, but after all this programming, I was kinda tired, and kept slugging when it comes
+to telling people about the work done! That's not very smart, but you know how it goes&#x2026; :) But, then, if we don't
+tell people about awesome software that we have, nobody is going to use it, so finally I had to stop kicking
+this down the road, sit, and write the first post. It's been long overdue, so expect more posts soon!
+</p>
+<div id="outline-container-orge2dbf4b" class="outline-2">
+<h2 id="orge2dbf4b">ONNX Runtime in one line of Clojure</h2>
+<div class="outline-text-2" id="text-orge2dbf4b">
+<p>
+The most recent thing I'm currently working on started its life as <a href="https://github.com/uncomplicate/diamond-onnxrt">Clojure ML</a><iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=clojure-onnxrt&amp;type=watch" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe> (again, superthanks to
+<a href="https://www.clojuriststogether.org/news/q3-2025-funding-announcement/">Clojurists Together for sponsoring this</a>). I proposed to create a human-friendly Clojure API for AI/DL/ML
+models, and back it by the first implementation, in this case based on <a href="https://onnxruntime.ai/">ONNX Runtime</a>. Of course, it should all be integrated
+into existing Clojure libraries, and follow the Clojure way of doing stuff as much as possible!
+</p>
+
+<p>
+The idea is to get an existing, pre-trained ML model previously exported to the <a href="https://onnx.ai/">ONNX</a> format from whatever technology
+the authors chose (which in today's world is typically Python and PyTorch), and put it into production
+in Clojure and JVM. It should be seamless and in-process, without any clunky interoperability, copy, translation, etc.
+Of course, our Clojure numerical libraries fully support GPU computing, so it goes without saying
+that we want that, too! Just to be clear, <i>we do not use nor need any Python or Python interop for this, we use the <a href="https://onnxruntime.ai/">ONNX Runtime</a>'s underlying C library</i>.
+</p>
+
+<p>
+Nice idea, but what parts of this well intended story can we evaluate in our REPLs right now?
+At least some promising demo? Are we on the trail? To access that AI goodness, we surely have to
+do a sophisticated dance? Are the steps hard to learn? Do we need to watch carefully for
+slippery floor? Is it accessible to mere mortals?
+</p>
+
+<p>
+Here's the gist:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>onnx <span style="color: #4E9A06;">"data/mnist-12.onnx"</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+"Wait, what?", you'll say. One function? One tini, tiny, function, with one laughingly trivial argument?
+Is that an API? What does such trivial API do? "Now you confused me!", you'll scratch your head.
+It's just a stick.
+</p>
+
+<p>
+I hope I've also intrigued you, so please keep reading to see it in action (this post is actually
+generated from a live REPL session, so the example is fully executable, not just interesting bits
+on the table, and a ton of complex boilerplate under a Persian rug).
+</p>
+</div>
+</div>
+<div id="outline-container-org2a73fbe" class="outline-2">
+<h2 id="org2a73fbe">Hello World, the MNIST image recognition model</h2>
+<div class="outline-text-2" id="text-org2a73fbe">
+<p>
+For this recipe, you'll need the following ingredients: <a href="https://github.com/uncomplicate/deep-diamond">Deep Diamond</a> tensors (one cup), <a href="https://github.com/uncomplicate/deep-diamond">Deep Diamond</a>
+network (one slice), one <a href="https://neanderthal.uncomplicate.org">Neanderthal </a><iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=neanderthal&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe> <code>transfer!</code> function for moving data around for demo purposes,
+and that's it! Oh, yes, don't forget the new <code>onnx</code> function. We load the <code>native</code> namespace, and
+the right <a href="https://github.com/uncomplicate/deep-diamond">Deep Diamond</a> <iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=deep-diamond&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe> engine is set up for our system (yes, even on Mac OS, thanks to <a href="https://www.clojuriststogether.org/news/clojurists-together-2025-long-term-funding-announcement/">Clojurists Together</a>!).
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span>uncomplicate.neanderthal.core <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>transfer! iamax<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>uncomplicate.diamond
+           <span style="color: #909183;">[</span>tensor <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>tensor desc<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>dnn <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>network<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>onnxrt <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>onnx<span style="color: #709870;">]</span><span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>uncomplicate.diamond.native<span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+</div>
+<div id="outline-container-orgc0eecd9" class="outline-3">
+<h3 id="orgc0eecd9">The ONNX model</h3>
+<div class="outline-text-3" id="text-orgc0eecd9">
+<p>
+We evaluate the <code>onnx</code> function, and it loads the model.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">mnist-onnx</span> <span style="color: #7388d6;">(</span>onnx <span style="color: #4E9A06;">"../../data/mnist-12.onnx"</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#'user/mnist-onnx
+</pre>
+
+
+<p>
+Sure, that's easy, but how is <i>that</i> useful? Well, the result is a function. This function
+has just been set up with ONNX internals, so now it can create <a href="https://github.com/uncomplicate/deep-diamond">Deep Diamond</a> network layers
+and fit in with the rest of the Tensor-y stuff that DD already provides.
+</p>
+
+<p>
+The ONNX Runtime model revolves around environment, session, input and output tensors,
+type info, and a lot of other stuff and brittle ceremony. Sure, sometimes you need
+to reach these internals, and <code>diamond-onnxrt</code> provides clojurized internals API even for that.
+However, it can sing the main song, and set all the right arguments at the right places for you.
+Even the <code>onnx</code> function supports option map, where you can tell what you like, and it will take
+care to configure ONNX to do the right thing, but this is a story for another article.
+</p>
+</div>
+</div>
+<div id="outline-container-org56b31c2" class="outline-3">
+<h3 id="org56b31c2">The rest is the usual Deep Diamond stuff, which is simple as beans!</h3>
+<div class="outline-text-3" id="text-org56b31c2">
+<p>
+The <a href="https://en.wikipedia.org/wiki/MNIST_database">MNIST dataset</a> specifies images of hand-written digits, in just one grayscale channel, each \(28\times28\) pixels
+a challenging task for 1989's USPO and the tecnology from back then, but a hello world level
+stuff for today's accelerated libraries (still, keep in mind that if you tried to code even this easy
+example without such libraries, you'll be surprised how slow that can be!).
+</p>
+
+<p>
+We create a tensor descriptor for such input (this step can be left out, but I'm being pedantic to accommodate beginners):
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">input-desc</span> <span style="color: #7388d6;">(</span>desc <span style="color: #909183;">[</span>1 1 28 28<span style="color: #909183;">]</span> <span style="color: #F5666D;">:float</span> <span style="color: #F5666D;">:nchw</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#'user/input-desc
+</pre>
+
+
+<p>
+Next, we create a reusable abstract network blueprint, that can then create concrete networks
+tailored for training, or optimized for inference, that is classifying MNIST images.
+Normally, we would have to train these networks, or load the parameters from somewhere,
+but in this case it contains only of the <code>onnx</code> model, which had already been trained and
+already knows all the right weights, so no training is needed (nor available with ONNX Runtime yet;
+it's main job is inference in production).
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">mnist</span> <span style="color: #7388d6;">(</span>network input-desc <span style="color: #909183;">[</span>mnist-onnx<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#'user/mnist
+</pre>
+
+
+<p>
+Note that all these things so far look and behave just as ordinary Clojure objects. You can
+use them even outside this specific structure. Full flexibility that I hope will spark your creativity.
+</p>
+
+<p>
+We'll also need a place for the actual image that we'd like to classify. This particular network
+that I downloaded from ONNX Runtime examples specifies exactly one image at input, to classify one at a time.
+Typically, if we have many images, it's better to compute them in batches, but it's just a hello-world, after all,
+we won't be too demanding.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">input-tz</span> <span style="color: #7388d6;">(</span>tensor input-desc<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#'user/input-tz
+</pre>
+
+
+<p>
+A blueprint (mnist in this case) is a function that can create networks optimized for inference
+with concrete tensors, adequate internal tensors, and parameters.
+The following line is the moment when the network is actually created from the abstract descriptors
+contained in its blueprint, to the actual engines, operation primitives, and tensors in memory.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">classify!</span> <span style="color: #7388d6;">(</span>mnist input-tz<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+#'user/classify!
+</pre>
+
+
+<p>
+True to the Clojure philosophy, <code>mnist</code> is a function, which, given the specification for
+desired input, <code>(mnist input-tz)</code> produces classify!, which is a function, too, but for actual inference!
+It might sound cumbersome when it's written out, but the code shows it's elegance. No need for
+complex APIs. Each thing does exactly one thing, and does it in the most simple way, by just
+evaluating with one or two parameters!
+</p>
+</div>
+</div>
+<div id="outline-container-org64c65d8" class="outline-3">
+<h3 id="org64c65d8">Now we got a function that classifies images</h3>
+<div class="outline-text-3" id="text-org64c65d8">
+<p>
+This is how you would typically use this
+</p>
+
+<p>
+Step one: classify! is now a typical Clojure function! Evaluate it:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>classify!<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+{:shape [1 10], :data-type :float, :layout [10 1]} (-0.04485602676868439 0.007791661191731691 0.06810081750154495 0.02999374084174633 -0.1264096349477768 0.14021874964237213 -0.055284902453422546 -0.04938381537795067 0.08432205021381378 -0.05454041436314583)
+</pre>
+
+
+<p>
+The result is a ten-element tensor, each element represents the possibility that the category
+at its index is the right one.
+So we should just find which element contains the highest value, and that'd be our category,
+which in the MNIST example is, very conveniently a digit 0 to 9 that is equal to that index.
+</p>
+
+<p>
+However, you can see that the current values are just random small numbers. This is because
+we never loaded any image data to the input tensor! It just classified random noise as not very likely
+to be an image of any digit.
+</p>
+
+<p>
+We need step zero: place the image data in network's input somehow. This could be done in
+many different ways (for example, by memory-mapping the image data on disk), but we'll
+keep it simple, and we'll just transfer it naively from an in-place Clojure sequence. (this is a hello-world :)
+</p>
+
+<p>
+The following sequence is copied from the actual MNIST data, but I just took the data of the first image, and
+scaled it to 0-1 range instead of 0-255.
+</p>
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>transfer! <span style="color: #7388d6;">(</span>map #<span style="color: #909183;">(</span>float <span style="color: #709870;">(</span>/ <span style="color: #0084C8; font-weight: bold;">%</span> 255<span style="color: #709870;">)</span><span style="color: #909183;">)</span> <span style="color: #909183;">[</span>0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 <span style="color: #ee82ee; background-color: #333333;">0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 84.0 185.0 159.0 151.0 60.0 36.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 222.0 254.0 254.0 254.0 254.0 241.0 198.0 198.0 198.0 198.0 198.0 198.0 198.0 198.0 170.0 52.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 67.0 114.0 72.0 114.0 163.0 227.0 254.0 225.0 254.0 254.0 254.0 250.0 229.0 254.0 254.0 140.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 17.0 66.0 14.0 67.0 67.0 67.0 59.0 21.0 236.0 254.0 106.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 83.0 253.0 209.0 18.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 22.0 233.0 255.0 83.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 129.0 254.0 238.0 44.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 59.0 249.0 254.0 62.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 133.0 254.0 187.0 5.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 9.0 205.0 248.0 58.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 126.0 254.0 182.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 75.0 251.0 240.0 57.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 19.0 221.0 254.0 166.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 3.0 203.0 254.0 219.0 35.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 38.0 254.0 254.0 77.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 31.0 224.0 254.0 115.0 1.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 133.0 254.0 254.0 52.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 61.0 242.0 254.0 254.0 52.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 121.0 254.0 254.0 219.0 40.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 121.0 254.0 207.0 18.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0</span><span style="color: #909183; background-color: #333333;">]</span><span style="color: #7388d6; background-color: #333333;">)</span>
+           input-tz<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+{:shape [1 1 28 28], :data-type :float, :layout [784 784 28 1]} (0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0)
+</pre>
+
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>classify!<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+{:shape [1 10], :data-type :float, :layout [10 1]} (-1.2567189931869507 0.6275832653045654 8.642718315124512 9.428943634033203 -13.740066528320312 -6.045698642730713 -23.486745834350586 28.3399658203125 -6.7914958000183105 3.941998243331909)
+</pre>
+
+
+<p>
+Now, we see some better looking results, but are we the one who need to look at a bunch of numbers and compare them?
+</p>
+
+<p>
+No, the machine should do that. Luckily, <a href="https://neanderthal.uncomplicate.org">Neanderthal </a><iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=neanderthal&amp;type=watch&amp;count=true" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe> has just the right function for this!
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>iamax <span style="color: #7388d6;">(</span>classify!<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+7
+</pre>
+
+
+<p>
+And this is the kind of answer that we can show our clients! What's on this image? Easy, it's 7!
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-org1776049" class="outline-2">
+<h2 id="org1776049">Can you tell me the main point of this, in one paragraph?</h2>
+<div class="outline-text-2" id="text-org1776049">
+<p>
+Yes. Clojure programmers typically write functions. Functions are things that take something at the input,
+compute stuff internally, and return an output, which is hopefully useful downstream.
+The funcion transforms the input into the output according to the logic that we programmers
+wrote in code, following some algorithm that we designed for the purpose. Now, <i>sometimes</i>
+the problem is so convoluted that we don't have the slightest idea how to write that
+transformation in code, but what we (or someone else) do have is lots of data, and in many
+such cases we can train a general machinery (neural networks for example) to find out a good
+enough transformation. Sometimes someone else have already done the hard part by training the network,
+exporting it to a standard format (ONNX) and gave it to you! <b>Now, you can load it in Clojure and use it
+as a Clojure function.</b> You don't even need to know how it works internally, but it does
+the thing that you need, it transforms the input tensors that you have into just the right
+output tensors. What you do with these outputs is up to you :)
+</p>
+</div>
+</div>
+<div id="outline-container-orgd2386cd" class="outline-2">
+<h2 id="orgd2386cd">Who is this for?</h2>
+<div class="outline-text-2" id="text-orgd2386cd">
+<p>
+Do you need to be an AI researcher to find this useful? Absolutely not! This can appeal to any Clojure engineer.
+</p>
+
+<p>
+AI researchers try to find novel AI models, or to push their model by 0.1% on an artificial
+benchmark. Recently, they don't necessarily even do that, some of them found the way to chase funding at crazy evaluations,
+and catch it.
+Some of them don't necessarily write code but work with mathematical models trying to figure a way to do some abstract thing.
+Or, if they are PhD students, they spend endless nights fiddling with Python and PyTorch trying to
+figure this or that task assigned by their laboratory, or they just try to catch a bit of sleep while
+a GPU cluster crunches some tiny step in an endless training cycle.
+</p>
+
+<p>
+There's nothing wrong with that, but if you're a Clojure programmer, you probably don't have time,
+opportunity, experience, or even interest to work on that stuff. But, even if you don't want
+(or can't) understand AI internals, you can still be very creative with the <i>applications</i>.
+Now there are many, many, published ML models that work, many of them are even exported
+to ONNX, and quite usable. You don't need to invent a new OpenAI competitor, there are
+many more mundane problems that can be solved by taking an already existing model and
+applying it in a niche context, in a domain that you know well. You don't even need to
+understand exactly what or how the model does what it does, you can treat it as a black-box function
+that transforms inputs and outputs, and that function just need a bit more care to work
+than a regular Clojure four-liner that you'd normally write and be proud of.
+</p>
+
+<p>
+Although (sadly) Clojure has not find its way in the big guns AI arena, Clojure <i>is</i> a
+very capable capable language and Clojure programmers very knowledgeable people when it
+comes to integrating stuff into real-world applications! So, here it is, now you don't have
+to make compromises; you can got to <a href="https://huggingface.co/">Hugging Face, or some other AI related community</a>,
+find ONNX models that other people already prepared, and join the AI fun, <b>directly from Clojure</b>.
+</p>
+</div>
+</div>
