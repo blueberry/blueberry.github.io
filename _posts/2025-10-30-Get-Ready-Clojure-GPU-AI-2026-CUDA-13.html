@@ -1,0 +1,301 @@
+---
+date: 2025-10-30 17:37
+author: dragan
+layout: post
+title: Get Ready for Clojure, GPU, and AI in 2026 with CUDA 13.0
+categories: 
+- Clojure,
+- AI,
+- Deep
+- Diamond,
+- Tensors
+tags: 
+excerpt: Did you know that CUDA has been available in Clojure for the last 9 years, and GPU programming through OpenCL for more than 10? I almost forgot about these anniversaries. Why not celebrate that by opening the REPL, and coding your first Hello World application on the GPU?
+---
+<div id="outline-container-orgd4dbf90" class="outline-2">
+<h2 id="orgd4dbf90">A little anniversary</h2>
+<div class="outline-text-2" id="text-orgd4dbf90">
+<p>
+Did you know that CUDA has been available in Clojure for the last 9 years through ClojureCUDA,
+and GPU programming through OpenCL for more than 10? I almost forgot about
+these anniversaries.
+</p>
+
+<p>
+Ten years ago most people liked it a lot, starred it on Github, patted me on the back,
+but then concluded that they don't have an Nvidia card available on their laptops,
+or, if they had GPUs, that they won't have time to learn to think in massive parallel
+algorithms, or if they have time and will, that there are no GPUs in the servers,
+so what would they do with their applications, even if they created them in Clojure,
+and so on, and so off :)
+</p>
+
+<p>
+But, <a href="https://github.com/uncomplicate/clojurecuda">ClojureCUDA</a><iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=clojurecuda&amp;type=watch" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe> and <a href="https://github.com/uncomplicate/clojurecl">ClojureCL</a><iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=clojurecl&amp;type=watch" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe> continued living on for these 10 years, I used them in
+creating <a href="https://github.com/uncomplicate/neanderthal">Neanderthal</a><iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=neanderthal&amp;type=watch" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>, <a href="https://github.com/uncomplicate/deep-diamond">Deep Diamond</a><iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=deep-diamond&amp;type=watch" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>, and <a href="https://github.com/uncomplicate/diamond-onnxrt">Diamond ML<iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=diamond-onnxrt&amp;type=watch" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe></a>, and they proved themselves
+as simple and reliable tools. I still had trouble convincing Clojure programmers that
+they can write GPU programs that run as fast as they'd wrote them in C++, but
+<i>interactively</i> in the Cloujre REPL, without C++ hell.
+</p>
+
+<p>
+But I'm not easy to shake off! If it's necessary, I'll continue for 10 more years,
+for I'm convinced there'd be a moment when Clojure programmers are going to
+say "hmmm, this is something that we <i>can</i> use and be good at!".
+</p>
+</div>
+</div>
+<div id="outline-container-org747f487" class="outline-2">
+<h2 id="org747f487">CUDA 13 is here!</h2>
+<div class="outline-text-2" id="text-org747f487">
+<p>
+I've recently released  <a href="https://github.com/uncomplicate/clojurecuda">ClojureCUDA</a><iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=clojurecuda&amp;type=watch" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>  0.25.0, with support for the latest CUDA 13.0.2!
+</p>
+
+<p>
+Why not celebrate that by opening the REPL, and coding your first Hello World application
+on the GPU? I promise, it won't be a usual GPU carpet of text; this is ClojureCUDA,
+it follows the Clojure philosophy by being simple and interactive!
+</p>
+
+<p>
+There's not much sense in wielding a GPU to print out "Hello World".
+Note that it is also not very useful to work with scalar numbers and call a GPU function
+to add or multiply two numbers. No. Unless you have many, many, numbers to crunch,
+stay by your trusty CPU. For our purposes, many, many, numbers would be two vectors
+of dimension 3 (hey, it's hello world; imagine it's 3 billion). Also, even when we
+have many, many, numbers the sheer cost of getting them to the GPU memory would
+destroy any gains we get in the computation speed, so we must also ensure that
+we want to perfom many complicated operations. Well, we will only do the
+simple operation of adding these two vectors, and we will pretend that this
+operation is extra-demanding (we're hello-worlders today, we can cheat a bit).
+</p>
+</div>
+</div>
+<div id="outline-container-orgba9ae10" class="outline-2">
+<h2 id="orgba9ae10">CUDA Hello World</h2>
+<div class="outline-text-2" id="text-orgba9ae10">
+<p>
+First things first, we require the functions that we'll use.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span>uncomplicate.commons.core <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>release<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>uncomplicate.clojure-cpp <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>float-pointer pointer-seq<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>uncomplicate.clojurecuda.core
+           <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>compile! context device function grid-1d init launch! mem-alloc-driver
+                   mem-alloc-pinned mem-alloc-runtime memcpy-host! module parameters program
+                   synchronize! push-context!<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+If it seems to you that this list already looks too large, I agree with you.
+But, don't be afraid; in Uncomplicate libraries there are so many higher-level
+helpers that you'll rarely need to touch these. I only use them here because
+I want to show you that even when we program at the base CUDA level, Clojure
+can do it interactively and each line can be evaluated by itself, and each
+intermediate result can be inspected and understood.
+</p>
+
+<p>
+I'll use <code>def</code> for poor man variables, and <code>pop-context!</code> so this is evaluated step-by-step. The real
+code would be much simpler; resources can be managed by <code>with-release</code> and <code>with-context</code>!
+</p>
+
+<p>
+First we initialize CUDA and create the the CUDA context.
+</p>
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>init<span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">ctx</span> <span style="color: #7388d6;">(</span>context <span style="color: #909183;">(</span>device<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Unfortunately, CUDA insists on managing contexts in different threads by itself, so we have
+to let CUDA know that we want to use the context that we've just created. ClojureCUDA
+has some macros that can help with making this simpler, such as <code>with-context</code>, and <code>in-context</code>,
+but we'll do this hello world as real ninjas, with basic tools!
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>push-context! ctx<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Many language integrations try to let you write <i>everything</i> in that language, both the
+host code that manages GPU computations, and the GPU kernels themselves. So far, they
+don't fare too well compared to C++ CUDA, even when it comes to simplicity of such kernel code.
+ClojureCUDA doesn't do that, for a reason. We are practical people. We understand that
+we won't be able compile kernels ourselves and be competitive with Nvidia. So, we write
+kernels in C++ that Nvidia uses, since they are typically not that complicated compared
+to host code that manages them. We can load these kernels as strings, and I find it's
+most convenient to not sprinkle these strings throughout my <code>.clj</code> source files,
+but to load them from <code>.cu</code> files, which contain C++ code that text editors recognize.
+</p>
+
+<p>
+We load the kernel source.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">kernel-source</span> <span style="color: #7388d6;">(</span>slurp <span style="color: #4E9A06;">"test/cuda/examples/jnvrtc-vector-add.cu"</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Next, we compile it.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">prog</span> <span style="color: #7388d6;">(</span>compile! <span style="color: #909183;">(</span>program kernel-source<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+We create the module&#x2026;
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">m</span> <span style="color: #7388d6;">(</span>module prog<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+&#x2026; and load the <code>add</code> function that was defined in the kernel code. CUDA kernels
+are short functions that run on the GPU.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">add</span> <span style="color: #7388d6;">(</span>function m <span style="color: #4E9A06;">"add"</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+This way we get the best of both worlds: we edit short C++ kernels, and then load them
+in our Clojure REPL and manage the kernels they define. If we change anything, there's
+no need for recompilation of everything; just the short <code>.cu</code> file that changed, and
+this is also interactive, as these tools are available as Clojure functions.
+</p>
+
+<p>
+Next, this kernel needs data! We allocate some memory on the GPU. There are a few different
+types that CUDA offers, and even a few CUDA APIS: runtime and driver. Typically, the runtime
+API is what CUDA uses in the C++ code that mixes host and GPU device code, while the driver
+API is more geared towards tools such is ClojureCUDA. But, some CUDA libraries will expect
+inputs to be from the runtime API, and ClojureCUDA supports both. We can even mix them!
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">gpu-a</span> <span style="color: #7388d6;">(</span>mem-alloc-runtime <span style="color: #909183;">(</span>* <span style="color: #2F8B58; font-weight: bold;">Float</span>/BYTES 3<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">gpu-b</span> <span style="color: #7388d6;">(</span>mem-alloc-driver <span style="color: #909183;">(</span>* <span style="color: #2F8B58; font-weight: bold;">Float</span>/BYTES 3<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+The data needs to be transferred to the GPU memory. There are many functions in CUDA for
+doing that for every combination of different argument types. ClojureCUDA simplifies this
+a lot with protocols, and usually <code>memcpy-host!</code> will find the right way to transfer the
+data. We also need the place to keep the results, unless we want to overwrite one of
+the two input arrays.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>memcpy-host! <span style="color: #7388d6;">(</span>float-pointer <span style="color: #909183;">[</span>1 2 3<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span> gpu-a<span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>memcpy-host! <span style="color: #7388d6;">(</span>float-pointer <span style="color: #909183;">[</span>2 3 4<span style="color: #909183;">]</span><span style="color: #7388d6;">)</span> gpu-b<span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">gpu-result</span> <span style="color: #7388d6;">(</span>mem-alloc-pinned <span style="color: #909183;">(</span>* <span style="color: #2F8B58; font-weight: bold;">Float</span>/BYTES 3<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+That's a lot of work to set everything up! Let's compute it at last!
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>launch! add <span style="color: #7388d6;">(</span>grid-1d 3<span style="color: #7388d6;">)</span> <span style="color: #7388d6;">(</span>parameters 3 gpu-a gpu-b gpu-result<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+The kernels are launched asynchronously. That means that the <code>launch!</code> function returns
+as soon as it puts the kernel in the computation queue of the GPU, typically <i>before</i> the kernel
+has actually been executed; there might be 1000 kernels in the queue before this one. We can
+explicitly wait until the kernel has completed its work by calling <code>synchronize!</code>.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>synchronize!<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Since we now know that the new data is in the <code>gpu-result</code> array, we will have to
+move it back to the host if we wont to see it.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>pointer-seq <span style="color: #7388d6;">(</span>memcpy-host! gpu-result <span style="color: #909183;">(</span>float-pointer 3<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojure">=&gt; <span style="color: #707183;">(</span>3.0 5.0 7.0<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+
+<p>
+Yeah, I know, a dozen lines of code for a simple addition of two vectors.
+But hear me out: the management code for more demanding kernels is not much
+more complicated. So, it's a dozen lines for this simple case, but it will
+be a dozen lines for some real crunching. Or 23 lines, but not 2000 lines.
+</p>
+
+<p>
+Plus, there are so many functions <i>in the libraries</i> for computing vectors,
+matrices, and tensors, that you'll write your own kernels only occasionally,
+and you'll still get great speed, once you learn the basics.
+</p>
+
+<p>
+So, invest some time in 2026, learn the basics of GPU computing,
+and enjoy the coming AI age! In Clojure!
+</p>
+
+<p>
+Oh, I didn't show you the C++ kernel code. It's C++, it must be scary!
+No, it's not. CUDA kernels are written in a subset of C++, without the
+scary parts!
+</p>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span style="color: #A52A2A; font-weight: bold;">extern</span> <span style="color: #4E9A06;">"C"</span>
+__global__ <span style="color: #2F8B58; font-weight: bold;">void</span> <span style="color: #00578E; font-weight: bold;">add</span>(<span style="color: #2F8B58; font-weight: bold;">int</span> <span style="color: #0084C8; font-weight: bold;">n</span>, <span style="color: #2F8B58; font-weight: bold;">float</span> *<span style="color: #0084C8; font-weight: bold;">a</span>, <span style="color: #2F8B58; font-weight: bold;">float</span> *<span style="color: #0084C8; font-weight: bold;">b</span>, <span style="color: #2F8B58; font-weight: bold;">float</span> *<span style="color: #0084C8; font-weight: bold;">sum</span>) {
+    <span style="color: #2F8B58; font-weight: bold;">int</span> <span style="color: #0084C8; font-weight: bold;">i</span> = blockIdx.x * blockDim.x + threadIdx.x;
+    <span style="color: #A52A2A; font-weight: bold;">if</span> (i &lt; n) {
+        sum[i] = a[i] + b[i];
+    }
+};
+</pre>
+</div>
+
+<p>
+&#x2026; and, hey, we shouldn't forget to clean up the memory! Since if we didn't use
+<code>def</code>, we could just rely on <code>with-release</code> to do this for us, but we did everything
+manually, and now we have to clean up manually.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>release gpu-result<span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>release gpu-b<span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>release gpu-a<span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>release add<span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>release m<span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>release prog<span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>release ctx<span style="color: #707183;">)</span>
+</pre>
+</div>
+</div>
+</div>
