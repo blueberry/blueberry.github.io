@@ -1,0 +1,191 @@
+---
+date: 2025-11-09 18:49
+author: dragan
+layout: post
+title: Not One, Not Two, Not Even Three, but Four Ways to Run an ONNX AI Model on GPU with CUDA
+categories: 
+- Clojure,
+- AI,
+- Deep
+- Diamond,
+- Tensors
+tags: 
+excerpt: I show you not one, not two, not three, but four ways to run ONNX model on the GPU with Diamond ONNX RT. And the best of all, it's Clojure-level simple, while being easy at the same time!
+---
+<p>
+Two weeks ago, <a href="./Clojure-Runs-ONNX-AI-Models-Now">I announced a new Clojure ML library, Diamond ONNX RT</a>, which integrates ONNX Runtime into Deep Diamond.
+In that post, we explored the classic Hello World example of Neural Networks, MNIST handwritten image recognition, step-by-step.
+We run that example on the CPU, from main memory. The next logical step is to execute this stuff on the GPU.
+</p>
+
+<p>
+You'll see that with a little help of <a href="https://github.com/uncomplicate/clojurecuda">ClojureCUDA</a><iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=clojurecuda&amp;type=watch" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe> and <a href="https://github.com/uncomplicate/clojurecl">Deep Diamond</a><iframe class="github-btn" src="https://ghbtns.com/github-btn.html?user=uncomplicate&amp;repo=deep-diamond&amp;type=watch" width="100" height="20" title="Star on GitHub" frameBorder="0"></iframe>
+built-in CUDA machinery, this is both easy and simple, requiring almost no effort from
+a curious Clojure programmer. But don't just trust me; let's fire up your REPL, and we can continue together.
+</p>
+
+<p>
+Here's how you can evaluate this directly in your REPL (you can use the Hello World that is provided in the <a href="https://github.com/uncomplicate/diamond-onnxrt/tree/main/examples/hello-world"><code>./examples</code></a>
+sub-folder of Diamond ONNX RT as a springboard).
+</p>
+<div id="outline-container-org7278bfb" class="outline-2">
+<h2 id="org7278bfb">Require Diamond's namespaces</h2>
+<div class="outline-text-2" id="text-org7278bfb">
+<p>
+First things first, we refer functions that we're going to use.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>require '<span style="color: #7388d6;">[</span>uncomplicate.commons.core <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>with-release<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>uncomplicate.neanderthal.core <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>transfer! iamax native<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>uncomplicate.diamond
+           <span style="color: #909183;">[</span>tensor <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>tensor with-diamond<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>dnn <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>network<span style="color: #709870;">]</span><span style="color: #909183;">]</span>
+           <span style="color: #909183;">[</span>onnxrt <span style="color: #F5666D;">:refer</span> <span style="color: #709870;">[</span>onnx<span style="color: #709870;">]</span><span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>uncomplicate.diamond.internal.dnnl.factory <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>dnnl-factory<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>uncomplicate.diamond.internal.cudnn.factory <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>cudnn-factory<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span>
+         '<span style="color: #7388d6;">[</span>hello-world.native <span style="color: #F5666D;">:refer</span> <span style="color: #909183;">[</span>input-desc input-tz mnist-onnx<span style="color: #909183;">]</span><span style="color: #7388d6;">]</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+None of the following ways to run CUDA models has preference, you use the one that best suits your needs.
+</p>
+</div>
+</div>
+<div id="outline-container-orge34c8e7" class="outline-2">
+<h2 id="orge34c8e7">Way one</h2>
+<div class="outline-text-2" id="text-orge34c8e7">
+<p>
+One of the ways to run ONNX models on your GPU is to simply use Deep Diamond's cuDNN factory
+as the backend for your tensors. Then, the machinery recognizes what you need and proceeds
+doing everything on the GPU, using the right stream for tensors, Deep Diamond operations,
+and ONNX Runtime operations. This looks exactly the same as any other Deep Diamond example
+from this blog or the DLFP book.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>with-diamond cudnn-factory <span style="color: #7388d6;">[]</span>
+  <span style="color: #7388d6;">(</span>with-release <span style="color: #909183;">[</span>cuda-input-tz <span style="color: #709870;">(</span>tensor input-desc<span style="color: #709870;">)</span>
+                 mnist <span style="color: #709870;">(</span>network cuda-input-tz <span style="color: #907373;">[</span>mnist-onnx<span style="color: #907373;">]</span><span style="color: #709870;">)</span>
+                 classify! <span style="color: #709870;">(</span>mnist cuda-input-tz<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>transfer! input-tz cuda-input-tz<span style="color: #909183;">)</span>
+    <span style="color: #909183;">(</span>iamax <span style="color: #709870;">(</span>native <span style="color: #907373;">(</span>classify!<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+7
+</pre>
+
+
+<p>
+..it says.
+</p>
+</div>
+</div>
+<div id="outline-container-org45bbc19" class="outline-2">
+<h2 id="org45bbc19">Way two</h2>
+<div class="outline-text-2" id="text-org45bbc19">
+<p>
+As an ONNX model usually defines the whole network, you don't need to use Deep Diamond's
+network as a wrapper. The <code>onnx</code> function can create a Deep Diamond blueprint,
+and Deep Diamond blueprints can be used as standalone layer creators. Just like
+in the following code snippet.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>with-diamond cudnn-factory <span style="color: #7388d6;">[]</span>
+  <span style="color: #7388d6;">(</span>with-release <span style="color: #909183;">[</span>cuda-input-tz <span style="color: #709870;">(</span>tensor input-desc<span style="color: #709870;">)</span>
+                 mnist-bp <span style="color: #709870;">(</span>onnx cuda-input-tz <span style="color: #4E9A06;">"../../data/mnist-12.onnx"</span> <span style="color: #F5666D;">nil</span><span style="color: #709870;">)</span>
+                 infer-number! <span style="color: #709870;">(</span>mnist-bp cuda-input-tz<span style="color: #709870;">)</span><span style="color: #909183;">]</span>
+    <span style="color: #909183;">(</span>transfer! input-tz cuda-input-tz<span style="color: #909183;">)</span>
+    <span style="color: #909183;">(</span>iamax <span style="color: #709870;">(</span>native <span style="color: #907373;">(</span>infer-number!<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+7
+</pre>
+
+
+<p>
+&#x2026; again.
+</p>
+</div>
+</div>
+<div id="outline-container-orga90330f" class="outline-2">
+<h2 id="orga90330f">Way three</h2>
+<div class="outline-text-2" id="text-orga90330f">
+<p>
+We can even mix CUDA and CPU. Let's say your input and output tensors are in the main
+memory, and you'd like to process them on the CPU, but you want to take advantage
+of the GPU for the model processing itself. Nothing is easier, if you use Deep Diamond.
+Just specify an <code>:ep</code> (execution provider) in the <code>onnx</code> function configuration, and tell it that
+you'd like to use only CUDA. Now your network is executed on the GPU, while your
+input and output tensors are in the main memory, and can be easily accessed.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>with-release <span style="color: #7388d6;">[</span>mnist <span style="color: #909183;">(</span>network input-tz <span style="color: #709870;">[</span><span style="color: #907373;">(</span>onnx <span style="color: #4E9A06;">"../../data/mnist-12.onnx"</span> <span style="color: #6276ba;">{</span><span style="color: #F5666D;">:ep</span> <span style="color: #858580;">[</span><span style="color: #F5666D;">:cuda</span><span style="color: #858580;">]</span><span style="color: #6276ba;">}</span><span style="color: #907373;">)</span><span style="color: #709870;">]</span><span style="color: #909183;">)</span>
+               infer-number! <span style="color: #909183;">(</span>mnist input-tz<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+        <span style="color: #7388d6;">(</span>iamax <span style="color: #909183;">(</span>infer-number!<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+7
+</pre>
+
+
+<p>
+&#x2026; and again the same answer.
+</p>
+</div>
+</div>
+<div id="outline-container-org21da661" class="outline-2">
+<h2 id="org21da661">Way four</h2>
+<div class="outline-text-2" id="text-org21da661">
+<p>
+Still need more options? No problem, <code>onnx</code> can create a standalone blueprint, and that blueprint
+recognizes the <code>:ep</code> configuration too.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>with-release <span style="color: #7388d6;">[</span>mnist-bp <span style="color: #909183;">(</span>onnx input-tz <span style="color: #4E9A06;">"../../data/mnist-12.onnx"</span> <span style="color: #709870;">{</span><span style="color: #F5666D;">:ep</span> <span style="color: #907373;">[</span><span style="color: #F5666D;">:cuda</span><span style="color: #907373;">]</span><span style="color: #709870;">}</span><span style="color: #909183;">)</span>
+               infer-number! <span style="color: #909183;">(</span>mnist-bp input-tz<span style="color: #909183;">)</span><span style="color: #7388d6;">]</span>
+        <span style="color: #7388d6;">(</span>iamax <span style="color: #909183;">(</span>infer-number!<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<pre class="example">
+7
+</pre>
+
+
+<p>
+No surprises here.
+</p>
+</div>
+</div>
+<div id="outline-container-org6e7e7e4" class="outline-2">
+<h2 id="org6e7e7e4">Is there anything easier?</h2>
+<div class="outline-text-2" id="text-org6e7e7e4">
+<p>
+If you've seen code in any programming language that does this in a simpler and easier
+way, please let me know, so we can try to make Clojure even better in the age of AI!
+</p>
+</div>
+</div>
+<div id="outline-container-org8562baa" class="outline-2">
+<h2 id="org8562baa">The books</h2>
+<div class="outline-text-2" id="text-org8562baa">
+<p>
+Should I mention that the book <a href="https://aiprobook.com/deep-learning-for-programmers/">Deep Learning for Programmers: An Interactive Tutorial with
+CUDA, OpenCL, DNNL, Java, and Clojure</a> teaches the nuts and bolts of neural networks and deep learning
+by showing you how Deep Diamond is built, <b>from scratch</b>? In interactive sessions. Each line of code
+can be executed and the results inspected in the plain Clojure REPL. The best way to master something is to build
+it yourself!
+</p>
+</div>
+</div>
