@@ -1,0 +1,186 @@
+---
+date: 2025-11-29 01:41
+author: dragan
+layout: post
+title: Plan for Clojure AI, ML, and high-performance Uncomplicate ecosystem in 2026
+categories: 
+- Clojure,
+- AI,
+- Matrices,
+- Neanderthal,
+- Vectors,
+- Linear
+- Algebra,
+- Apple
+tags: 
+excerpt: I've applied for Clojurists Together funding to continuously develop Clojure AI, ML, and high-performance ecosystem of Uncomplicate libraries (Neanderhal and many more), on Nvidia GPUs, Apple Silicon, and traditional PC. In this year, I will also focus on writing tutorals on my blog and creating websites for the projects involved, which is something that I wanted for years, but didn't have time to do because I spent all time on programming.
+---
+<p>
+I've applied for Clojurists Together yearly funding in 2026. Here's my application. If you are a Clojurists Together member,
+and would like to see continued development in this area, your vote can help me keep working on this :)
+</p>
+
+<p>
+My goal with this funding in 2026 is to continuously develop Clojure AI, ML, and high-performance
+ecosystem of Uncomplicate libraries (Neanderhal and many more), on Nvidia GPUs, Apple Silicon, and traditional PC.
+In this year, I will also focus on writing tutorals on my blog and creating websites for the projects involved,
+which is something that I wanted for years, but didn't have time to do because I spent all time on
+programming.
+</p>
+<div id="outline-container-orgcdb087b" class="outline-2">
+<h2 id="orgcdb087b">How that work will benefit the Clojure community</h2>
+<div class="outline-text-2" id="text-orgcdb087b">
+<p>
+This will highly benefit the Clojure community as this is THE AI ecosystem for Clojure,
+and supporting AI is arguably the main focus on probably all software platforms.
+Clojure has something to offer on that front, beyond just calling OpenAI API as a web service!
+</p>
+
+<p>
+Uncomplicate grew to quite a few libraries (of which some are quite big; just Neanderthal is 28,000 lines of
+highly-condensed, aggresively macroized, and reusable code): Diamond ONNX Runtime, Neanderthal, Deep Diamond,
+ClojureCUDA, ClojureCPP, Apple Presets, ClojureCL, Fluokitten, Bayadera, Clojure Sound, and Commons.
+</p>
+
+<p>
+Here's a word or two of how I hope to improve each of these libraries with Clojurists Together funding in 2026.
+</p>
+</div>
+<div id="outline-container-orge748947" class="outline-3">
+<h3 id="orge748947">Neanderthal (Clojure's alternative to NumPy, on steroids)</h3>
+<div class="outline-text-3" id="text-orge748947">
+<p>
+In 2025, Neanderthal celebrated its 10th birthday. It started as a humble but fast matrix and vector library
+for Clojure, but after 10 years of relentless improvements, now it boasts a general matrix/vector/linear algebra API
+implemented by no less than 5(!) engines for CPUs, GPU (Nvidia CUDA), GPU (OpenCL: AMD, Intel, Nvidia), Apple Silicon (Accelerate),
+and general CPU (OpenBLAS). And this is not a superficial support for the sake of ticking a checking; each of these
+engines support much more operations on exotic structures, and configuration options, than I've seen elsewhere.
+It has almost everything, but it doesn't (YET!) have a METAL-based engine for Apple GPUs. Let's work on that!
+</p>
+</div>
+</div>
+<div id="outline-container-org451c97f" class="outline-3">
+<h3 id="org451c97f">Deep Diamond (the Clojure Tensor and Deep Learning library, not quite unlike PyTorch, but of different philosophy)</h3>
+<div class="outline-text-3" id="text-org451c97f">
+<p>
+In 2019, I started Deep Diamond as a demo showcase for Neanderthal's capabilities as the foundation
+for high-performance number-crunching software. It quickly outgrew that, and became a general Tensor/Deep Learning
+API, implemented by several fast, native optimized, backends, that run on both CPUs and GPUs, across
+hardware platforms (x86<sub>64</sub>, GPUs, arm64, Apple Silicon, you name it) and operating systems (Linux, MasOS, Windows).
+Of course, it does not clash with Neanderthal, but complements it, in the best manner of highly focused
+Clojure libraries that do one job and do it well.
+</p>
+
+<p>
+Deep Diamond is quite capable, but it cries for a METAL-based engine for Apple GPUs, too.
+</p>
+</div>
+</div>
+<div id="outline-container-org3470569" class="outline-3">
+<h3 id="org3470569">Diamond ONNX Runtime (the Clojure library for executing AI models)</h3>
+<div class="outline-text-3" id="text-org3470569">
+<p>
+This is the latest gem in Uncomplicate's store, and I developed it thanks to Clojurists Together
+funding in Q3 2025. Similarly to how I started Deep Diamond mainly as a teaching showcase for Neanderthal,
+I started this to show Clojure programmers how close we, Clojurists, are to the latest and shiniest AI stuff
+that everyone's raving about. But of course, being close does not mean that we can close the gap
+to the multi-billion funded Python ecosystem in a few afternoons. It needs laser-focused development
+and knowing what to do, when, and where. Nevertheless, Clojure <b>is there</b>. Now we can run inference on the trained models
+from Hugging Face and other vibrant AI communities directly in Clojure's REPL. Does this make an effortless billion-dollar
+AI startup? NO. Does it bring Clojurians to the party? YES! And there's more to come.
+</p>
+
+<p>
+Not only that this library is new, but the whole wider ecosystem exploded in the last year
+with the wide availability of open-weights model that you can run at home. So, lots of functionality
+is added upstream all the time, and I hope to be able to stay current and have the best and newest stuff in Clojure..
+</p>
+</div>
+</div>
+<div id="outline-container-orgb9763c1" class="outline-3">
+<h3 id="orgb9763c1">ClojureCUDA (REPL-based low-level CUDA development)</h3>
+<div class="outline-text-3" id="text-orgb9763c1">
+<p>
+Not many Clojurians may prefer to work with GPU directly, or to write their own kernels. Neither do I.
+But, this library is one of the un-celebrated workhorses that enables me to implement whatever I want
+in Neanderthal, Deep Diamond, and Diamond ONNX Runtime, instead of just trying to wrap whatever there
+is in upstream C++ libraies. ClojureCUDA gives us the superpower of choice: wrap whatever works,
+but then implement the missing parts yourself!
+</p>
+
+<p>
+As CUDA is receiving a steady stream of changes and improvements, I'd like to improve and extend
+ClojureCUDA to always be in top shape! It is not as easy as it seems to the casual onlooker.
+</p>
+</div>
+</div>
+<div id="outline-container-org3444432" class="outline-3">
+<h3 id="org3444432">ClojureCPP (the gateway to native C++ libraries)</h3>
+<div class="outline-text-3" id="text-org3444432">
+<p>
+From 20,000 feet, integrating a native library to JVM and Clojure may look straightforward.
+Oh, how wrong they are. Virtually every C++ library is a special kind of jungle, with its
+own structures, patterns and inventions. What might seems a minor technical detail might
+require special acrobatics to support it on the JVM. Masking that mess under the hood
+so that a Clojurian do not need to care might be insanely brittle if it weren't for
+ClojureCPP! It is not as large as Neanderthal or Deep Diamond, but it is one of the reasons
+that enables these upper level libraries stay on the 25,000 or 3,000 lines of code mark,
+instead of being 500,000 or 50,000, as many of their counterparts in other languages.
+</p>
+</div>
+</div>
+<div id="outline-container-org5d60bff" class="outline-3">
+<h3 id="org5d60bff">Apple Presets (native JNI bindings for various Apple libraries)</h3>
+<div class="outline-text-3" id="text-org5d60bff">
+<p>
+Yup. To support Apple Silicon in Neanderthal and Deep Diamond I had to make these bindings,
+since there weren't any to "just" wrap. And to support more Apple high performance computing apis,
+I'll have to create additional bindings (for example, for METAL) and only then
+develop the Clojure part.
+</p>
+</div>
+</div>
+<div id="outline-container-orgfabadd5" class="outline-3">
+<h3 id="orgfabadd5">Fluokitten, Bayadera, ClojureCL, Commons, Clojure Sound, etc.</h3>
+<div class="outline-text-3" id="text-orgfabadd5">
+<p>
+These libraries will not be in focus in 2026., but will probably need some care and
+assorted improvements here and there.
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-org1a2368e" class="outline-2">
+<h2 id="org1a2368e">Summary:</h2>
+<div class="outline-text-2" id="text-org1a2368e">
+<p>
+In short, my focus with this funding with Clojurists Together will have two main branches:
+</p>
+<ol class="org-ol">
+<li>Development of new functionalities, supporting more hardware and platforms for existing functionality,
+and fixing issues for a dozen Uncomplicate libraries that already exist. This is what is described
+in the text you've just read.</li>
+<li>Develop an unified website for Uncomplicate and stuff it with useful information in one place.
+Currently, some libraries have websites that I wrote many years ago, while some rely
+on GitHub Clojure tests, in-code documentation, tutorials on dragan.rocks and my books.
+There are many resources, some of which are quite detailed (2 full books!), but people
+without experience (which is the majority of Clojure programmers) have a hard time using all these in organized way.
+I hope to solve this with the unified website!</li>
+</ol>
+</div>
+</div>
+<div id="outline-container-org5983ef7" class="outline-2">
+<h2 id="org5983ef7">Projects directly involved:</h2>
+<div class="outline-text-2" id="text-org5983ef7">
+<p>
+<a href="https://github.com/uncomplicate/diamond-onnxrt">https://github.com/uncomplicate/diamond-onnxrt</a>
+<a href="https://github.com/uncomplicate/neanderthal">https://github.com/uncomplicate/neanderthal</a>
+<a href="https://github.com/uncomplicate/deep-diamond">https://github.com/uncomplicate/deep-diamond</a>
+<a href="https://github.com/uncomplicate/clojurecuda">https://github.com/uncomplicate/clojurecuda</a>
+<a href="https://github.com/uncomplicate/clojure-cpp">https://github.com/uncomplicate/clojure-cpp</a>
+<a href="https://github.com/uncomplicate/clojurecl">https://github.com/uncomplicate/clojurecl</a>
+<a href="https://github.com/uncomplicate/apple-presets">https://github.com/uncomplicate/apple-presets</a>
+<a href="https://github.com/uncomplicate/fluokitten">https://github.com/uncomplicate/fluokitten</a>
+</p>
+</div>
+</div>
