@@ -1,0 +1,129 @@
+---
+date: 2025-12-09 23:35
+author: dragan
+layout: post
+title: Gemma 3 AI model in Clojure
+categories: 
+- Clojure,
+- AI,
+- Deep
+- Diamond,
+- Gemma
+- 3
+tags: 
+excerpt: Can we now load and run the inference on the real deal models, such as the open LLMs from the Hugging Face, for example? Let's see with Gemma 3!
+---
+<p>
+Recently I've been working on the ONNX runtime integration into Deep Diamond, backed by the grant sponsored by the <a href="https://www.clojuriststogether.org/news/clojurists-together-2025-long-term-funding-announcement/">Clojurists Together</a> Foundation.
+In the past few articles, we've seen how ONNX models are integrated into Deep Diamond, using only a single
+function <code>onnx</code>, with almost no need for additional configuration (which is available).
+I used a simple MNIST model in the demonstration. But, can we now load and run the inference on
+the real deal models, such as the open LLMs from the Hugging Face, for example? Let's see!
+</p>
+
+<p>
+The Hugging Face model card has this to say about Gemma 3: "Gemma is a family of lightweight, state-of-the-art open models from Google, built from the same research and technology used to create the Gemini models." (etc., etc.)
+So, it seems to be something worth trying.
+</p>
+
+<p>
+I'll try to be brief, and skip the unnecessary talk. Let's just show the code,
+which I've just lifted up and adapted from the Diamond's midje tests.
+</p>
+
+<p>
+What we need for this? First, decide on the backend engine; this time we'll use tensors in main memory
+backed up by the oneDNN engine (DNNL).
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">fact</span> <span style="color: #7388d6;">(</span>dnnl-factory<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">neand-fact</span> <span style="color: #7388d6;">(</span>neanderthal-factory fact<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Next, load and configure a particular flavor of Gemma 3 (a smaller one, only 1 billion parameters).
+The <code>onnx</code> function creates a generalized blueprint, which can create the actual functions when
+evaluated with the specific input tensors.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">onnx-bp</span> <span style="color: #7388d6;">(</span>onnx fact <span style="color: #4E9A06;">"data/gemma-3-1b-it-ONNX-GQA/onnx/model.onnx"</span>
+                   <span style="color: #909183;">{</span><span style="color: #F5666D;">:options</span> <span style="color: #709870;">(</span><span style="color: #A52A2A; font-weight: bold;">-&gt;</span> <span style="color: #907373;">(</span>options<span style="color: #907373;">)</span>
+                           <span style="color: #907373;">(</span>override-dimension! <span style="color: #4E9A06;">"batch_size"</span> 1<span style="color: #907373;">)</span>
+                           <span style="color: #907373;">(</span>override-dimension! <span style="color: #4E9A06;">"sequence_length"</span> 1<span style="color: #907373;">)</span>
+                           <span style="color: #907373;">(</span>override-dimension! <span style="color: #4E9A06;">"past_sequence_length"</span> 1<span style="color: #907373;">)</span>
+                           <span style="color: #907373;">(</span>override-dimension! <span style="color: #4E9A06;">"total_sequence_length"</span> 1<span style="color: #907373;">)</span><span style="color: #709870;">)</span><span style="color: #909183;">}</span><span style="color: #7388d6;">)</span>
+</pre>
+</div>
+
+<p>
+Gemma 3 has 63 inputs and 61 outputs. We'll need to provide these, but even here we can automate some parts
+with Clojure, since past-key values are pretty uniform. We only need to provide inputs, while the engine
+can create the outputs for us.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">src-tz</span> <span style="color: #7388d6;">(</span>tensor fact <span style="color: #909183;">[</span>1 1 28 28<span style="color: #909183;">]</span> <span style="color: #F5666D;">:float</span> <span style="color: #F5666D;">:nchw</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">input-ids</span> <span style="color: #7388d6;">(</span>tensor neand-fact <span style="color: #909183;">[</span>1 1<span style="color: #909183;">]</span> <span style="color: #F5666D;">:long</span> <span style="color: #F5666D;">:nc</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">position-ids</span> <span style="color: #7388d6;">(</span>tensor neand-fact <span style="color: #909183;">[</span>1 1<span style="color: #909183;">]</span> <span style="color: #F5666D;">:long</span> <span style="color: #F5666D;">:nc</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">attention-mask</span> <span style="color: #7388d6;">(</span>tensor neand-fact <span style="color: #909183;">[</span>1 1<span style="color: #909183;">]</span> <span style="color: #F5666D;">:long</span> <span style="color: #F5666D;">:nc</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">past-key-values</span> <span style="color: #7388d6;">(</span>repeatedly 60 #<span style="color: #909183;">(</span>tensor fact <span style="color: #709870;">[</span>1 3 1 64<span style="color: #709870;">]</span> <span style="color: #F5666D;">:float</span> <span style="color: #F5666D;">:nchw</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Next, create the executable instance model. Nothing too fancy here.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">def</span> <span style="color: #0084C8; font-weight: bold;">gemma-next!</span> <span style="color: #7388d6;">(</span>onnx-bp <span style="color: #909183;">(</span>into <span style="color: #709870;">[</span>input-ids attention-mask position-ids<span style="color: #709870;">]</span> past-key-values<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Now, these inputs need to be initialized. Normally, that would be done inside an LLM generation loop, but
+here we only demonstrate one step, and we transfer some mock data.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>transfer! <span style="color: #7388d6;">[</span>2<span style="color: #7388d6;">]</span> input-ids<span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>transfer! <span style="color: #7388d6;">[</span>0<span style="color: #7388d6;">]</span> position-ids<span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span>transfer! <span style="color: #7388d6;">[</span>1<span style="color: #7388d6;">]</span> attention-mask<span style="color: #707183;">)</span>
+<span style="color: #707183;">(</span><span style="color: #A52A2A; font-weight: bold;">doseq</span> <span style="color: #7388d6;">[</span>pkv past-key-values<span style="color: #7388d6;">]</span>
+  <span style="color: #7388d6;">(</span>transfer! <span style="color: #909183;">(</span>repeat 0<span style="color: #909183;">)</span> pkv<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Aaaaand, we actually run the model by calling our gemma function, which provides the next token.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure"><span style="color: #707183;">(</span>gemma-next!<span style="color: #707183;">)</span>
+</pre>
+</div>
+
+<p>
+Now, hold on with the celebration. This does not actually return a full answer from the LLM.
+This only returns the next token, but in the form of large tensor full of numbers. The information
+is there, but needs to be extracted from these numbers to the form of string. Also, this is only one step;
+a LLM would typically run this in a loop and spew tokens after tokens. There's some more work to do
+until we get a ready made, hands-off chatty LLM. But the main work has been done, and now it's the matter
+of setting it up properly, tokenizing the inputs, and calling it in a useful way! Still lots of work,
+but not the hardest parts :)
+</p>
+
+<p>
+I've applied for Clojurists Together yearly funding in 2026. If you are a Clojurists Together member,
+and would like to see continued development in this area, <a href="https://www.clojuriststogether.org/news/vote-on-2026-annual-funding/">your vote can help me keep working on this</a> :)
+</p>
+
+<p>
+My goal with this funding in 2026 is to continuously develop Clojure AI, ML, and high-performance
+ecosystem of Uncomplicate libraries (Neanderhal and many more), on Nvidia GPUs, Apple Silicon, and traditional PC.
+In this year, I will also focus on writing tutorals on my blog and creating websites for the projects involved,
+which is something that I wanted for years, but didn't have time to do because I spent all time on
+programming.
+</p>
