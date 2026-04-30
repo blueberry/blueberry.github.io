@@ -3,7 +3,7 @@ layout: full-width
 title: Dragan Duric
 ---
 
-My name is Dragan Duric. Here's a few words about me and what you can expect to find on this blog. If you think that your company might need my skills, I do develop specialized software for money; please contact me and we can chat about this (you can email me at dragandj@gmail.com or find me online at Clojure communities).
+My name is Dragan Duric. Here's a few words about me and what you can expect to find on this blog. If you think that your company might need my skills, I do develop specialized software for money; please contact me and we can chat about this (you can email me at <a href="mailto:dragandj@gmail.com" class="email-link">dragandj AT gmail [dot] com</a> or find me online at Clojure communities).
 
 When I'm not running, working out, dancing, reading, and pleasantly wasting time, I'm working on software, mainly [Uncomplicate Clojure libraries](http://uncomplicate.org). What time is left, I spend it as [a professor of software engineering](https://en.fon.bg.ac.rs/nastavnici/dragan-djuric/) at [University of Belgrade](https://en.fon.bg.ac.rs/nastavnici/dragan-djuric/). I am a member of [Good Old AI Network](http://goodoldai.org), a group of researchers that share a similar passion for intelligent systems.
 
