@@ -20,6 +20,9 @@ This blog is a place where I'll write about my journey of trying (and eventually
 
 ## My profiles
 
+![Dragan Duric]({{ site.baseurl }}/assets/img/dragan-djuric.jpg)
+
+
 - [Google Scholar](https://scholar.google.com/citations?user=bDd0r1gAAAAJ)
 - [Good Old AI](http://goodoldai.org/dragan_djuric)
 - [University of Belgrade](https://en.fon.bg.ac.rs/nastavnici/dragan-djuric/)
