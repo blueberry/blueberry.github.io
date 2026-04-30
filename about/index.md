@@ -5,7 +5,7 @@ title: Dragan Djuric
 
 My name is Dragan Duric. Here's a few words about me and what you can expect to find on this blog. If you think that your company might need my skills, I do develop specialized software for money; please contact me and we can chat about this (you can email me at dragandj@gmail.com or find me online at Clojure communities).
 
-When I'm not running, working out, dancing, reading, and pleasantly wasting time, I'm working on software, mainly [Uncomplicate Clojure libraries](http://uncomplicate.org). What time is left, I spend it as [a professor of software engineering](http://www.fon.bg.ac.rs/eng/about-fos/academic-staff/dragan-djuric/) at [University of Belgrade](http://bg.ac.rs/en/index.php). I am a member of [Good Old AI Network](http://goodoldai.org), a group of researchers that share a similar passion for intelligent systems.
+When I'm not running, working out, dancing, reading, and pleasantly wasting time, I'm working on software, mainly [Uncomplicate Clojure libraries](http://uncomplicate.org). What time is left, I spend it as [a professor of software engineering](http://www.fon.bg.ac.rs/eng/about-fos/academic-staff/dragan-djuric/) at [University of Belgrade](https://en.fon.bg.ac.rs/nastavnici/dragan-djuric/). I am a member of [Good Old AI Network](http://goodoldai.org), a group of researchers that share a similar passion for intelligent systems.
 
 I live in [Belgrade](https://en.wikipedia.org/wiki/Belgrade), [Serbia](https://en.wikipedia.org/wiki/Serbia); if you are curious, it's in the southern part of Europe, just across the Adriatic Sea from Italy, to the North-East.
 
@@ -22,7 +22,7 @@ This blog is a place where I'll write about my journey of trying (and eventually
 
 - [Google Scholar](https://scholar.google.com/citations?user=bDd0r1gAAAAJ)
 - [Good Old AI](http://goodoldai.org/dragan_djuric)
-- [University of Belgrade](http://www.fon.bg.ac.rs/eng/about-fos/academic-staff/dragan-djuric/)
+- [University of Belgrade](https://en.fon.bg.ac.rs/nastavnici/dragan-djuric/)
 - [GitHub](http://github.com/blueberry)
 - [Most of my code on GitHub is part of Uncomplicate](http://github.com/uncomplicate)
 - [Uncomplicate.org](http://uncomplicate.org)
