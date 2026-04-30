@@ -1,6 +1,6 @@
 ---
 layout: full-width
-title: Dragan Djuric
+title: Dragan Duric
 ---
 
 My name is Dragan Duric. Here's a few words about me and what you can expect to find on this blog. If you think that your company might need my skills, I do develop specialized software for money; please contact me and we can chat about this (you can email me at dragandj@gmail.com or find me online at Clojure communities).
