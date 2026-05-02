@@ -3,7 +3,7 @@ layout: full-width
 title: Dragan Duric software consulting
 ---
 
-My name is Dragan Duric. If you think that your company might need my skills, I do develop specialized commercial software; please contact me and we can chat about this (you can email me at <a href="mailto:dragandj@gmail.com" class="email-link">dragandj@gmail.com</a> or find me online at Clojure communities).
+My name is Dragan Duric. If you think that your company might need my skills, I do develop specialized commercial software; please contact me and we can chat about this (you can email me at <a href="mailto:dragandj@gmail.com" class="email-link">dragandj AT gmail</a> or find me online at Clojure communities).
 
 I'm working on open source software, mainly [Uncomplicate Clojure libraries](http://uncomplicate.org), and teach [software engineering](https://en.fon.bg.ac.rs/nastavnici/dragan-djuric/) at [University of Belgrade](https://en.fon.bg.ac.rs/nastavnici/dragan-djuric/). I am a member of [Good Old AI Network](http://goodoldai.org), a group of researchers that share a similar passion for intelligent systems.
 
